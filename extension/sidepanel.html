@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>docviz</title>
+  <link rel="stylesheet" href="ui.css">
+  <style>
+    body { padding: 14px; background: var(--bg-soft); }
+    header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    header h1 { font-size: 16px; margin: 0; flex: 1; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-soft); }
+    .dot.on { background: #2f9e6e; } .dot.off { background: var(--danger); }
+    .panel { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+    .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--fg-soft); margin: 0 0 8px; }
+    #go { width: 100%; padding: 8px; font-weight: 600; }
+    #progress { margin: 8px 0 0; display: flex; align-items: center; gap: 8px; }
+    #progress:empty { display: none; }
+    ul { list-style: none; margin: 0; padding: 0; }
+    li { display: flex; gap: 8px; align-items: center; padding: 7px 6px; border-radius: 8px; cursor: pointer; }
+    li:hover { background: var(--bg-soft); }
+    li .t { flex: 1; min-width: 0; }
+    li .t b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    li .t small { color: var(--fg-soft); }
+    .pref { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: 8px; margin: 6px 0; }
+    .pref:has(input) { grid-template-columns: auto 1fr; }
+    .note { background: var(--accent-soft); border-radius: 8px; padding: 6px 10px; margin-top: 8px; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+    .offline { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="dot" id="dot"></span>
+    <h1>docviz</h1>
+    <a href="options.html" target="_blank">Settings</a>
+  </header>
+
+  <div class="panel">
+    <button class="primary" id="go">Break down this page</button>
+    <div id="progress"></div>
+    <p class="offline" id="offline" hidden></p>
+  </div>
+
+  <div class="panel">
+    <h2>On this page</h2>
+    <ul id="cards"></ul>
+    <p class="muted" id="empty">No cards yet. Break down the page, or select text and press <code>Alt+Shift+V</code>.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Your preferences</h2>
+    <div id="prefs"></div>
+    <div class="note" id="change" hidden></div>
+  </div>
+
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>

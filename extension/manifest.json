@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "docviz",
+  "version": "0.1.0",
+  "description": "See how documented code behaves: inline diagrams and interactive simulations, powered by your Claude Code or Codex login.",
+  "minimum_chrome_version": "116",
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": {
+    "default_title": "docviz: break down this page",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png" }
+  },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["activeTab", "scripting", "contextMenus", "storage", "sidePanel"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "optional_host_permissions": ["<all_urls>"],
+  "commands": {
+    "breakdown": {
+      "suggested_key": { "default": "Alt+Shift+D" },
+      "description": "Break down this page"
+    },
+    "visualize-selection": {
+      "suggested_key": { "default": "Alt+Shift+V" },
+      "description": "Visualize the selected text"
+    }
+  },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "options_page": "options.html",
+  "sandbox": { "pages": ["sandbox.html"] },
+  "content_security_policy": {
+    "sandbox": "sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:"
+  },
+  "web_accessible_resources": [
+    { "resources": ["card.html", "sandbox.html", "sandbox.js"], "matches": ["<all_urls>"] }
+  ]
+}

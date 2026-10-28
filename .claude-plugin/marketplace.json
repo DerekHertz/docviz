@@ -1,0 +1,16 @@
+{
+  "name": "docviz",
+  "owner": {
+    "name": "Derek Hertzell"
+  },
+  "metadata": {
+    "description": "docviz: diagrams and simulations for any docs page, powered by your Claude Code login."
+  },
+  "plugins": [
+    {
+      "name": "docviz",
+      "source": "./",
+      "description": "Starts the docviz helper for the docviz Chrome extension."
+    }
+  ]
+}

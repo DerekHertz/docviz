@@ -1,0 +1,8 @@
+{
+  "name": "docviz",
+  "version": "0.1.0",
+  "description": "Starts the docviz helper so the docviz Chrome extension can turn docs into diagrams and simulations with your Claude Code login.",
+  "author": { "name": "Derek Hertzell" },
+  "license": "MIT",
+  "keywords": ["docs", "diagrams", "visualization", "chrome-extension"]
+}

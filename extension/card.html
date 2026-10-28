@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>docviz card</title>
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="card.css">
+</head>
+<body>
+  <article class="card" id="card">
+    <header>
+      <span class="pill" id="kind"></span>
+      <h1 id="title"></h1>
+      <button class="ghost icon" id="dismiss" title="Dismiss" aria-label="Dismiss">✕</button>
+    </header>
+    <div class="note" id="note" hidden></div>
+    <div class="error" id="error" hidden></div>
+    <div class="body" id="body"></div>
+    <p class="caption" id="caption"></p>
+    <section class="meta" id="meta" hidden></section>
+    <footer id="actions">
+      <button data-direction="simpler">Simpler</button>
+      <button data-direction="more">More detail</button>
+      <select id="kind-select" aria-label="Diagram type">
+        <option value="">Type…</option>
+      </select>
+      <span class="grow"></span>
+      <button id="toggle-view" class="primary">Explore ▸</button>
+    </footer>
+  </article>
+  <script src="vendor/mermaid.min.js"></script>
+  <script type="module" src="card.js"></script>
+</body>
+</html>

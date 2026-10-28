@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>docviz settings</title>
+  <link rel="stylesheet" href="ui.css">
+  <style>
+    body { background: var(--bg-soft); padding: 32px 16px; }
+    main { max-width: 640px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .lede { margin: 0 0 20px; }
+    section { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px; }
+    h2 { font-size: 15px; margin: 0 0 10px; display: flex; gap: 8px; align-items: center; }
+    h2 .n { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; display: inline-grid; place-items: center; }
+    pre { background: var(--bg-soft); padding: 10px 12px; border-radius: 8px; margin: 8px 0; font: 13px ui-monospace, Menlo, Consolas, monospace; }
+    .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+    .row label { min-width: 110px; }
+    input[type=text] { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 10px; flex: 1; min-width: 200px; }
+    #code { font: 600 16px ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; max-width: 180px; }
+    .pref { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 8px; margin: 8px 0; }
+    .pref:has(input) { grid-template-columns: auto 1fr; }
+    #status.ok { color: #2f9e6e; } #status.bad { color: var(--danger); }
+    details summary { cursor: pointer; color: var(--fg-soft); }
+    .done { text-align: right; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>docviz</h1>
+  <p class="lede muted">See how documented code behaves — diagrams inline on any page, simulations on demand. Runs on your own Claude Code or Codex login.</p>
+
+  <section>
+    <h2><span class="n">1</span>Start the helper</h2>
+    <p>In a terminal where <code>claude</code> or <code>codex</code> is logged in (WSL works):</p>
+    <pre>docviz serve</pre>
+    <p class="muted">Or run <code>/docviz</code> inside Claude Code with the docviz plugin installed. It prints a pairing code.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Pair</h2>
+    <div class="row">
+      <label for="code">Pairing code</label>
+      <input type="text" id="code" placeholder="ABCD-EFGH" autocomplete="off" spellcheck="false">
+      <button id="test">Connect</button>
+      <span id="status"></span>
+    </div>
+    <details>
+      <summary>Advanced</summary>
+      <div class="row"><label for="url">Helper URL</label><input type="text" id="url"></div>
+      <div class="row">
+        <label for="provider">Use</label>
+        <select id="provider">
+          <option value="auto">Auto (Claude if installed, else Codex)</option>
+          <option value="claude">Claude Code</option>
+          <option value="codex">Codex</option>
+        </select>
+      </div>
+      <div class="row"><label for="model">Model</label><input type="text" id="model" placeholder="CLI default (e.g. sonnet, opus, gpt-5)"></div>
+    </details>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>How should visuals explain things to you?</h2>
+    <div id="prefs"></div>
+    <p class="muted">Real identifiers always appear, whatever you pick. “Simpler” and “More detail” on a card nudge your depth — you’ll see it happen, with undo.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Triggers</h2>
+    <p><b>Break down a page:</b> toolbar icon or <code>Alt+Shift+D</code>. <b>Visualize a selection:</b> right-click or <code>Alt+Shift+V</code>.</p>
+    <label class="pref"><input type="checkbox" id="chip"><span>Show a “Visualize” chip whenever I highlight text <span class="muted">(asks for access to all sites)</span></span></label>
+  </section>
+
+  <p class="done"><button class="primary" id="finish">Done</button></p>
+</main>
+<script type="module" src="options.js"></script>
+</body>
+</html>
