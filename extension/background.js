@@ -3,7 +3,8 @@
 // Card records live in chrome.storage.session under `card:<key>`; per-tab
 // state (progress + card keys) under `tab:<tabId>`. Cards and the side panel
 // read them and listen for `card:updated` / `tab:updated` broadcasts.
-import { getSettings, setSettings, DEPTHS, rollSpend, spendToday, money } from './settings.js';
+import { getSettings, setSettings, DEPTHS, money } from './settings.js';
+import { sha, addCost, budgetRefusal, pictureCacheKey, createLedger } from './ledger.js';
 
 const BATCH_SECTIONS = 5;
 const BATCH_CHARS = 14_000;
@@ -59,9 +60,8 @@ function release() {
 
 async function callHelper(route, body) {
   const s = await getSettings();
-  if (s.budget > 0 && spendToday(s.spend) >= s.budget) {
-    throw new Error(`Today’s ${money(s.budget)} docviz budget is used up (${money(spendToday(s.spend))}). Raise it in settings to keep going.`);
-  }
+  const refusal = budgetRefusal(s);
+  if (refusal) throw new Error(refusal);
   hold();
   try {
     let res;
@@ -79,8 +79,9 @@ async function callHelper(route, body) {
     chrome.action.setBadgeText({ text: '' });
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) throw new Error('Pairing code rejected — paste the code `docviz` printed into docviz settings.');
-    if (!res.ok) throw new Error(data.error || `Helper error ${res.status}`);
     await record(data.usage);
+    // A call that failed after the CLI spent still carries its usage, so callers can charge the card.
+    if (!res.ok) throw Object.assign(new Error(data.error || `Helper error ${res.status}`), { usage: data.usage });
     return { result: data.result, usage: data.usage };
   } finally {
     release();
@@ -88,28 +89,19 @@ async function callHelper(route, body) {
 }
 
 // Every call is charged to the ledger as it returns — nothing is spent silently.
-let ledger = Promise.resolve();
-function record(usage) {
-  if (!usage) return ledger;
-  ledger = ledger.then(async () => {
-    const { spend } = await chrome.storage.local.get('spend');
-    await setSettings({ spend: rollSpend(spend, usage.usd) });
+const ledger = createLedger({
+  load: async () => (await chrome.storage.local.get('spend')).spend,
+  save: async (spend) => {
+    await setSettings({ spend });
     broadcast({ type: 'spend:updated' });
-  });
-  return ledger;
-}
+  },
+});
+const record = (usage) => ledger.record(usage).catch((e) => console.warn('docviz: ledger write failed', e));
 
-// A card's cost is the sum of every call made for it; a breakdown batch is
-// split evenly across the cards it produced.
-function addCost(cost, what, usage, share = 1) {
-  const c = cost || { usd: 0, estimated: false, items: [] };
-  if (!usage) return c;
-  const usd = usage.usd / share;
-  return {
-    usd: c.usd + usd,
-    estimated: c.estimated || usage.estimated,
-    items: [...c.items, { what: share > 1 ? `${what} (1/${share} of batch)` : what, usd, estimated: usage.estimated, provider: usage.provider, model: usage.model, tokens: usage.inputTokens + usage.outputTokens }],
-  };
+// Charge a card for a call that spent but produced nothing usable.
+async function charge(key, what, usage) {
+  const rec = key && usage && (await getCard(key));
+  if (rec) await putCard({ ...rec, cost: addCost(rec.cost, what, usage) });
 }
 
 let caps = null;
@@ -167,11 +159,6 @@ function broadcast(msg) {
 }
 
 const newKey = () => crypto.randomUUID().slice(0, 8);
-
-async function sha(value) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)));
-  return [...new Uint8Array(buf)].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 async function cacheGet(hash) {
   return (await chrome.storage.local.get(`c:${hash}`))[`c:${hash}`]?.cards;
@@ -268,6 +255,8 @@ export async function breakdown(tab) {
         await place(spec, addCost(null, 'breakdown', usage, cards.length));
       }
     } catch (e) {
+      // Spent but unusable: no card to carry it, so the page total keeps it.
+      if (e.usage) state.unassigned = (state.unassigned || 0) + e.usage.usd;
       errors.push(e.message);
     }
     state.status.done += batch.length;
@@ -321,9 +310,11 @@ async function generate(key, adjust) {
     const cur = await getCard(key);
     // A new diagram makes the old picture stale.
     await putCard({ ...cur, spec, cost: addCost(cur.cost, what, usage), status: 'ready', error: null, view: 'diagram', picture: null });
-    if (rec.picture || (await getSettings()).prefs.pictures === 'auto') picture(key);
+    if ((await getSettings()).prefs.pictures === 'auto') picture(key);
   } catch (e) {
-    await putCard({ ...(await getCard(key)), status: rec.spec ? 'ready' : 'error', error: e.message });
+    const cur = await getCard(key);
+    if (!cur) return;
+    await putCard({ ...cur, cost: addCost(cur.cost, 'failed attempt', e.usage), status: rec.spec ? 'ready' : 'error', error: e.message });
   }
 }
 
@@ -341,6 +332,9 @@ async function learn(key, direction) {
 
 async function adjust(key, { direction, kind }) {
   const rec = await getCard(key);
+  // Refused up front, so a blocked click doesn't move the saved depth either.
+  const refusal = budgetRefusal(await getSettings());
+  if (refusal) return putCard({ ...rec, error: refusal });
   await putCard({ ...rec, status: 'loading', loadingText: direction === 'simpler' ? 'Simplifying…' : direction === 'more' ? 'Adding detail…' : `Redrawing as ${kind}…` });
   if (direction) await learn(key, direction);
   await generate(key, { direction, kind });
@@ -355,31 +349,59 @@ async function explore(key) {
     const cur = await getCard(key);
     await putCard({ ...cur, explore: result, cost: addCost(cur.cost, 'simulation', usage), view: 'explore', status: 'ready', error: null });
   } catch (e) {
-    await putCard({ ...(await getCard(key)), status: 'ready', error: e.message });
+    const cur = await getCard(key);
+    if (cur) await putCard({ ...cur, cost: addCost(cur.cost, 'failed simulation', e.usage), status: 'ready', error: e.message });
   }
 }
 
 // Pictures run beside the diagram (own status), so the card stays usable while Codex paints.
-async function picture(key) {
-  if (!caps) await health();
-  if (!caps?.pictures) return;
-  const rec = await getCard(key);
-  if (!rec?.spec || rec.picture?.status === 'loading') return;
-  // Same card text → same picture; never pay twice for it.
-  const pkey = `p:${await sha([rec.spec.title, rec.spec.picture, (await getSettings()).prefs.depth === 'eli5'])}`;
-  const known = (await chrome.storage.local.get(pkey))[pkey];
-  if (known) {
-    return putCard({ ...rec, picture: { status: 'ready', imageId: known }, cost: addCost(rec.cost, 'picture (cached — free)', { usd: 0, estimated: false, inputTokens: 0, outputTokens: 0 }) });
-  }
-  await putCard({ ...rec, picture: { status: 'loading' } });
+const painting = new Set();
+const CACHED_PICTURE = 'picture (cached — free)';
+
+// The cache remembers an id; the PNG lives in the helper's cache folder and can be cleared.
+async function pictureStillExists(imageId) {
+  const s = await getSettings();
   try {
-    const { result, usage } = await callHelper('illustrate', { card: rec.spec });
-    await chrome.storage.local.set({ [pkey]: result.imageId });
-    const cur = await getCard(key);
-    if (cur) await putCard({ ...cur, picture: { status: 'ready', imageId: result.imageId }, cost: addCost(cur.cost, 'picture', usage) });
-  } catch (e) {
-    const cur = await getCard(key);
-    if (cur) await putCard({ ...cur, picture: { status: 'error', error: e.message } });
+    const res = await fetch(`${s.helperUrl}/v1/image/${imageId}`, { headers: { 'x-docviz-token': s.token } });
+    res.body?.cancel();
+    return res.status !== 404;
+  } catch {
+    return true;
+  }
+}
+
+async function picture(key) {
+  // Claimed before any await, so a double-click can't start two paid calls.
+  if (painting.has(key)) return;
+  painting.add(key);
+  try {
+    if (!caps) await health();
+    if (!caps?.pictures) return;
+    const s = await getSettings();
+    if (s.prefs.pictures === 'off') return;
+    const rec = await getCard(key);
+    if (!rec?.spec) return;
+    // Same card text → same picture; never pay twice for it.
+    const pkey = await pictureCacheKey(rec.spec, s.prefs.depth === 'eli5');
+    const known = (await chrome.storage.local.get(pkey))[pkey];
+    if (known && (await pictureStillExists(known))) {
+      const had = rec.cost?.items.some((i) => i.what === CACHED_PICTURE);
+      const cost = had ? rec.cost : addCost(rec.cost, CACHED_PICTURE, { usd: 0, estimated: false, inputTokens: 0, outputTokens: 0 });
+      return putCard({ ...rec, picture: { status: 'ready', imageId: known }, cost });
+    }
+    if (known) await chrome.storage.local.remove(pkey);
+    await putCard({ ...rec, picture: { status: 'loading' } });
+    try {
+      const { result, usage } = await callHelper('illustrate', { card: rec.spec });
+      await chrome.storage.local.set({ [pkey]: result.imageId });
+      const cur = await getCard(key);
+      if (cur) await putCard({ ...cur, picture: { status: 'ready', imageId: result.imageId }, cost: addCost(cur.cost, 'picture', usage) });
+    } catch (e) {
+      const cur = await getCard(key);
+      if (cur) await putCard({ ...cur, picture: { status: 'error', error: e.message }, cost: addCost(cur.cost, 'failed picture', e.usage) });
+    }
+  } finally {
+    painting.delete(key);
   }
 }
 
@@ -424,7 +446,14 @@ const handlers = {
   'card:view': async ({ key, view }) => putCard({ ...(await getCard(key)), view }),
   'card:retry': ({ key }) => { generate(key, {}); },
   'card:repair': async ({ key, mermaid, error }) => {
-    const { result, usage } = await callHelper('repair', { mermaid, error });
+    let out;
+    try {
+      out = await callHelper('repair', { mermaid, error });
+    } catch (e) {
+      await charge(key, 'failed syntax repair', e.usage);
+      throw e;
+    }
+    const { result, usage } = out;
     const rec = await getCard(key);
     if (rec) await putCard({ ...rec, cost: addCost(rec.cost, 'syntax repair', usage) });
     return result.mermaid;

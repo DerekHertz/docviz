@@ -85,6 +85,18 @@ card (a breakdown batch is split evenly over its cards) and to a ledger (today /
 budget check runs before every call. Claude's price comes from the CLI; Codex's is estimated from
 tokens and `--codex-rates`, shown with `~`.
 
+- The budget is a soft cap: the check reads spend already recorded, so calls started together (a
+  breakdown's batches, a picture beside them) can overshoot it by what they were already running.
+  There is no reservation.
+- A call that fails after the CLI spent (error result, unparseable output, no picture) still returns
+  its `usage` in the error body; the extension records it and charges the card as a "failed …" row.
+  A timeout kills the CLI before it reports, so that spend can't be recovered and isn't shown.
+- A breakdown batch that yields no usable cards has no card to charge. It counts in the side panel's
+  "this page" total and in the toast, not in any card's breakdown.
+- Simpler / More detail check the budget first, so a blocked click doesn't move the saved depth.
+- Pictures repaint on a changed diagram only in `auto`; `off` hides 🎨. A cached picture whose PNG is
+  gone is dropped from the cache so 🎨 paints again.
+
 ## Also in v0
 
 - Side panel: helper status, cards on this page (click to scroll), prefs, last pref change.

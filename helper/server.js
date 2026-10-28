@@ -69,7 +69,7 @@ export function startServer({ host, port, token, provider: defaultProvider, mode
       return send(200, { ok: true, paired: true, providers: available, provider: defaultProvider, pictures: available.codex, codexRates: CODEX_RATES, version: '0.2.0' });
     }
 
-    const image = url.pathname.match(/^\/v1\/image\/([0-9a-f-]{36})$/)?.[1];
+    const image = url.pathname.match(/^\/v1\/image\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/)?.[1];
     if (req.method === 'GET' && image) {
       if (!authed) return send(401, { error: 'Bad or missing pairing code' });
       const file = join(IMAGES, `${image}.png`);
@@ -83,11 +83,13 @@ export function startServer({ host, port, token, provider: defaultProvider, mode
     if (!authed) return send(401, { error: 'Bad or missing pairing code' });
 
     const started = Date.now();
+    let provider = null;
     try {
       const body = await readJson(req);
       const picture = route === 'illustrate';
+      if (picture && (!body.card || typeof body.card !== 'object')) throw httpError(400, 'illustrate needs a card');
       if (picture && !available.codex) throw httpError(503, 'Pictures need the Codex CLI on PATH');
-      const provider = picture ? 'codex' : pickProvider(body.provider || defaultProvider, available);
+      provider = picture ? 'codex' : pickProvider(body.provider || defaultProvider, available);
       const job = BUILDERS[route](body);
       const label = route === 'cards' ? `${body.sections?.length || 0} sections` : (body.section?.heading || body.card?.title || '').slice(0, 40);
       log(`→ ${route} via ${provider} · ${label}`);
@@ -100,7 +102,8 @@ export function startServer({ host, port, token, provider: defaultProvider, mode
       send(200, { provider, result: output, usage: { ...usage, provider, ms: Date.now() - started } });
     } catch (e) {
       log(`✗ ${route}: ${e.message}`);
-      send(e.status || 500, { error: e.message });
+      // A call that failed after the CLI spent still reports what it cost.
+      send(e.status || 500, { error: e.message, ...(e.usage && { usage: { ...e.usage, provider, ms: Date.now() - started } }) });
     }
   });
 

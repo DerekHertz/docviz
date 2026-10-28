@@ -38,8 +38,9 @@ export function pickProvider(requested, available) {
   throw httpError(503, 'Neither claude nor codex CLI found on PATH');
 }
 
-export function httpError(status, message) {
-  return Object.assign(new Error(message), { status });
+// `usage` rides on errors raised after the CLI already spent, so the caller can still charge it.
+export function httpError(status, message, usage) {
+  return Object.assign(new Error(message), { status }, usage && { usage });
 }
 
 function run(bin, args, input, timeoutMs) {
@@ -80,7 +81,6 @@ async function runClaude({ system, prompt, schema, tools = [], model, timeoutMs 
   const out = await run('claude', args, prompt, timeoutMs);
   let res;
   try { res = JSON.parse(out); } catch { throw httpError(502, `claude returned non-JSON: ${out.slice(0, 300)}`); }
-  if (res.is_error) throw httpError(502, `claude error: ${res.result || res.subtype}`);
   const u = res.usage || {};
   const usage = {
     // Claude Code prices every call itself (list price; on a Pro/Max login that is
@@ -91,8 +91,9 @@ async function runClaude({ system, prompt, schema, tools = [], model, timeoutMs 
     outputTokens: u.output_tokens || 0,
     model: Object.keys(res.modelUsage || {})[0] || model || '',
   };
+  if (res.is_error) throw httpError(502, `claude error: ${res.result || res.subtype}`, usage);
   if (res.structured_output) return { output: res.structured_output, usage };
-  try { return { output: JSON.parse(res.result), usage }; } catch { throw httpError(502, 'claude returned no structured output'); }
+  try { return { output: JSON.parse(res.result), usage }; } catch { throw httpError(502, 'claude returned no structured output', usage); }
 }
 
 // `codex exec --json` streams events; the thread id names the folder generated
@@ -138,7 +139,7 @@ async function runCodex({ system, prompt, schema, search = false, model, timeout
     const stdout = await run('codex', args, `${system}\n\n---\n\n${prompt}`, timeoutMs);
     const text = readFileSync(outFile, 'utf8');
     const usage = codexUsage(parseCodexEvents(stdout).t, model);
-    try { return { output: JSON.parse(text), usage }; } catch { throw httpError(502, `codex returned non-JSON: ${text.slice(0, 300)}`); }
+    try { return { output: JSON.parse(text), usage }; } catch { throw httpError(502, `codex returned non-JSON: ${text.slice(0, 300)}`, usage); }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -155,7 +156,7 @@ export async function illustrate({ prompt, model, timeoutMs }) {
   const dir = join(CODEX_HOME, 'generated_images', threadId);
   let files = [];
   try { files = readdirSync(dir).filter((f) => f.endsWith('.png')).map((f) => join(dir, f)); } catch {}
-  if (!threadId || !files.length) throw httpError(502, 'codex finished without generating a picture');
+  if (!threadId || !files.length) throw httpError(502, 'codex finished without generating a picture', codexUsage(t, model));
   const newest = files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
   const imageId = randomUUID();
   copyFileSync(newest, join(IMAGES, `${imageId}.png`));

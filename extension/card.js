@@ -133,7 +133,7 @@ function renderCost() {
 async function renderPicture() {
   const box = $('picture');
   const p = rec.picture;
-  $('paint').hidden = !caps?.pictures || !rec.spec || rec.view === 'explore' || !!p;
+  $('paint').hidden = !caps?.pictures || settings?.prefs.pictures === 'off' || !rec.spec || rec.view === 'explore' || !!p;
   if (!p || rec.view === 'explore') { box.hidden = true; return; }
   box.hidden = false;
   if (p.status === 'loading') {

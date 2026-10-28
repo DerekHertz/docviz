@@ -47,6 +47,12 @@ test('pictures need the code and a UUID', async () => {
   assert.equal((await req(`/v1/image/${id}`)).status, 401);
   assert.equal((await req(`/v1/image/${id}`, { token: TOKEN })).status, 404);
   assert.equal((await req('/v1/image/..%2F..%2Fetc%2Fpasswd', { token: TOKEN })).status, 404);
+  assert.equal((await req(`/v1/image/${'-'.repeat(36)}`, { token: TOKEN })).status, 404);
+});
+
+test('illustrate without a card is a 400, not a crash', async () => {
+  const res = await req('/v1/illustrate', { method: 'POST', token: TOKEN, body: {} });
+  assert.equal(res.status, 400);
 });
 
 test('ELI5 depth reaches the prompt and every card asks for a picture brief', () => {
