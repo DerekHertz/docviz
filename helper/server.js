@@ -1,13 +1,15 @@
 // Localhost bridge between the extension and the user's CLI.
 import { createServer } from 'node:http';
-import { complete, detectProviders, pickProvider, httpError } from './providers.js';
-import { cardsPrompt, cardPrompt, repairPrompt, explorePrompt } from './prompts.js';
+import { createReadStream, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { complete, illustrate, detectProviders, pickProvider, httpError, IMAGES, CODEX_RATES } from './providers.js';
+import { cardsPrompt, cardPrompt, repairPrompt, explorePrompt, illustratePrompt } from './prompts.js';
 
 const MAX_BODY = 2_000_000;
 const CONCURRENCY = 3;
 
-const TIMEOUTS = { cards: 240_000, card: 150_000, repair: 90_000, explore: 480_000 };
-const BUILDERS = { cards: cardsPrompt, card: cardPrompt, repair: repairPrompt, explore: explorePrompt };
+const TIMEOUTS = { cards: 240_000, card: 150_000, repair: 90_000, explore: 480_000, illustrate: 300_000 };
+const BUILDERS = { cards: cardsPrompt, card: cardPrompt, repair: repairPrompt, explore: explorePrompt, illustrate: illustratePrompt };
 
 // Small FIFO so a 20-section page can't fork 20 CLIs at once.
 let active = 0;
@@ -63,28 +65,39 @@ export function startServer({ host, port, token, provider: defaultProvider, mode
 
     if (req.method === 'GET' && url.pathname === '/v1/health') {
       if (!authed) return send(200, { ok: true, paired: false });
-      return send(200, { ok: true, paired: true, providers: available, provider: defaultProvider, version: '0.1.0' });
+      // With both CLIs, Claude plans the cards and Codex paints the pictures.
+      return send(200, { ok: true, paired: true, providers: available, provider: defaultProvider, pictures: available.codex, codexRates: CODEX_RATES, version: '0.2.0' });
     }
 
-    const route = url.pathname.match(/^\/v1\/(cards|card|repair|explore)$/)?.[1];
+    const image = url.pathname.match(/^\/v1\/image\/([0-9a-f-]{36})$/)?.[1];
+    if (req.method === 'GET' && image) {
+      if (!authed) return send(401, { error: 'Bad or missing pairing code' });
+      const file = join(IMAGES, `${image}.png`);
+      if (!existsSync(file)) return send(404, { error: 'No such picture' });
+      res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'private, max-age=31536000', ...(origin && { 'access-control-allow-origin': origin, 'access-control-allow-headers': 'x-docviz-token' }) });
+      return createReadStream(file).pipe(res);
+    }
+
+    const route = url.pathname.match(/^\/v1\/(cards|card|repair|explore|illustrate)$/)?.[1];
     if (req.method !== 'POST' || !route) return send(404, { error: 'Not found' });
     if (!authed) return send(401, { error: 'Bad or missing pairing code' });
 
     const started = Date.now();
     try {
       const body = await readJson(req);
-      const provider = pickProvider(body.provider || defaultProvider, available);
+      const picture = route === 'illustrate';
+      if (picture && !available.codex) throw httpError(503, 'Pictures need the Codex CLI on PATH');
+      const provider = picture ? 'codex' : pickProvider(body.provider || defaultProvider, available);
       const job = BUILDERS[route](body);
-      const label = route === 'cards' ? `${body.sections?.length || 0} sections` : (body.section?.heading || '').slice(0, 40);
+      const label = route === 'cards' ? `${body.sections?.length || 0} sections` : (body.section?.heading || body.card?.title || '').slice(0, 40);
       log(`→ ${route} via ${provider} · ${label}`);
-      const result = await limited(() => complete(provider, {
-        ...job,
-        model: body.model || defaultModel,
-        research: route === 'explore',
-        timeoutMs: TIMEOUTS[route],
-      }));
-      log(`✓ ${route} in ${((Date.now() - started) / 1000).toFixed(1)}s`);
-      send(200, { provider, result });
+      // The planner's --model is a Claude/Codex text model; pictures use Codex's default.
+      const run = picture
+        ? () => illustrate({ ...job, timeoutMs: TIMEOUTS[route] })
+        : () => complete(provider, { ...job, model: body.model || defaultModel, research: route === 'explore', timeoutMs: TIMEOUTS[route] });
+      const { output, usage } = await limited(run);
+      log(`✓ ${route} in ${((Date.now() - started) / 1000).toFixed(1)}s · ${usage.estimated ? '~' : ''}$${usage.usd.toFixed(4)}`);
+      send(200, { provider, result: output, usage: { ...usage, provider, ms: Date.now() - started } });
     } catch (e) {
       log(`✗ ${route}: ${e.message}`);
       send(e.status || 500, { error: e.message });

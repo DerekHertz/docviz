@@ -52,16 +52,38 @@ Setup on first run; editable in settings and the side panel.
 
 | Pref | Options | Default |
 |---|---|---|
-| Depth | concept / mechanism / implementation | mechanism |
+| Depth | eli5 / concept / mechanism / implementation | mechanism |
 | Style | strict diagrams / illustrated (cartoons, metaphors welcome) | illustrated |
 | Coverage | only where something behaves / every section | behavior |
 | Think first | question first, diagram blurred until revealed | off |
+| Pictures | on demand / every card / never (Codex) | on demand |
+| Daily budget | USD, 0 = no cap | $2 |
+
+Setup's preference step is a calibration: `debounce` explained at each depth (static text, no model
+call); the one the user picks sets depth. ELI5 builds the diagram on one everyday analogy and tags
+each real identifier once beside it.
 
 Fixed rule regardless of prefs: **real identifiers always appear** — illustrate freely, never
 oversimplify.
 
 Learning: **Simpler / More detail** move the saved depth one step and the card says so with
 **Undo** — never silent.
+
+## Roles: Claude plans, Codex paints
+
+With both CLIs, the planner (Claude by default) writes each card including a `picture`
+brief; `/v1/illustrate` always goes to Codex's built-in `image_gen`, with the brief, caption and
+Mermaid source. Pictures are explanatory figures, not decoration: each object maps to a real
+identifier, order is shown with numbered steps, and up to 6 labels name real identifiers. (v0's
+wordless "friendly metaphor" pictures were pretty and taught nothing.) Pictures are opt-in per card by
+default because they cost ~3x a card.
+
+## Cost
+
+Every helper response carries `usage` (`usd`, `estimated`, tokens). The extension charges it to the
+card (a breakdown batch is split evenly over its cards) and to a ledger (today / all time). The
+budget check runs before every call. Claude's price comes from the CLI; Codex's is estimated from
+tokens and `--codex-rates`, shown with `~`.
 
 ## Also in v0
 
@@ -72,3 +94,4 @@ Learning: **Simpler / More detail** move the saved depth one step and the card s
 
 - Mascot that hops onto the page and "paints the picture" (own character — not Anthropic's).
 - Pet/status event stream, API-key providers.
+- Cost estimate before a breakdown starts (today only after).

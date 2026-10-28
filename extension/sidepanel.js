@@ -1,4 +1,4 @@
-import { getSettings } from './settings.js';
+import { getSettings, spendToday, money } from './settings.js';
 import { renderPrefs } from './prefs-form.js';
 
 const $ = (id) => document.getElementById(id);
@@ -54,11 +54,30 @@ async function refreshCards() {
     const small = document.createElement('small');
     small.textContent = c.status === 'loading' ? 'working…' : c.popover ? 'selection' : c.section.heading;
     t.append(b, small);
-    li.append(pill, t);
+    const cost = document.createElement('span');
+    cost.className = 'c';
+    cost.textContent = c.cost ? money(c.cost.usd, c.cost.estimated) : '';
+    li.append(pill, t, cost);
     li.onclick = () => send('panel:scroll', { key: c.key });
     return li;
   }));
   $('empty').hidden = cards.length > 0;
+  const page = cards.reduce((t, c) => t + (c.cost?.usd || 0), state.unassigned || 0);
+  $('sp-page').textContent = money(page, cards.some((c) => c.cost?.estimated));
+}
+
+async function refreshSpend() {
+  const s = await getSettings();
+  const today = spendToday(s.spend);
+  $('sp-today').textContent = money(today);
+  $('sp-total').textContent = money(s.spend?.total || 0);
+  const bar = $('sp-bar');
+  bar.hidden = !(s.budget > 0);
+  bar.classList.toggle('over', today >= s.budget);
+  bar.firstElementChild.style.width = `${Math.min(100, (today / s.budget) * 100)}%`;
+  $('sp-budget').textContent = s.budget > 0
+    ? `${money(today)} of your ${money(s.budget)} daily budget${today >= s.budget ? ' — new cards are paused until tomorrow or you raise it in Settings.' : ''}`
+    : 'No daily budget set — add one in Settings.';
 }
 
 async function refreshPrefs() {
@@ -84,6 +103,7 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'tab:updated' && msg.tabId === tabId) refreshCards();
   if (msg.type === 'card:updated' && msg.tabId === tabId) refreshCards();
   if (msg.type === 'prefs:updated') refreshPrefs();
+  if (msg.type === 'spend:updated') refreshSpend();
 });
 chrome.tabs.onActivated.addListener(async () => { await activeTab(); refreshCards(); });
 chrome.tabs.onUpdated.addListener((id, info) => { if (id === tabId && info.status === 'complete') refreshCards(); });
@@ -92,4 +112,5 @@ await activeTab();
 refreshHealth();
 refreshCards();
 refreshPrefs();
+refreshSpend();
 setInterval(refreshHealth, 15_000);

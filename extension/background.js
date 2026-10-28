@@ -3,7 +3,7 @@
 // Card records live in chrome.storage.session under `card:<key>`; per-tab
 // state (progress + card keys) under `tab:<tabId>`. Cards and the side panel
 // read them and listen for `card:updated` / `tab:updated` broadcasts.
-import { getSettings, setSettings, DEPTHS } from './settings.js';
+import { getSettings, setSettings, DEPTHS, rollSpend, spendToday, money } from './settings.js';
 
 const BATCH_SECTIONS = 5;
 const BATCH_CHARS = 14_000;
@@ -59,6 +59,9 @@ function release() {
 
 async function callHelper(route, body) {
   const s = await getSettings();
+  if (s.budget > 0 && spendToday(s.spend) >= s.budget) {
+    throw new Error(`Today’s ${money(s.budget)} docviz budget is used up (${money(spendToday(s.spend))}). Raise it in settings to keep going.`);
+  }
   hold();
   try {
     let res;
@@ -77,17 +80,47 @@ async function callHelper(route, body) {
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) throw new Error('Pairing code rejected — paste the code `docviz` printed into docviz settings.');
     if (!res.ok) throw new Error(data.error || `Helper error ${res.status}`);
-    return data.result;
+    await record(data.usage);
+    return { result: data.result, usage: data.usage };
   } finally {
     release();
   }
 }
 
+// Every call is charged to the ledger as it returns — nothing is spent silently.
+let ledger = Promise.resolve();
+function record(usage) {
+  if (!usage) return ledger;
+  ledger = ledger.then(async () => {
+    const { spend } = await chrome.storage.local.get('spend');
+    await setSettings({ spend: rollSpend(spend, usage.usd) });
+    broadcast({ type: 'spend:updated' });
+  });
+  return ledger;
+}
+
+// A card's cost is the sum of every call made for it; a breakdown batch is
+// split evenly across the cards it produced.
+function addCost(cost, what, usage, share = 1) {
+  const c = cost || { usd: 0, estimated: false, items: [] };
+  if (!usage) return c;
+  const usd = usage.usd / share;
+  return {
+    usd: c.usd + usd,
+    estimated: c.estimated || usage.estimated,
+    items: [...c.items, { what: share > 1 ? `${what} (1/${share} of batch)` : what, usd, estimated: usage.estimated, provider: usage.provider, model: usage.model, tokens: usage.inputTokens + usage.outputTokens }],
+  };
+}
+
+let caps = null;
+
 export async function health() {
   const s = await getSettings();
   try {
     const res = await fetch(`${s.helperUrl}/v1/health`, { headers: { 'x-docviz-token': s.token } });
-    return await res.json();
+    const h = await res.json();
+    if (h.paired) caps = h;
+    return h;
   } catch {
     return { ok: false };
   }
@@ -203,19 +236,20 @@ export async function breakdown(tab) {
   await toast(tabId, `docviz · reading ${sections.length} sections…`);
 
   const bySection = new Map(sections.map((x) => [x.id, x]));
-  const place = async (spec) => {
+  const place = async (spec, cost) => {
     const section = bySection.get(spec.sectionId);
     if (!section) return;
     const key = newKey();
-    await putCard({ key, tabId, page, section, spec, status: 'ready', view: 'diagram' });
+    await putCard({ key, tabId, page, section, spec, cost, status: 'ready', view: 'diagram' });
     state.keys.push(key);
     await toTab(tabId, { type: 'insert', key, sectionId: spec.sectionId });
+    if (s.prefs.pictures === 'auto') picture(key);
   };
 
   const hash = await sha([page.url, sections.map((x) => x.text), s.prefs, s.provider, s.model]);
   const cached = await cacheGet(hash);
   if (cached) {
-    for (const spec of cached) await place(spec);
+    for (const spec of cached) await place(spec, { usd: 0, estimated: false, items: [{ what: 'cached — free', usd: 0 }] });
     state.status = { phase: 'done', done: sections.length, total: sections.length, cached: true };
     await putTab(tabId, state);
     return toast(tabId, `docviz · ${state.keys.length} cards (cached)`, 'done');
@@ -225,17 +259,21 @@ export async function breakdown(tab) {
   const errors = [];
   await Promise.all(batchSections(sections).map(async (batch) => {
     try {
-      const result = await callHelper('cards', { page, sections: batch });
-      for (const spec of result.cards || []) {
+      const { result, usage } = await callHelper('cards', { page, sections: batch });
+      const cards = (result.cards || []).filter((c) => bySection.has(c.sectionId));
+      // A batch that found nothing to draw still cost something; the page total keeps it.
+      if (!cards.length) state.unassigned = (state.unassigned || 0) + usage.usd;
+      for (const spec of cards) {
         all.push(spec);
-        await place(spec);
+        await place(spec, addCost(null, 'breakdown', usage, cards.length));
       }
     } catch (e) {
       errors.push(e.message);
     }
     state.status.done += batch.length;
     await putTab(tabId, state);
-    await toast(tabId, `docviz · ${state.status.done}/${sections.length} sections · ${state.keys.length} cards`);
+    const spent = (await Promise.all(state.keys.map(getCard))).reduce((t, c) => t + (c?.cost?.usd || 0), state.unassigned || 0);
+    await toast(tabId, `docviz · ${state.status.done}/${sections.length} sections · ${state.keys.length} cards · ${money(spent)} so far`);
   }));
 
   state.status.phase = errors.length && !all.length ? 'error' : 'done';
@@ -277,9 +315,13 @@ export async function visualizeSelection(tab, given = {}) {
 async function generate(key, adjust) {
   const rec = await getCard(key);
   try {
-    const spec = await callHelper('card', { page: rec.page, section: rec.section, adjust, previous: rec.spec });
+    const { result: spec, usage } = await callHelper('card', { page: rec.page, section: rec.section, adjust, previous: rec.spec });
     spec.sectionId = rec.section.id;
-    await putCard({ ...(await getCard(key)), spec, status: 'ready', error: null, view: 'diagram' });
+    const what = adjust?.direction === 'simpler' ? 'simpler' : adjust?.direction === 'more' ? 'more detail' : adjust?.kind ? `as ${adjust.kind}` : 'diagram';
+    const cur = await getCard(key);
+    // A new diagram makes the old picture stale.
+    await putCard({ ...cur, spec, cost: addCost(cur.cost, what, usage), status: 'ready', error: null, view: 'diagram', picture: null });
+    if (rec.picture || (await getSettings()).prefs.pictures === 'auto') picture(key);
   } catch (e) {
     await putCard({ ...(await getCard(key)), status: rec.spec ? 'ready' : 'error', error: e.message });
   }
@@ -309,10 +351,35 @@ async function explore(key) {
   if (rec.explore) return putCard({ ...rec, view: 'explore' });
   await putCard({ ...rec, status: 'loading', loadingText: 'Reading the source and building a simulation… (1–3 min)' });
   try {
-    const result = await callHelper('explore', { page: rec.page, section: rec.section, card: rec.spec });
-    await putCard({ ...(await getCard(key)), explore: result, view: 'explore', status: 'ready', error: null });
+    const { result, usage } = await callHelper('explore', { page: rec.page, section: rec.section, card: rec.spec });
+    const cur = await getCard(key);
+    await putCard({ ...cur, explore: result, cost: addCost(cur.cost, 'simulation', usage), view: 'explore', status: 'ready', error: null });
   } catch (e) {
     await putCard({ ...(await getCard(key)), status: 'ready', error: e.message });
+  }
+}
+
+// Pictures run beside the diagram (own status), so the card stays usable while Codex paints.
+async function picture(key) {
+  if (!caps) await health();
+  if (!caps?.pictures) return;
+  const rec = await getCard(key);
+  if (!rec?.spec || rec.picture?.status === 'loading') return;
+  // Same card text → same picture; never pay twice for it.
+  const pkey = `p:${await sha([rec.spec.title, rec.spec.picture, (await getSettings()).prefs.depth === 'eli5'])}`;
+  const known = (await chrome.storage.local.get(pkey))[pkey];
+  if (known) {
+    return putCard({ ...rec, picture: { status: 'ready', imageId: known }, cost: addCost(rec.cost, 'picture (cached — free)', { usd: 0, estimated: false, inputTokens: 0, outputTokens: 0 }) });
+  }
+  await putCard({ ...rec, picture: { status: 'loading' } });
+  try {
+    const { result, usage } = await callHelper('illustrate', { card: rec.spec });
+    await chrome.storage.local.set({ [pkey]: result.imageId });
+    const cur = await getCard(key);
+    if (cur) await putCard({ ...cur, picture: { status: 'ready', imageId: result.imageId }, cost: addCost(cur.cost, 'picture', usage) });
+  } catch (e) {
+    const cur = await getCard(key);
+    if (cur) await putCard({ ...cur, picture: { status: 'error', error: e.message } });
   }
 }
 
@@ -347,12 +414,21 @@ export async function syncChip(on) {
 // ---------- messages from content script, cards, side panel, options ----------
 
 const handlers = {
-  'card:get': async ({ key }) => ({ rec: await getCard(key), settings: await getSettings() }),
+  'card:get': async ({ key }) => {
+    if (!caps) await health();
+    return { rec: await getCard(key), settings: await getSettings(), caps };
+  },
+  'card:picture': ({ key }) => { picture(key); },
   'card:adjust': ({ key, direction, kind }) => { adjust(key, { direction, kind }); },
   'card:explore': ({ key }) => { explore(key); },
   'card:view': async ({ key, view }) => putCard({ ...(await getCard(key)), view }),
   'card:retry': ({ key }) => { generate(key, {}); },
-  'card:repair': async ({ mermaid, error }) => (await callHelper('repair', { mermaid, error })).mermaid,
+  'card:repair': async ({ key, mermaid, error }) => {
+    const { result, usage } = await callHelper('repair', { mermaid, error });
+    const rec = await getCard(key);
+    if (rec) await putCard({ ...rec, cost: addCost(rec.cost, 'syntax repair', usage) });
+    return result.mermaid;
+  },
   'card:fix': async ({ key, mermaid }) => {
     const rec = await getCard(key);
     await putCard({ ...rec, spec: { ...rec.spec, mermaid } });

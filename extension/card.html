@@ -11,10 +11,19 @@
     <header>
       <span class="pill" id="kind"></span>
       <h1 id="title"></h1>
+      <button class="ghost cost" id="cost" title="What this card cost" hidden></button>
+      <span class="zoom" id="zoom" hidden>
+        <button class="ghost icon" data-zoom="-1" title="Zoom out" aria-label="Zoom out">−</button>
+        <button class="ghost icon" data-zoom="0" title="Fit to width" aria-label="Fit to width">Fit</button>
+        <button class="ghost icon" data-zoom="1" title="Zoom in" aria-label="Zoom in">+</button>
+      </span>
+      <button class="ghost icon" id="expand" title="Expand (Esc to close)" aria-label="Expand">⤢</button>
       <button class="ghost icon" id="dismiss" title="Dismiss" aria-label="Dismiss">✕</button>
     </header>
+    <section class="costs" id="costs" hidden></section>
     <div class="note" id="note" hidden></div>
     <div class="error" id="error" hidden></div>
+    <figure class="picture" id="picture" hidden></figure>
     <div class="body" id="body"></div>
     <p class="caption" id="caption"></p>
     <section class="meta" id="meta" hidden></section>
@@ -24,6 +33,7 @@
       <select id="kind-select" aria-label="Diagram type">
         <option value="">Type…</option>
       </select>
+      <button id="paint" title="Codex paints a picture of this card's metaphor" hidden>🎨 Picture</button>
       <span class="grow"></span>
       <button id="toggle-view" class="primary">Explore ▸</button>
     </footer>

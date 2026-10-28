@@ -119,9 +119,14 @@
     if (popoverKey) remove(popoverKey);
     popoverKey = null;
   }
-  addEventListener('keydown', (e) => { if (e.key === 'Escape') closePopover(); });
+  addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (overlay) collapse();
+    else closePopover();
+  });
 
   function remove(key) {
+    if (overlay?.frame.src.includes(`key=${encodeURIComponent(key)}&`)) collapse();
     hosts.get(key)?.host.remove();
     hosts.delete(key);
     if (key === popoverKey) popoverKey = null;
@@ -138,11 +143,41 @@
     h.host.animate([{ outline: '3px solid #d97757', outlineOffset: '4px' }, { outline: '3px solid transparent', outlineOffset: '4px' }], { duration: 1400 });
   }
 
-  // Cards report their height; only trust our own extension frames.
+  // ---------- expanded view ----------
+
+  let overlay = null;
+  function expand(key) {
+    collapse();
+    overlay = document.createElement('div');
+    overlay.className = 'docviz-host';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(20,20,19,.55);display:grid;place-items:center;';
+    const iframe = document.createElement('iframe');
+    iframe.src = `${CARD_URL}?key=${encodeURIComponent(key)}&full=1`;
+    iframe.title = 'docviz diagram, expanded';
+    iframe.style.cssText = 'width:min(1400px,96vw);height:94vh;border:0;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.35);background:transparent;color-scheme:normal;';
+    overlay.appendChild(iframe);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) collapse(); });
+    overlay.frame = iframe;
+    document.documentElement.appendChild(overlay);
+    document.documentElement.style.setProperty('overflow', 'hidden', 'important');
+    iframe.focus();
+  }
+  function collapse() {
+    if (!overlay) return;
+    overlay.remove();
+    overlay = null;
+    document.documentElement.style.removeProperty('overflow');
+  }
+
+  // Cards report their height and ask to expand; only trust our own extension frames.
   addEventListener('message', (e) => {
-    if (e.origin !== EXT_ORIGIN || e.data?.docviz !== 'resize') return;
-    const h = hosts.get(e.data.key);
-    if (h && e.source === h.iframe.contentWindow) h.iframe.style.height = `${Math.ceil(e.data.height)}px`;
+    if (e.origin !== EXT_ORIGIN) return;
+    const { docviz, key } = e.data || {};
+    if (docviz === 'collapse' && overlay && e.source === overlay.frame.contentWindow) return collapse();
+    const h = hosts.get(key);
+    if (!h || e.source !== h.iframe.contentWindow) return;
+    if (docviz === 'resize') h.iframe.style.height = `${Math.ceil(e.data.height)}px`;
+    if (docviz === 'expand') expand(key);
   });
 
   // ---------- toast ----------

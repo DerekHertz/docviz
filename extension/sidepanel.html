@@ -25,6 +25,13 @@
     .pref:has(input) { grid-template-columns: auto 1fr; }
     .note { background: var(--accent-soft); border-radius: 8px; padding: 6px 10px; margin-top: 8px; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
     .offline { color: var(--danger); }
+    .spend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+    .spend b { display: block; font: 600 15px ui-monospace, Menlo, Consolas, monospace; }
+    .spend small { color: var(--fg-soft); }
+    .bar { height: 6px; border-radius: 3px; background: var(--bg-soft); margin: 10px 0 4px; overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--accent); }
+    .bar.over i { background: var(--danger); }
+    li .c { font: 11px ui-monospace, Menlo, Consolas, monospace; color: var(--fg-soft); }
   </style>
 </head>
 <body>
@@ -38,6 +45,17 @@
     <button class="primary" id="go">Break down this page</button>
     <div id="progress"></div>
     <p class="offline" id="offline" hidden></p>
+  </div>
+
+  <div class="panel">
+    <h2>Spend</h2>
+    <div class="spend">
+      <div><b id="sp-page">$0</b><small>this page</small></div>
+      <div><b id="sp-today">$0</b><small>today</small></div>
+      <div><b id="sp-total">$0</b><small>all time</small></div>
+    </div>
+    <div class="bar" id="sp-bar"><i></i></div>
+    <small class="muted" id="sp-budget"></small>
   </div>
 
   <div class="panel">
