@@ -52,3 +52,15 @@ Everything in `den:team-protocol` applies here; swap the den's commands for the 
 - Den-only tools (`node scripts/jg.mjs`, `node scripts/test-guard.mjs`, `npm run pr-map`, `npm run -s session-check`, `npm run verify:ui`, `den:update`) don't exist there: skip them and say so in your handoff. Den docs (`docs/agents/*`, the den's ADRs) are not in that repo; the rules they back are the ones in `den:team-protocol` and your role.
 - Roles load as `den:<role>`; you still sign the board as the bare role (`--as qa`, `claim <ref> qa`).
 - The user approves new dependencies, accounts and keys, changes to `.claude/`, `CLAUDE.md`, `.den/` and CI, and gives every visual verdict.
+
+## Hand-offs on GitHub
+
+A review that leaves work to do tags the agent who should do it, on the last line of the review:
+
+- `@claude` — code fixes. `.github/workflows/claude.yml` runs Claude Code on the PR branch with the
+  owner's login; it reads this file and `SPEC.md`, fixes, runs `npm run check && npm test`, and pushes.
+- `@codex` — only if the ChatGPT Codex connector is installed on this repo; otherwise use `@claude`.
+
+List each finding with the file and line it's about. Tag once per review, after all findings, never per
+finding, so one round fixes everything. A visual verdict, a CI or `.den/` change, and the merge stay
+with the user: say so instead of tagging an agent.
