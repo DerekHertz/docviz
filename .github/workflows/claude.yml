@@ -57,7 +57,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # The den's roles for CI (role files only, with a GitHub-dispatch protocol; no board).
-          plugin_marketplaces: https://github.com/DerekHertz/DimSumDen.git
+          plugin_marketplaces: https://github.com/DerekHertz/DimSumDev.git
           plugins: den-roles@dimsumden-mods
           claude_args: >-
             --agent den-roles:${{ steps.role.outputs.role }}
