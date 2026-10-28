@@ -1,8 +1,9 @@
 name: Claude
 
 # `@claude <role>` in a PR or issue comment, review, or review comment starts that
-# Dim Sum Dev role (the `den` plugin from DerekHertz/DimSumDen) on this repo with the
-# owner's Claude login: `@claude qa`, `@claude security`, `@claude code-reviewer`...
+# Dim Sum Dev role (the `den-roles` plugin from DerekHertz/DimSumDev) on this repo with the
+# owner's Claude login: `@claude qa`, `@claude security`, `@claude code-reviewer`, `technical-writer`,
+# `architect`.
 # A bare `@claude` is the developer. Same shape as Anthropic's own `@claude review`
 # (Code Review), which this list leaves alone. Only the repo owner's comments count: the repo
 # is public, and anyone else's mention would spend the owner's plan. The den's
@@ -45,9 +46,9 @@ jobs:
         env:
           BODY: ${{ github.event.comment.body || github.event.review.body || github.event.issue.body }}
         run: |
-          role=$(printf '%s' "$BODY" | grep -oE '@claude[[:space:]]+(den:)?(developer|code-reviewer|qa|security|technical-writer|designer|architect)([^a-z-]|$)' | head -1 | sed -E 's/^@claude[[:space:]]+(den:)?//; s/[^a-z-]+$//')
+          role=$(printf '%s' "$BODY" | grep -oE '@claude[[:space:]]+(den:)?(developer|code-reviewer|qa|security|technical-writer|architect)([^a-z-]|$)' | head -1 | sed -E 's/^@claude[[:space:]]+(den:)?//; s/[^a-z-]+$//')
           echo "role=${role:-developer}" >> "$GITHUB_OUTPUT"
-          echo "Dispatching den:${role:-developer}"
+          echo "Dispatching den-roles:${role:-developer}"
       # The action allows only read tools by default; a den role also needs Edit/Write to fix,
       # and Skill/Agent for its team protocol and runner. Each role's own `tools:` list still
       # applies, so qa, code-reviewer and security can't edit.
@@ -55,13 +56,12 @@ jobs:
         uses: anthropics/claude-code-action@d70510b174a1244958df0b03166a54912811f3e6 # v1.0.264
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # The den roles, installed the documented way (plugin_marketplaces + plugins).
-          plugin_marketplaces: https://github.com/DerekHertz/DimSumDen.git
-          plugins: den@dimsumden-mods
+          # The den's roles for CI (role files only, with a GitHub-dispatch protocol; no board).
+          plugin_marketplaces: https://github.com/DerekHertz/DimSumDev.git
+          plugins: den-roles@dimsumden-mods
           claude_args: >-
-            --agent den:${{ steps.role.outputs.role }}
-            --allowedTools "Edit,MultiEdit,Write,TodoWrite,Skill,Agent,Bash(npm run check),Bash(npm test),Bash(node --check:*),Bash(git:*),Bash(gh pr:*)"
-            --append-system-prompt "You are running in GitHub Actions on a PR, dispatched by a mention. There is no den board, bridge or den CLI here: skip den board/test/risk-check commands and say so. Your ticket is the comment that tagged you plus the PR. Read CLAUDE.md and SPEC.md first. Commit to the checked-out branch and do not push: the workflow pushes your commits after you finish. End with a PR comment signed as the den role, and tag the next role per CLAUDE.md."
+            --agent den-roles:${{ steps.role.outputs.role }}
+            --allowedTools "Edit,MultiEdit,Write,TodoWrite,Skill,Agent,Bash(npm run check:*),Bash(npm test:*),Bash(node --check:*),Bash(node --test:*),Bash(ls:*),Bash(git:*),Bash(gh pr:*)"
       # The developer role leaves pushing to the release step; here that step is this one.
       - name: Push the role's commits
         if: steps.role.outputs.role != 'qa' && steps.role.outputs.role != 'code-reviewer' && steps.role.outputs.role != 'security'
