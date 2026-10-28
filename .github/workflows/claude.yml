@@ -48,6 +48,9 @@ jobs:
           role=$(printf '%s' "$BODY" | grep -oE '@claude[[:space:]]+(den:)?(developer|code-reviewer|qa|security|technical-writer|designer|architect)([^a-z-]|$)' | head -1 | sed -E 's/^@claude[[:space:]]+(den:)?//; s/[^a-z-]+$//')
           echo "role=${role:-developer}" >> "$GITHUB_OUTPUT"
           echo "Dispatching den:${role:-developer}"
+      # The action allows only read tools by default; a den role also needs Edit/Write to fix,
+      # and Skill/Agent for its team protocol and runner. Each role's own `tools:` list still
+      # applies, so qa, code-reviewer and security can't edit.
       - name: Claude
         uses: anthropics/claude-code-action@d70510b174a1244958df0b03166a54912811f3e6 # v1.0.264
         with:
@@ -57,7 +60,7 @@ jobs:
           plugins: den@dimsumden-mods
           claude_args: >-
             --agent den:${{ steps.role.outputs.role }}
-            --allowedTools "Bash(npm run check),Bash(npm test),Bash(node --check:*),Bash(git:*),Bash(gh pr:*)"
+            --allowedTools "Edit,MultiEdit,Write,TodoWrite,Skill,Agent,Bash(npm run check),Bash(npm test),Bash(node --check:*),Bash(git:*),Bash(gh pr:*)"
             --append-system-prompt "You are running in GitHub Actions on a PR, dispatched by a mention. There is no den board, bridge or den CLI here: skip den board/test/risk-check commands and say so. Your ticket is the comment that tagged you plus the PR. Read CLAUDE.md and SPEC.md first. Commit to the checked-out branch and do not push: the workflow pushes your commits after you finish. End with a PR comment signed as the den role, and tag the next role per CLAUDE.md."
       # The developer role leaves pushing to the release step; here that step is this one.
       - name: Push the role's commits
