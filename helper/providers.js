@@ -18,7 +18,8 @@ const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex');
 // `docviz serve --codex-rates in,cached,out,image` when you know your real ones.
 export const CODEX_RATES = { input: 1.25, cached: 0.125, output: 10, image: 0.1 };
 export function setCodexRates(csv) {
-  const [input, cached, output, image] = String(csv).split(',').map(Number);
+  // Blank fields keep their default: "2,,20" sets input and output only.
+  const [input, cached, output, image] = String(csv).split(',').map((v) => (v.trim() === '' ? NaN : Number(v)));
   Object.assign(CODEX_RATES, Object.fromEntries(Object.entries({ input, cached, output, image }).filter(([, v]) => Number.isFinite(v))));
 }
 

@@ -17,5 +17,9 @@
     "type": "git",
     "url": "https://github.com/DerekHertz/docviz.git"
   },
-  "homepage": "https://github.com/DerekHertz/docviz"
+  "homepage": "https://github.com/DerekHertz/docviz",
+  "scripts": {
+    "check": "for f in helper/*.js extension/*.js; do node --check \"$f\" || exit 1; done",
+    "test": "node --test test/*.test.mjs"
+  }
 }

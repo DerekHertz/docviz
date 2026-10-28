@@ -18,8 +18,10 @@ read it before changing behavior.
 ## Checking a change
 
 ```bash
-node --check helper/*.js extension/*.js
+npm run check && npm test
 ```
+
+CI runs the same on every PR; `main` is protected and requires the `test` check.
 
 ```bash
 node helper/cli.js serve --port 47829
