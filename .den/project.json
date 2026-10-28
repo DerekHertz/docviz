@@ -1,0 +1,12 @@
+{
+  "test": "npm test --",
+  "codePaths": [
+    "helper",
+    "extension",
+    "test"
+  ],
+  "guardrailPaths": [
+    ".github",
+    "helper/server.js"
+  ]
+}
