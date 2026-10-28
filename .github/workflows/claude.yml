@@ -53,6 +53,7 @@ jobs:
       # and Skill/Agent for its team protocol and runner. Each role's own `tools:` list still
       # applies, so qa, code-reviewer and security can't edit.
       - name: Claude
+        id: claude
         uses: anthropics/claude-code-action@d70510b174a1244958df0b03166a54912811f3e6 # v1.0.264
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -62,11 +63,17 @@ jobs:
           claude_args: >-
             --agent den-roles:${{ steps.role.outputs.role }}
             --allowedTools "Edit,MultiEdit,Write,TodoWrite,Skill,Agent,Bash(npm run check:*),Bash(npm test:*),Bash(node --check:*),Bash(node --test:*),Bash(ls:*),Bash(git:*),Bash(gh pr:*)"
-      # The developer role leaves pushing to the release step; here that step is this one.
+            --append-system-prompt "Your report goes in your tracking comment on the pull request: update it with mcp__github_comment__update_claude_comment, replacing the placeholder."
+      # The developer role leaves pushing to the release step; here that step is this one. It pushes with
+      # the token the action used (the Claude GitHub App's): a push with GITHUB_TOKEN starts no CI, so the
+      # required `test` check would never run on the role's commits.
       - name: Push the role's commits
         if: steps.role.outputs.role != 'qa' && steps.role.outputs.role != 'code-reviewer' && steps.role.outputs.role != 'security'
+        env:
+          TOKEN: ${{ steps.claude.outputs.github_token }}
+          REPO: ${{ github.repository }}
         run: |
           branch=$(git rev-parse --abbrev-ref HEAD)
           if [ "$branch" != "HEAD" ] && [ "$branch" != "main" ] && [ -n "$(git log --oneline "origin/$branch..HEAD" 2>/dev/null)" ]; then
-            git push origin "HEAD:$branch"
+            git push "https://x-access-token:${TOKEN}@github.com/${REPO}.git" "HEAD:$branch"
           fi
