@@ -2,9 +2,12 @@
 // so these cover auth, routing and prompt shape, not model output.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startServer } from '../helper/server.js';
+import { mkdtempSync, writeFileSync, chmodSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { startServer, cleanForLog } from '../helper/server.js';
 import { cardPrompt, illustratePrompt, SCHEMAS } from '../helper/prompts.js';
-import { setCodexRates, CODEX_RATES } from '../helper/providers.js';
+import { setCodexRates, CODEX_RATES, illustrate } from '../helper/providers.js';
 import { rollSpend, spendToday, money } from '../extension/settings.js';
 
 const TOKEN = 'TEST-CODE';
@@ -72,6 +75,34 @@ test('codex rates can be overridden, ignoring blanks', () => {
   setCodexRates('2,,20');
   assert.deepEqual(CODEX_RATES, { ...before, input: 2, output: 20 });
   Object.assign(CODEX_RATES, before);
+});
+
+test('log labels lose control characters', () => {
+  assert.equal(cleanForLog('a\u001b[2Jb\r\nc\u0007'), 'a [2Jb  c ');
+  assert.equal(cleanForLog('plain heading'), 'plain heading');
+});
+
+test('illustrate rejects an odd thread id from codex and still reports usage', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fake-codex-'));
+  const bin = join(dir, 'codex');
+  writeFileSync(bin, `#!/bin/sh
+cat >/dev/null
+echo '{"type":"thread.started","thread_id":"../../etc"}'
+echo '{"type":"turn.completed","usage":{"input_tokens":1000,"output_tokens":10}}'
+`);
+  chmodSync(bin, 0o755);
+  const oldPath = process.env.PATH;
+  process.env.PATH = `${dir}:${oldPath}`;
+  try {
+    await assert.rejects(() => illustrate({ prompt: 'x', timeoutMs: 10_000 }), (e) => {
+      assert.equal(e.status, 502);
+      assert.match(e.message, /unexpected thread id/);
+      assert.equal(e.usage.inputTokens, 1000);
+      return true;
+    });
+  } finally {
+    process.env.PATH = oldPath;
+  }
 });
 
 test('spend ledger rolls over at midnight and keeps the all-time total', () => {

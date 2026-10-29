@@ -153,10 +153,12 @@ export async function illustrate({ prompt, model, timeoutMs }) {
   args.push('-');
   const stdout = await run('codex', args, prompt, timeoutMs);
   const { threadId, t } = parseCodexEvents(stdout);
+  // The id names a folder under CODEX_HOME; accept only a UUID-shaped one.
+  if (!/^[0-9a-f-]{36}$/i.test(threadId)) throw httpError(502, 'codex returned an unexpected thread id', codexUsage(t, model));
   const dir = join(CODEX_HOME, 'generated_images', threadId);
   let files = [];
   try { files = readdirSync(dir).filter((f) => f.endsWith('.png')).map((f) => join(dir, f)); } catch {}
-  if (!threadId || !files.length) throw httpError(502, 'codex finished without generating a picture', codexUsage(t, model));
+  if (!files.length) throw httpError(502, 'codex finished without generating a picture', codexUsage(t, model));
   const newest = files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
   const imageId = randomUUID();
   copyFileSync(newest, join(IMAGES, `${imageId}.png`));

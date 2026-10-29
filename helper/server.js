@@ -5,6 +5,10 @@ import { join } from 'node:path';
 import { complete, illustrate, detectProviders, pickProvider, httpError, IMAGES, CODEX_RATES } from './providers.js';
 import { cardsPrompt, cardPrompt, repairPrompt, explorePrompt, illustratePrompt } from './prompts.js';
 
+// Headings and titles come from untrusted pages; keep control characters out of the console.
+const CONTROL = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]', 'g');
+export const cleanForLog = (s) => String(s).replace(CONTROL, ' ');
+
 const MAX_BODY = 2_000_000;
 const CONCURRENCY = 3;
 
@@ -92,7 +96,7 @@ export function startServer({ host, port, token, provider: defaultProvider, mode
       provider = picture ? 'codex' : pickProvider(body.provider || defaultProvider, available);
       const job = BUILDERS[route](body);
       const label = route === 'cards' ? `${body.sections?.length || 0} sections` : (body.section?.heading || body.card?.title || '').slice(0, 40);
-      log(`→ ${route} via ${provider} · ${label}`);
+      log(`→ ${route} via ${provider} · ${cleanForLog(label)}`);
       // The planner's --model is a Claude/Codex text model; pictures use Codex's default.
       const run = picture
         ? () => illustrate({ ...job, timeoutMs: TIMEOUTS[route] })
@@ -101,7 +105,7 @@ export function startServer({ host, port, token, provider: defaultProvider, mode
       log(`✓ ${route} in ${((Date.now() - started) / 1000).toFixed(1)}s · ${usage.estimated ? '~' : ''}$${usage.usd.toFixed(4)}`);
       send(200, { provider, result: output, usage: { ...usage, provider, ms: Date.now() - started } });
     } catch (e) {
-      log(`✗ ${route}: ${e.message}`);
+      log(`✗ ${route}: ${cleanForLog(e.message)}`);
       // A call that failed after the CLI spent still reports what it cost.
       send(e.status || 500, { error: e.message, ...(e.usage && { usage: { ...e.usage, provider, ms: Date.now() - started } }) });
     }
