@@ -99,7 +99,29 @@ See [SPEC.md](SPEC.md) for the decisions behind all of this.
 docviz serve [--port 47823] [--host 127.0.0.1] [--provider auto|claude|codex] [--model M] [--new-code]
              [--codex-rates in,cached,out,image]   # USD per 1M tokens, and per picture
 docviz code     # print the pairing code
+docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M]
 ```
+
+## Diagrams on pull requests
+
+`docviz pr` prints a PR comment: one small flowchart of what the PR does, the steps it adds or
+changes outlined in orange, and a table linking each step to its lines at `HEAD`. Run it from the
+PR's checkout after pushing; post the output as a comment (it starts with
+`<!-- docviz-pr-diagrams -->`, so you can find and update the same comment on the next push).
+
+```json
+{ "steps": [
+  { "id": "search", "label": "Search each forum by likes", "changed": true,
+    "sources": [{ "path": "src/sources/discourse.js", "from": "async function searchForum", "to": "export async function find" }] }
+] }
+```
+
+Each step is one box: `id` becomes the node id, `changed` marks it new in this PR, and `from`/`to`
+are text markers that cut a file to the step's code (`to` is exclusive; leave both out for the whole
+file). `--glossary` passes a file of your project's terms (a `CONTEXT.md`) so labels use them. The
+comment's footer shows what it cost. If [Playwright](https://playwright.dev) is installed in the
+PR's repo or next to docviz, the diagram is syntax-checked with docviz's own Mermaid build and
+repaired once on error; otherwise the footer says it wasn't checked.
 
 ## Troubleshooting
 

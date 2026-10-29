@@ -178,3 +178,26 @@ Then write "html": ONE self-contained HTML document.
   const prompt = `Page: ${page?.title || ''}\nURL: ${page?.url || ''}\n\n=== ${section.heading || 'Selection'} ===\n${section.text}\n\n=== EXISTING DIAGRAM (${card?.kind || ''}) ===\n${card?.mermaid || ''}`;
   return { system, prompt, schema: SCHEMAS.explore };
 }
+
+// `docviz pr`: the one diagram on a pull request, for a reader deciding whether to merge.
+const PR_PREFS = { depth: 'concept', style: 'strict', coverage: 'all', thinkFirst: false };
+const PR_RULES = `This card is the one diagram on a pull request. The reader decides whether to merge without reading the code, often in GitHub's dark theme.
+- Draw the whole flow as ONE flowchart TD with one node per STEP below, in order, using each step's id as the node id. Add at most one extra node, only for a fallback the reader must see. At most 6 nodes in total: merge adjacent steps when there are more.
+- Node labels: at most 5 plain words, no code names, no parentheses (the table under the diagram links the code), e.g. A["Rank the results"]. This overrides the identifier rule: the code links carry the real names.
+- Edge labels: only on a branch, at most 3 words (e.g. "3+ likes", "fails"). No labels on straight edges.
+- Steps marked NEW must be drawn with :::changed, and the diagram must end with exactly: classDef changed stroke:#d29922,stroke-width:3px
+  Never set fill or color: the theme picks them, and a fill makes text unreadable in dark mode.
+- Caption: at most two short sentences. First what this PR changes for the user, then the one thing that keeps it safe or cheap.
+- Kind is always "flow". Question "". Interactive false. Picture "".`;
+
+export function prCardPrompt({ page, steps, glossary }) {
+  const section = {
+    id: 'pr',
+    heading: 'Pull request flow',
+    text: steps.map((s) => `=== STEP ${s.id}: ${s.label} (${s.changed ? 'NEW in this PR' : 'unchanged'}) ===\n`
+      + s.cuts.map((c) => `// ${c.path}:${c.start}-${c.end}\n${c.text}`).join('\n\n')).join('\n\n'),
+  };
+  const job = cardPrompt({ page, section, prefs: PR_PREFS });
+  const rules = glossary ? `${PR_RULES}\n\nName things in labels and caption with this project's own terms:\n${glossary}` : PR_RULES;
+  return { ...job, system: `${job.system}\n\n${rules}` };
+}

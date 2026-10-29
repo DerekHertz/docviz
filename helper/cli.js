@@ -1,20 +1,22 @@
 #!/usr/bin/env node
 // docviz [serve] [--port N] [--host H] [--provider auto|claude|codex] [--model M] [--codex-rates in,cached,out,image] [--new-code]
+// docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M] [--codex-rates ...]
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { randomInt } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { startServer } from './server.js';
 import { setCodexRates } from './providers.js';
+import { runPr, money } from './pr.js';
 
 const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'docviz');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 
 function parseArgs(argv) {
-  const opts = { cmd: 'serve' };
+  const opts = { cmd: 'serve', args: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (!a.startsWith('--')) { opts.cmd = a; continue; }
+    if (!a.startsWith('--')) { if (i === 0) opts.cmd = a; else opts.args.push(a); continue; }
     const key = a.slice(2);
     if (key === 'new-code' || key === 'help') opts[key] = true;
     else opts[key] = argv[++i];
@@ -41,13 +43,35 @@ function loadConfig(regenerate) {
 }
 
 const opts = parseArgs(process.argv.slice(2));
-if (opts.help || !['serve', 'code'].includes(opts.cmd)) {
+if (opts.help || !['serve', 'code', 'pr'].includes(opts.cmd) || (opts.cmd === 'pr' && (!opts.args[0] || !opts.pr))) {
   console.log(`docviz — local helper for the docviz Chrome extension
 
   docviz serve [--port 47823] [--host 127.0.0.1] [--provider auto|claude|codex] [--model M] [--new-code]
                [--codex-rates in,cached,out,image]   USD per 1M tokens + per picture, for Codex cost estimates
-  docviz code            print the pairing code`);
+  docviz code            print the pairing code
+  docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M]
+                         print a PR comment: one diagram of the PR's flow, code links, its cost`);
   process.exit(opts.help ? 0 : 1);
+}
+
+if (opts['codex-rates']) setCodexRates(opts['codex-rates']);
+
+if (opts.cmd === 'pr') {
+  const log = (m) => console.error(m);
+  try {
+    const { body, missing, usage } = await runPr({
+      stepsFile: opts.args[0], prUrl: opts.pr, title: opts.title, glossaryFile: opts.glossary,
+      provider: opts.provider, model: opts.model, log,
+    });
+    if (missing.length) log(`warning: steps not drawn as nodes: ${missing.join(', ')}`);
+    log(`cost: ${money(usage)}`);
+    process.stdout.write(body);
+    process.exit(0);
+  } catch (e) {
+    console.error(e.message);
+    if (e.usage) console.error(`cost: ${money(e.usage)}`);
+    process.exit(2);
+  }
 }
 
 const cfg = loadConfig(opts['new-code']);
@@ -60,7 +84,6 @@ const port = Number(opts.port || process.env.DOCVIZ_PORT || 47823);
 const host = opts.host || '127.0.0.1';
 const provider = opts.provider || 'auto';
 const log = (m) => console.log(`${new Date().toLocaleTimeString()}  ${m}`);
-if (opts['codex-rates']) setCodexRates(opts['codex-rates']);
 
 startServer({ host, port, token: cfg.token, provider, model: opts.model, log })
   .then(({ available }) => {
