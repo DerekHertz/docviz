@@ -2,9 +2,10 @@
 import { getSettings, setSettings } from './settings.js';
 
 export const PREF_FIELDS = [
-  { name: 'depth', label: 'Depth', options: [['concept', 'Concept'], ['mechanism', 'Mechanism'], ['implementation', 'Implementation']] },
+  { name: 'depth', label: 'Depth', options: [['eli5', 'Explain like I’m 5'], ['concept', 'Concept'], ['mechanism', 'Mechanism'], ['implementation', 'Implementation']] },
   { name: 'style', label: 'Style', options: [['illustrated', 'Illustrated — cartoons welcome'], ['strict', 'Strict diagrams']] },
   { name: 'coverage', label: 'Coverage', options: [['behavior', 'Only where something behaves'], ['all', 'Every section']] },
+  { name: 'pictures', label: 'Pictures', options: [['demand', 'When I click 🎨 (Codex)'], ['auto', 'On every card (Codex, costs more)'], ['off', 'Never']] },
 ];
 
 export function renderPrefs(container, prefs) {
@@ -33,7 +34,7 @@ export function renderPrefs(container, prefs) {
   container.append(think);
 }
 
-async function save(patch) {
+export async function save(patch) {
   const s = await getSettings();
   await setSettings({ prefs: { ...s.prefs, ...patch }, lastPrefChange: null });
   chrome.runtime.sendMessage({ type: 'prefs:updated' }).catch(() => {});

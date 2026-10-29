@@ -12,6 +12,7 @@ const cardProps = {
   caption: { type: 'string' },
   question: { type: 'string' },
   interactive: { type: 'boolean' },
+  picture: { type: 'string' },
 };
 
 const cardSchema = {
@@ -58,6 +59,11 @@ export const SCHEMAS = {
 };
 
 const DEPTH = {
+  eli5: `EXPLAIN LIKE I'M FIVE depth: the reader is new to this and wants the idea to click before any detail.
+- Build the diagram on ONE everyday analogy (a mailbox, a restaurant kitchen, a line at a shop) that matches the behavior exactly. Node and message labels use the analogy's plain words.
+- Each real identifier still appears, once, as a short tag beside its analogy: A["📬 mailbox<br/>debounce()"]. Never more jargon than that.
+- 3–7 nodes. One idea per diagram.
+- Caption: two or three short sentences a curious ten-year-old could follow, then "In code:" and one sentence mapping the analogy back to the real names.`,
   concept: 'CONCEPT depth: what the thing does and why, the shape of the behavior. Still name the real API surface involved.',
   mechanism: 'MECHANISM depth: how it behaves step by step — the calls, states, ordering, and branches a working engineer needs to predict it.',
   implementation: 'IMPLEMENTATION depth: internals — data structures, edge cases, error paths, concurrency, exact parameter effects.',
@@ -70,9 +76,11 @@ const STYLE = {
 
 function prefsBlock(prefs) {
   const p = { depth: 'mechanism', style: 'illustrated', coverage: 'behavior', thinkFirst: false, ...prefs };
+  // A strict reader still gets the analogy at ELI5 — that is the point of ELI5.
+  const style = p.depth === 'eli5' ? STYLE.illustrated : STYLE[p.style] || STYLE.illustrated;
   return [
     DEPTH[p.depth] || DEPTH.mechanism,
-    STYLE[p.style] || STYLE.illustrated,
+    style,
     p.thinkFirst
       ? 'THINK FIRST is on: fill "question" with one pointed question about the behavior the reader should try to answer before seeing the diagram (e.g. "What happens if the token expires mid-request?").'
       : 'THINK FIRST is off: set "question" to "".',
@@ -84,13 +92,20 @@ const MERMAID_RULES = `Mermaid rules (the diagram must parse with Mermaid 11):
 - In flowcharts, ALWAYS quote labels: A["setTimeout(fn, wait)"] — never leave ( ) [ ] { } < > : ; # unquoted in a label. Never use "end" as a node id.
 - In sequence diagrams, keep message text free of semicolons and "#"; declare participants with aliases and NO quotes (participant C as Client) — quotes render literally.
 - No HTML except <br/>. No click handlers, no styles that set fonts.
-- 4–14 nodes/steps. Prefer one clear diagram over an exhaustive one.
+- 4–14 nodes/steps (3–7 at ELI5 depth). Prefer one clear diagram over an exhaustive one.
 - Edge and message labels: 6 words max, led by the real identifier ("flush()", "wait elapsed"). Explanations go in the caption, not on edges.
 - State diagrams: avoid more than ~10 transitions; split concerns rather than drawing every edge.`;
 
 const BASE = `You turn technical documentation into diagrams that show how code BEHAVES.
 Fixed rule: use the doc's real identifiers — function names, parameters, options, status codes, config keys, error names. Illustrate freely, never oversimplify.
-Card fields: "title" (short), "kind", "mermaid" (source only, no fences), "caption" (one or two sentences: the key insight), "question", "interactive" (true when the behavior depends on tunable parameters or timing that an interactive simulation would make much clearer — e.g. debounce wait, retry backoff, pool size, TTL).`;
+Card fields: "title" (short), "kind", "mermaid" (source only, no fences), "caption" (one or two sentences: the key insight), "question", "interactive" (true when the behavior depends on tunable parameters or timing that an interactive simulation would make much clearer — e.g. debounce wait, retry backoff, pool size, TTL), "picture" (a brief for an explanatory figure another model will paint — see PICTURE BRIEF).
+
+PICTURE BRIEF — the picture must TEACH the same behavior as the diagram, like a figure in a good textbook, never decoration. Write 3–5 sentences:
+1. The scene: 2–5 concrete objects, and for each the real identifier it stands for ("a big toolbox = require('lodash'), a slim pouch = 'lodash/core'").
+2. What happens, in order, that shows the behavior (what moves where, what grows or shrinks, what waits).
+3. The one contrast or consequence the reader should notice ("the pouch is a sixth the size of the toolbox").
+4. The labels to draw: at most 6, each a real identifier or a number from the doc, 1–3 words.
+If the behavior is a sequence, ask for numbered steps. Do not repeat the diagram as boxes and arrows; show it as things in the world.`;
 
 export function cardsPrompt({ page, sections, prefs }) {
   const coverage = prefs?.coverage === 'all'
@@ -120,6 +135,25 @@ export function repairPrompt({ mermaid, error }) {
     system: `You fix Mermaid 11 syntax errors. Keep the diagram's meaning and labels; change only what is needed to parse.\n\n${MERMAID_RULES}`,
     prompt: `Parser error:\n${error}\n\nDiagram:\n${mermaid}`,
     schema: SCHEMAS.repair,
+  };
+}
+
+export function illustratePrompt({ card, prefs }) {
+  const tone = prefs?.depth === 'eli5' ? 'warm, friendly picture-book' : 'clean, modern textbook';
+  return {
+    prompt: `Use your built-in image_gen tool to generate exactly ONE image, then reply with just "done". Do not read files or run commands first.
+
+Make an explanatory figure for a reader of technical documentation. It must teach the behavior below at a glance — a reader who only looks at the picture should come away knowing the key point. Decorative scenes that don't explain anything are a failure.
+
+What to draw:
+${card.picture || card.caption}
+
+What it explains — "${card.title}": ${card.caption}
+
+The diagram it sits beside (for accuracy; don't copy its boxes and arrows):
+${card.mermaid}
+
+Style: ${tone} illustration, flat shapes, soft colors, plain light background, landscape 3:2. Draw the labels from the brief as short, crisp, correctly spelled text (code in a monospace font), with leader lines to what they name. Every arrow starts at the object it belongs to and ends where that thing goes. No other text, no logos, no UI chrome.`,
   };
 }
 

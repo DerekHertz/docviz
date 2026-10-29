@@ -1,8 +1,12 @@
 // One card, rendered inside an extension iframe. All state lives in the
 // service worker; this page re-reads its record whenever it changes.
-import { KINDS } from './settings.js';
+import { KINDS, money } from './settings.js';
 
-const key = new URLSearchParams(location.search).get('key');
+const params = new URLSearchParams(location.search);
+const key = params.get('key');
+// The expanded copy of a card lives in a page-wide overlay; same record, more room.
+const full = params.get('full') === '1';
+document.body.classList.toggle('full', full);
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...children) => {
   const n = Object.assign(document.createElement(tag), props);
@@ -12,6 +16,9 @@ const el = (tag, props = {}, ...children) => {
 
 let rec = null;
 let settings = null;
+let caps = null;
+let zoom = 0; // 0 = fit (expanded view only), else a scale factor
+let pictureUrl = { id: '', url: '' };
 let revealed = false;
 let renderedSig = '';
 let repairTried = false;
@@ -45,6 +52,7 @@ async function send(type, payload = {}) {
 // ---------- sizing ----------
 
 function reportHeight() {
+  if (full) return;
   const h = $('card').getBoundingClientRect().height + 2;
   parent.postMessage({ docviz: 'resize', key, height: h }, '*');
 }
@@ -58,6 +66,7 @@ async function load() {
   const value = await send('card:get');
   rec = value.rec;
   settings = value.settings;
+  caps = value.caps;
   render();
 }
 
@@ -74,6 +83,8 @@ function render() {
   $('caption').textContent = rec.view === 'explore' ? '' : spec?.caption || '';
   renderNote();
   renderError();
+  renderCost();
+  renderPicture();
 
   const loading = rec.status === 'loading';
   $('actions').setAttribute('aria-disabled', String(loading || !spec));
@@ -100,6 +111,57 @@ function render() {
     else renderDiagram(spec.mermaid);
   }
   renderThink();
+  reportHeight();
+}
+
+function renderCost() {
+  const c = rec.cost;
+  const chip = $('cost');
+  chip.hidden = !c;
+  if (!c) { $('costs').hidden = true; return; }
+  chip.textContent = money(c.usd, c.estimated);
+  const rows = c.items.map((i) => el('tr', {},
+    el('td', { textContent: `${i.what}${i.provider ? ` · ${i.provider}` : ''}${i.tokens ? ` · ${i.tokens.toLocaleString()} tok` : ''}` }),
+    el('td', { textContent: money(i.usd, i.estimated) })));
+  rows.push(el('tr', { className: 'total' }, el('td', { textContent: 'This card' }), el('td', { textContent: money(c.usd, c.estimated) })));
+  $('costs').replaceChildren(el('table', {}, ...rows), el('p', {
+    textContent: (c.estimated ? '~ = estimated from Codex token counts. ' : '') +
+      'API-equivalent price; on a Claude or ChatGPT subscription this comes out of your plan’s usage instead of a bill.',
+  }));
+}
+
+async function renderPicture() {
+  const box = $('picture');
+  const p = rec.picture;
+  $('paint').hidden = !caps?.pictures || settings?.prefs.pictures === 'off' || !rec.spec || rec.view === 'explore' || !!p;
+  if (!p || rec.view === 'explore') { box.hidden = true; return; }
+  box.hidden = false;
+  if (p.status === 'loading') {
+    box.replaceChildren(el('div', { className: 'spinner' }), el('span', { textContent: 'Codex is painting a picture… (about a minute)' }));
+  } else if (p.status === 'error') {
+    const retry = el('button', { textContent: 'Try again' });
+    retry.onclick = () => send('card:picture');
+    box.replaceChildren(el('span', { textContent: p.error }), retry);
+  } else if (pictureUrl.id !== p.imageId) {
+    // The helper wants the pairing code, which an <img src> can't send.
+    try {
+      const res = await fetch(`${settings.helperUrl}/v1/image/${p.imageId}`, { headers: { 'x-docviz-token': settings.token } });
+      if (!res.ok) throw new Error();
+      URL.revokeObjectURL(pictureUrl.url);
+      pictureUrl = { id: p.imageId, url: URL.createObjectURL(await res.blob()) };
+    } catch {
+      box.replaceChildren(el('span', { textContent: 'Picture unavailable — is the helper running?' }));
+      return;
+    }
+  }
+  if (p.status === 'ready' && pictureUrl.id === p.imageId) {
+    const img = el('img', { src: pictureUrl.url, alt: rec.spec?.picture || '' });
+    img.onload = reportHeight;
+    // Pictures carry labels; give them room.
+    if (!full) img.onclick = () => parent.postMessage({ docviz: 'expand', key }, '*');
+    img.title = full ? '' : 'Click to expand';
+    box.replaceChildren(img);
+  }
   reportHeight();
 }
 
@@ -145,6 +207,7 @@ async function renderDiagram(src) {
     const { svg } = await mermaid.render(`dv-${key}-${seq}`, src);
     if (seq !== renderSeq) return;
     body.innerHTML = svg;
+    applyZoom();
   } catch (e) {
     if (seq !== renderSeq) return;
     const message = String(e?.message || e).slice(0, 600);
@@ -202,7 +265,44 @@ addEventListener('message', (e) => {
   }
 });
 
+function applyZoom() {
+  const body = $('body');
+  const svg = body.querySelector('svg');
+  body.classList.toggle('fit', full && !zoom);
+  if (!svg || !full) return;
+  if (!zoom) { svg.style.width = ''; return; }
+  const natural = svg.viewBox.baseVal?.width || svg.getBoundingClientRect().width;
+  svg.style.width = `${Math.round(natural * zoom)}px`;
+  svg.style.height = 'auto';
+}
+
 // ---------- actions ----------
+
+$('expand').textContent = full ? '⤡' : '⤢';
+$('expand').title = full ? 'Close (Esc)' : 'Expand';
+$('expand').onclick = () => parent.postMessage({ docviz: full ? 'collapse' : 'expand', key }, '*');
+$('dismiss').hidden = full;
+if (full) {
+  // Picture beside the diagram, so the diagram gets the full height.
+  const stage = el('div', { className: 'stage' });
+  $('body').before(stage);
+  stage.append($('picture'), $('body'));
+}
+$('zoom').hidden = !full;
+if (full) {
+  // The overlay iframe has focus, so Escape arrives here rather than on the page.
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') parent.postMessage({ docviz: 'collapse', key }, '*'); });
+  for (const b of document.querySelectorAll('[data-zoom]')) {
+    b.onclick = () => {
+      const d = Number(b.dataset.zoom);
+      zoom = d === 0 ? 0 : Math.max(0.5, Math.min(4, (zoom || 1) * (d > 0 ? 1.25 : 0.8)));
+      applyZoom();
+    };
+  }
+}
+
+$('cost').onclick = () => { $('costs').hidden = !$('costs').hidden; reportHeight(); };
+$('paint').onclick = () => send('card:picture');
 
 for (const btn of document.querySelectorAll('[data-direction]')) {
   btn.onclick = () => { repairTried = false; revealed = false; send('card:adjust', { direction: btn.dataset.direction }); };

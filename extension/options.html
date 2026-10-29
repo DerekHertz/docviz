@@ -22,6 +22,11 @@
     #status.ok { color: #2f9e6e; } #status.bad { color: var(--danger); }
     details summary { cursor: pointer; color: var(--fg-soft); }
     .done { text-align: right; }
+    .calib { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin: 10px 0 14px; }
+    .calib button { text-align: left; padding: 10px 12px; border-radius: 10px; line-height: 1.45; display: flex; flex-direction: column; gap: 4px; }
+    .calib button b { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
+    .calib button[aria-pressed=true] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); background: var(--accent-soft); }
+    #budget { max-width: 100px; flex: none; min-width: 0; }
   </style>
 </head>
 <body>
@@ -60,13 +65,23 @@
   </section>
 
   <section>
-    <h2><span class="n">3</span>How should visuals explain things to you?</h2>
+    <h2><span class="n">3</span>Learn how you like things explained</h2>
+    <p>Here’s <code>debounce(fn, wait)</code> explained four ways. <b>Pick the one that clicks</b> — your cards start there.</p>
+    <div class="calib" id="calib"></div>
     <div id="prefs"></div>
-    <p class="muted">Real identifiers always appear, whatever you pick. “Simpler” and “More detail” on a card nudge your depth — you’ll see it happen, with undo.</p>
+    <p class="muted">Real identifiers always appear, whatever you pick. Docviz keeps learning: “Simpler” and “More detail” on a card nudge your depth — you’ll see it happen, with undo.</p>
   </section>
 
   <section>
-    <h2><span class="n">4</span>Triggers</h2>
+    <h2><span class="n">4</span>Spending</h2>
+    <p>Every card shows what it cost, and the side panel keeps a running total. Docviz stops starting new work once today’s spend reaches your budget.</p>
+    <div class="row"><label for="budget">Daily budget</label>$<input type="text" id="budget" inputmode="decimal"><span class="muted">0 = no cap</span></div>
+    <p class="muted" id="spent"></p>
+    <p class="muted">Prices are what the same calls cost on the API. On a Claude or ChatGPT subscription you aren’t billed per call — it comes out of your plan’s usage limits instead. Codex prices are estimated from token counts.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span>Triggers</h2>
     <p><b>Break down a page:</b> toolbar icon or <code>Alt+Shift+D</code>. <b>Visualize a selection:</b> right-click or <code>Alt+Shift+V</code>.</p>
     <label class="pref"><input type="checkbox" id="chip"><span>Show a “Visualize” chip whenever I highlight text <span class="muted">(asks for access to all sites)</span></span></label>
   </section>

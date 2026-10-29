@@ -50,10 +50,30 @@ Then `/docviz` starts the helper in the background and shows the pairing code.
 | Toolbar icon or `Alt+Shift+D` | Cards under each section that describes behavior + the side panel |
 | Select text → right-click or `Alt+Shift+V` | A popover diagram for just that selection |
 | **Simpler / More detail** on a card | Regenerates that card *and* nudges your saved depth (shown on the card, with Undo) |
+| **⤢** on a card | Expands it to fill the window, with zoom (Esc closes) |
+| **🎨 Picture** | Codex paints the card's metaphor (needs the Codex CLI; ~30–60s) |
+| **$0.04** on a card | What that card cost, call by call |
 | **Type ▾** | Redraw as sequence / state / flow / timeline / architecture |
 | **Explore ▸** | An interactive simulation with the doc's real knobs. Takes 1–3 min: it reads the source first. Always labeled *simulated*, with sources and assumptions |
 
-Preferences (depth, style, coverage, think-first) live in the side panel and settings page.
+Preferences (depth, style, coverage, pictures, think-first) live in the side panel and settings page.
+Setup starts by showing one idea explained four ways, from **Explain like I'm 5** to implementation
+detail; the one you pick is where your cards start.
+
+### Claude + Codex together
+
+With both CLIs installed, Claude plans every card (diagram, caption, and a picture idea) and
+Codex paints the pictures with its built-in image generator. With only one, that one does the text
+and pictures need Codex.
+
+### What it costs
+
+Every card shows its cost; the side panel shows this page, today, and all time, against a daily
+budget (default $2, set in settings, 0 = no cap). Once today's spend reaches the budget, docviz
+starts no new work. Prices are API-equivalent: on a Claude or ChatGPT subscription you aren't billed
+per call, it comes out of your plan's usage. Claude reports its own price; Codex prices are estimated
+from token counts (`--codex-rates` sets the rates). Rough numbers: a card $0.02–0.05 on Opus, a
+picture ~$0.12.
 
 ## How it works
 
@@ -77,6 +97,7 @@ See [SPEC.md](SPEC.md) for the decisions behind all of this.
 
 ```
 docviz serve [--port 47823] [--host 127.0.0.1] [--provider auto|claude|codex] [--model M] [--new-code]
+             [--codex-rates in,cached,out,image]   # USD per 1M tokens, and per picture
 docviz code     # print the pairing code
 ```
 

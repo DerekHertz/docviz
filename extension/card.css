@@ -25,3 +25,29 @@ iframe.sim { width: 100%; height: 360px; border: 1px solid var(--line); border-r
 .meta h2 { font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: .04em; color: var(--fg-soft); }
 .meta ul { margin: 2px 0 0; padding-left: 18px; }
 .meta li { margin: 1px 0; }
+
+.cost { font: 600 11px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--fg-soft); padding: 4px 6px; }
+.costs { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--bg-soft); font-size: 12px; }
+.costs table { width: 100%; border-collapse: collapse; }
+.costs td { padding: 1px 0; }
+.costs td:last-child { text-align: right; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.costs tr.total td { border-top: 1px solid var(--line); font-weight: 600; padding-top: 3px; }
+.costs p { margin: 6px 0 0; color: var(--fg-soft); }
+.picture { margin: 10px 0 0; display: flex; justify-content: center; align-items: center; gap: 10px; min-height: 40px; color: var(--fg-soft); }
+.picture img { max-width: 100%; max-height: 300px; border-radius: 10px; display: block; }
+body:not(.full) .picture img { cursor: zoom-in; }
+
+/* Expanded: the card fills the overlay; the diagram fits the space and can zoom. */
+body.full, body.full .card { height: 100vh; }
+body.full .card { display: flex; flex-direction: column; border-radius: 0; border: 0; padding: 14px 20px 12px; }
+body.full header h1 { font-size: 17px; }
+body.full .stage { flex: 1; min-height: 0; display: flex; gap: 18px; margin: 12px 0 6px; }
+body.full .picture { flex: 0 0 44%; margin: 0; align-items: flex-start; }
+body.full .picture img { max-height: none; }
+body.full .body { flex: 1; min-width: 0; overflow: auto; margin: 0; }
+body.full .body svg { max-width: none; }
+/* Fit to width and scroll: a tall diagram squeezed to the window height is what made cards unreadable. */
+body.full .body.fit svg { width: 100% !important; height: auto !important; }
+body.full iframe.sim { height: 100%; }
+body.full .caption { font-size: 14px; max-width: 900px; }
+.zoom { display: inline-flex; gap: 2px; }
