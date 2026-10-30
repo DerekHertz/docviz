@@ -118,6 +118,48 @@ returns one PR comment.
 - Mermaid is checked only when Playwright is found (docviz takes no dependency on it); the footer
   says "not syntax-checked" otherwise.
 
+## Lab (`docviz lab`)
+
+Added 2026-10-30. A local page (`lab/`, port 47830) for trying a new evaluator on known-good and
+known-broken cases before anything ships with it. Jev is the first; the plan is
+[docs/jev-eval-plan.md](docs/jev-eval-plan.md). It runs from a repo checkout (`docviz lab` or
+`npm run lab`); the published helper leaves it out.
+
+Direction: the lab is how docviz decides which checks to trust on large diffs, PRs and generated
+code. An adopted check runs where docviz explains code (`docviz pr`, cards) and its result is shown
+there; the lab keeps rerunning it as models and prompts change.
+
+- An experiment is a module in `lab/experiments/` exporting `meta` (pass bar, and `tested`: what
+  the evaluator is given, asked, and what is left to code), `cases()` and `evaluate()`. Bad cases
+  are made by breaking good ones on purpose, so the truth is known. The page shows all of it, with
+  a table of case kinds, before any result.
+- Jev is asked only what code can't answer. Exact strings (spelling, names existing, line numbers)
+  stay in code. Every Jev question carries criteria: what counts as yes and as no.
+- Results show calibration (when Jev says 80%, is it right 80% of the time?) and confidence bands:
+  confident answers act, the middle goes to review (a stronger model or a person).
+- Three-way experiments: truth is good / broken / can't tell (the evaluator honestly can't decide
+  from what it's shown), and an answer becomes pass / flag / review. A yes/no question can't say
+  "unknown" (Jev expresses doubt only by answering near 0.5), so a check is tested both ways on
+  the same cases: yes/no with bands, and three named options including "can't tell". Scored on
+  broken let through, good flagged, clear cases sent to review, and can't-tell cases passed
+  anyway. A broken case sent to review counts as caught: a person sees it.
+- Repeatability is judged on decisions, not probabilities: the share of cases whose decision
+  changed since the previous run (Jev's probabilities move by a few hundredths between runs).
+- Adopted so far (2026-10-30), both not yet wired into docviz:
+  - **B2 identifier readable** (rendered card PNG, yes/no, threshold tuned per run).
+  - **C3 step matches its code**, two questions per step: "is every claim in the label shown by
+    these lines?" (pass at ≥ 0.6) and "do they contradict it?" (flag at ≥ 0.5); neither is review.
+    A label may only claim what its linked lines show. The one-question and three-option
+    versions passed 44% / 56% of can't-tell labels and were rejected.
+- The page shows every case as the evaluator saw it, streams each decision as it lands, and scores
+  the run: threshold tuned on half the cases, rates on the other half; any injection case that gets
+  through fails the run. The user can flip a label, change the bar, and record adopt / reject /
+  needs a better question in `lab/decisions.json`. Only an adopted check moves into the product.
+- Spend: every call's cost is in the run and on the page. Jev cost is exact (input tokens ×
+  $0.042/Mtok; output free). The key comes from `TYPESAFE_API_KEY`.
+- Playwright is a dev dependency, used to render cards to PNG for the lab. The extension and
+  the published helper still take no dependencies.
+
 ## Later
 
 - Mascot that hops onto the page and "paints the picture" (own character — not Anthropic's).
