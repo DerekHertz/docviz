@@ -23,6 +23,14 @@ the CLI runner described below: same scoring (`lab/metrics.js`), with the cases 
   flagged after relabelling "ssh or .git remote" as broken, 97–98% right when decided), but 44% /
   56% of can't-tell cases passed: Jev reads "do these lines do what the label says?" as "does
   anything conflict?". Moving cutoffs only fixes it by tuning on the same cases.
+- **C3 on real PR steps (lab C3·real).** 19 steps from five of the author's projects (JS, TS, TSX,
+  Python; three are private, so the snapshots from `lab/snapshot-real.mjs` stay local and gitignored); true / next step's code / wrong
+  action / can't tell (half held out). Adopted check: 14/19 true pass, 0 flagged, 1/38 broken
+  passed, 1/9 held-out can't-tell passed; passes the bar with clear→review at 25%. With one-hop
+  context: 15/19, but 2/38 broken passed, one because the context held the helper the label
+  describes. Not adopted. Reviews on true steps come from labels with a "why" the code doesn't
+  show (".den from the base branch *so a branch can't weaken its checks*"), long functions
+  (66 lines), and snippet cuts.
 - **C3 two-question version: adopted** at shown ≥ 0.6 / contradicted ≥ 0.5, chosen without the
   held-out cases. Two runs: 0% broken let through, 3% good flagged, 14–16% clear cases to review,
   0% held-out can't-tell passed, 98% right when decided, 2 of 112 decisions changed (both toward

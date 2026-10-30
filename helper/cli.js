@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // docviz [serve] [--port N] [--host H] [--provider auto|claude|codex] [--model M] [--codex-rates in,cached,out,image] [--new-code]
 // docviz lab [--port 47830]   (repo checkout only: the lab needs Playwright)
-// docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M] [--codex-rates ...]
+// docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M] [--codex-rates ...] [--no-check]
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { randomInt } from 'node:crypto';
 import { homedir } from 'node:os';
@@ -19,7 +19,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith('--')) { if (i === 0) opts.cmd = a; else opts.args.push(a); continue; }
     const key = a.slice(2);
-    if (key === 'new-code' || key === 'help') opts[key] = true;
+    if (key === 'new-code' || key === 'help' || key === 'no-check') opts[key] = true;
     else opts[key] = argv[++i];
   }
   return opts;
@@ -50,8 +50,9 @@ if (opts.help || !['serve', 'code', 'pr', 'lab'].includes(opts.cmd) || (opts.cmd
   docviz serve [--port 47823] [--host 127.0.0.1] [--provider auto|claude|codex] [--model M] [--new-code]
                [--codex-rates in,cached,out,image]   USD per 1M tokens + per picture, for Codex cost estimates
   docviz code            print the pairing code
-  docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M]
-                         print a PR comment: one diagram of the PR's flow, code links, its cost
+  docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M] [--no-check]
+                         print a PR comment: one diagram of the PR's flow, code links, its cost.
+                         With TYPESAFE_API_KEY set, Jev checks each step's label against its code
   docviz lab [--port 47830]
                          open the lab: try a check (Jev first) on known-good and known-broken cases`);
   process.exit(opts.help ? 0 : 1);
@@ -64,7 +65,7 @@ if (opts.cmd === 'pr') {
   try {
     const { body, missing, usage } = await runPr({
       stepsFile: opts.args[0], prUrl: opts.pr, title: opts.title, glossaryFile: opts.glossary,
-      provider: opts.provider, model: opts.model, log,
+      provider: opts.provider, model: opts.model, check: !opts['no-check'], log,
     });
     if (missing.length) log(`warning: steps not drawn as nodes: ${missing.join(', ')}`);
     log(`cost: ${money(usage)}`);

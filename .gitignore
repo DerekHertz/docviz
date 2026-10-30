@@ -3,3 +3,5 @@ node_modules/
 .scratch/
 lab/.cache/
 lab/runs/
+lab/fixtures/real-prs.src.json
+lab/fixtures/real-steps.json

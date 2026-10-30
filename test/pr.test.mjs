@@ -57,6 +57,36 @@ test('the comment links each step to its lines and shows the cost', () => {
   assert.match(body, /not syntax-checked/);
 });
 
+test('step checks add a column and a footer line, with their cost broken out', () => {
+  const body = prComment({
+    card: { caption: 'CAP', mermaid: 'flowchart TD\n  pick\n' },
+    steps: [
+      { label: 'Pick forums', cuts: [{ path: 'src/a.js', start: 3, end: 9 }] },
+      { label: 'Rank them', cuts: [{ path: 'src/b.js', start: 1, end: 4 }] },
+      { label: 'Post it', cuts: [{ path: 'src/c.js', start: 1, end: 2 }] },
+    ],
+    checks: [{ verdict: 'pass' }, { verdict: 'review' }, { verdict: 'flag' }],
+    sha: 'abcdef1234567', repoUrl: 'https://github.com/o/r', checked: true, version: 'v1',
+    usage: { usd: 0.04, estimated: false }, costs: { diagram: { usd: 0.04, estimated: false }, checks: { usd: 0.00006, estimated: false } },
+  });
+  assert.match(body, /\| Step \| \| Code \| Check \|/);
+  assert.match(body, /\| Pick forums \|  \| .* \| ✓ \|/);
+  assert.match(body, /\| Rank them \|  \| .* \| ⚠ review \|/);
+  assert.match(body, /\| Post it \|  \| .* \| ✗ doesn’t match \|/);
+  assert.match(body, /steps checked by Jev: 1 ✓, 1 ⚠, 1 ✗/);
+  assert.match(body, /cost \$0\.04 \(diagram \$0\.04, step checks \$0\.000\)/);
+});
+
+test('without checks the comment says the steps were not checked', () => {
+  const body = prComment({
+    card: { caption: 'CAP', mermaid: 'flowchart TD\n  pick\n' },
+    steps: [{ label: 'Pick forums', cuts: [{ path: 'src/a.js', start: 3, end: 9 }] }],
+    sha: 'abcdef1234567', repoUrl: 'https://github.com/o/r', usage: { usd: 0.04, estimated: false }, checked: true, version: 'v1',
+  });
+  assert.doesNotMatch(body, /\| Check \|/);
+  assert.match(body, /steps not checked/);
+});
+
 test('docviz pr runs the CLI once and prints the comment with its cost', () => {
   const bin = mkdtempSync(join(tmpdir(), 'fake-claude-'));
   const card = { sectionId: 'pr', kind: 'flow', title: 'T', mermaid: 'flowchart TD\n  pick["Pick forums"]:::changed\nclassDef changed stroke:#d29922,stroke-width:3px', caption: 'CAP', question: '', interactive: false, picture: '' };
@@ -79,8 +109,10 @@ cat '${join(bin, 'out.json')}'
     { id: 'pick', label: 'Pick forums', changed: true, sources: [{ path: 'src/a.js', from: 'function pick', to: 'function later' }] },
   ] }));
 
+  const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+  delete env.TYPESAFE_API_KEY;
   const res = spawnSync('node', [CLI, 'pr', 'steps.json', '--pr', 'https://github.com/o/r/pull/1', '--provider', 'claude'], {
-    cwd: repo, encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    cwd: repo, encoding: 'utf8', env,
   });
   assert.equal(res.status, 0, res.stderr);
   assert.ok(res.stdout.startsWith(MARKER));
@@ -89,4 +121,6 @@ cat '${join(bin, 'out.json')}'
   assert.match(res.stdout, new RegExp(`blob/${git('rev-parse', 'HEAD')}/src/a\\.js#L2-L2`));
   assert.match(res.stdout, /cost \$0\.03\./);
   assert.match(res.stderr, /\$0\.03/);
+  assert.match(res.stderr, /TYPESAFE_API_KEY not set: steps not checked/);
+  assert.match(res.stdout, /steps not checked/);
 });

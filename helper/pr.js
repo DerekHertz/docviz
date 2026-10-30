@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { complete, detectProviders, pickProvider } from './providers.js';
 import { prCardPrompt, repairPrompt } from './prompts.js';
+import { checkSteps } from './checks.js';
 
 export const MARKER = '<!-- docviz-pr-diagrams -->';
 const DOCVIZ_REPO = 'https://github.com/DerekHertz/docviz';
@@ -34,8 +35,22 @@ export function sumUsage(list) {
 // Same format as the extension's card costs (extension/settings.js money()).
 export const money = (u) => `${u.estimated ? '~' : ''}$${u.usd < 0.01 ? u.usd.toFixed(3) : u.usd.toFixed(2)}`;
 
-export function prComment({ card, steps, sha, repoUrl, usage, checked, version }) {
+const CHECK = { pass: '✓', review: '⚠ review', flag: '✗ doesn’t match', unchecked: '—' };
+
+// "1 ✓, 1 ⚠, 1 ✗": only the outcomes that happened.
+function checkSummary(checks) {
+  const n = (v) => checks.filter((c) => c.verdict === v).length;
+  const parts = [[n('pass'), '✓'], [n('review'), '⚠'], [n('flag'), '✗'], [n('unchecked'), 'not checked']].filter(([k]) => k).map(([k, s]) => `${k} ${s}`);
+  return `steps checked by Jev: ${parts.join(', ')}`;
+}
+
+/**
+ * `checks` (one per step, from helper/checks.js) adds a Check column; without it the footer says
+ * the steps weren't checked. `costs` breaks the total into diagram and step checks.
+ */
+export function prComment({ card, steps, sha, repoUrl, usage, checked, version, checks, costs }) {
   const link = (c) => `[\`${c.path}:${c.start}-${c.end}\`](${repoUrl}/blob/${sha}/${c.path}#L${c.start}-L${c.end})`;
+  const cost = costs ? `${money(usage)} (diagram ${money(costs.diagram)}, step checks ${money(costs.checks)})` : money(usage);
   return [
     MARKER,
     '## How this PR works',
@@ -49,11 +64,13 @@ export function prComment({ card, steps, sha, repoUrl, usage, checked, version }
     '',
     `### Where in the code (at \`${sha.slice(0, 7)}\`)`,
     '',
-    '| Step | | Code |',
-    '|---|---|---|',
-    ...steps.map((s) => `| ${s.label} | ${s.changed ? 'new' : ''} | ${s.cuts.map(link).join('<br>')} |`),
+    checks ? '| Step | | Code | Check |' : '| Step | | Code |',
+    checks ? '|---|---|---|---|' : '|---|---|---|',
+    ...steps.map((s, i) => `| ${s.label} | ${s.changed ? 'new' : ''} | ${s.cuts.map(link).join('<br>')} |${checks ? ` ${CHECK[checks[i]?.verdict] || '—'} |` : ''}`),
+    checks?.some((c) => c.verdict === 'review' || c.verdict === 'flag')
+      ? '\n⚠ the label claims something these lines don’t show (a person should look); ✗ the lines contradict the label.' : '',
     '',
-    `<sub>Diagram by [docviz](${DOCVIZ_REPO}) \`${version}\`, ${checked ? 'checked against Mermaid 11' : 'not syntax-checked'}, cost ${money(usage)}.</sub>`,
+    `<sub>Diagram by [docviz](${DOCVIZ_REPO}) \`${version}\`, ${checked ? 'checked against Mermaid 11' : 'not syntax-checked'}, ${checks ? checkSummary(checks) : 'steps not checked'}, cost ${cost}.</sub>`,
   ].join('\n') + '\n';
 }
 
@@ -84,7 +101,7 @@ function docvizVersion() {
 }
 
 /** Returns { body, missing, usage }; throws with `usage` when the diagram can't be used. */
-export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: requested, model, log = () => {} }) {
+export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: requested, model, check = true, ask, log = () => {} }) {
   const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim();
   const root = git('rev-parse', '--show-toplevel');
   const sha = git('rev-parse', 'HEAD');
@@ -112,7 +129,18 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
     }
   };
 
-  const card = await call(prCardPrompt({ page: { title: title || 'Pull request', url: prUrl }, steps, glossary }), 300_000);
+  // Step checks (Jev) run alongside the diagram; they never fail the comment.
+  const canCheck = check && (ask || process.env.TYPESAFE_API_KEY);
+  if (check && !canCheck) log('TYPESAFE_API_KEY not set: steps not checked');
+  const checking = canCheck ? checkSteps(steps, ask ? { ask } : {}) : null;
+
+  let card;
+  try {
+    card = await call(prCardPrompt({ page: { title: title || 'Pull request', url: prUrl }, steps, glossary }), 300_000);
+  } catch (e) {
+    const checks = await checking;
+    throw Object.assign(e, { usage: sumUsage([...spent, ...(checks || []).map((c) => c.usage)]) });
+  }
   const checker = await mermaidChecker(root);
   if (!checker) log('playwright not found: the diagram is not syntax-checked');
   try {
@@ -121,12 +149,18 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
       card.mermaid = (await call(repairPrompt({ mermaid: card.mermaid, error }), 120_000)).mermaid;
       error = await checker.check(card.mermaid);
     }
-    if (error) throw Object.assign(new Error(`diagram doesn't parse: ${error.split('\n')[0]}`), { usage: sumUsage(spent) });
+    if (error) {
+      const checks = await checking;
+      throw Object.assign(new Error(`diagram doesn't parse: ${error.split('\n')[0]}`), { usage: sumUsage([...spent, ...(checks || []).map((c) => c.usage)]) });
+    }
   } finally {
     await checker?.close();
   }
 
-  const usage = sumUsage(spent);
-  const body = prComment({ card, steps, sha, repoUrl, usage, checked: !!checker, version: docvizVersion() });
-  return { body, missing: missingSteps(steps, card.mermaid), usage };
+  const checks = await checking;
+  for (const c of checks || []) if (c.error) log(`step ${c.id} not checked: ${c.error}`);
+  const costs = checks ? { diagram: sumUsage(spent), checks: sumUsage(checks.map((c) => c.usage)) } : null;
+  const usage = sumUsage([...spent, ...(checks || []).map((c) => c.usage)]);
+  const body = prComment({ card, steps, sha, repoUrl, usage, checked: !!checker, version: docvizVersion(), checks, costs });
+  return { body, missing: missingSteps(steps, card.mermaid), usage, checks };
 }

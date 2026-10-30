@@ -1,6 +1,9 @@
 // Scoring for lab experiments. A case is { id, flag, bad, card?, usd?, injection? }:
 // `flag` is the evaluator's probability that the case is bad, `bad` the truth.
 import { createHash } from 'node:crypto';
+import { decideStep, ADOPTED } from '../helper/checks.js';
+
+const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] != null).map((k) => [k, o[k]]));
 
 export function rates(cases, t) {
   const bad = cases.filter((c) => c.bad);
@@ -127,12 +130,7 @@ export function decide(rule, r, bar = {}) {
     if (r.prob <= (bar.flagAt ?? 0.3)) return 'flag';
     return 'review';
   }
-  if (rule.kind === 'two') {
-    if (r.prob == null || r.probContra == null) return null;
-    if (r.probContra >= (bar.contradictedAt ?? 0.5)) return 'flag';
-    if (r.prob >= (bar.supportedAt ?? 0.7)) return 'pass';
-    return 'review';
-  }
+  if (rule.kind === 'two') return decideStep(r, { ...ADOPTED, ...pick(bar, ['supportedAt', 'contradictedAt']) });
   if (rule.kind === 'choice') {
     if (!r.choice) return null;
     if (bar.minConfidence && (r.confidence ?? 0) < bar.minConfidence) return 'review';

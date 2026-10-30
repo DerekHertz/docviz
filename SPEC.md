@@ -117,6 +117,17 @@ returns one PR comment.
   every call (card + repair), with `~` for Codex. A failed run still prints what it spent.
 - Mermaid is checked only when Playwright is found (docviz takes no dependency on it); the footer
   says "not syntax-checked" otherwise.
+- Step checks (lab C3, `helper/checks.js`): with `TYPESAFE_API_KEY` set, Jev checks each step's
+  label against its linked lines while the diagram is drawn, and the table gains a Check column:
+  ✓ every claim shown, ⚠ review (a claim the lines don't show), ✗ contradicted. A failed check
+  marks only that step unchecked. Jev's cost is in the footer, broken out from the diagram's.
+  `--no-check` skips it; without a key the footer says "steps not checked".
+  First real run (this repo, 2026-10-30): 4 of 5 steps went to review: snippet cuts with labels that
+  claimed more than the snippet. Retested in the lab on 19 real steps from five projects (JS, TS,
+  TSX, Python, whole functions): 14 of 19 true steps pass, none flagged, 1 of 38 broken let
+  through, 1 of 9 held-out can't-tell passed. Adding the definitions a step calls (one hop,
+  `helper/context.js`) didn't help overall and let a wrong link pass on its helper's code, so it is
+  not used.
 
 ## Lab (`docviz lab`)
 

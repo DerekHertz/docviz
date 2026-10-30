@@ -142,3 +142,27 @@ test('three-way repeatability counts verdicts that changed since the previous ru
   assert.ok(r.misses.some((m) => /decisions changed 33% > 5%/.test(m)));
   assert.equal(judge3(run, bar).changed, null);
 });
+
+const { hasFixture } = await import('../lab/real.js');
+test('real PR steps: 19 steps from 5 repos, four cases each, shared by both versions', { skip: !hasFixture() && 'real-steps fixture is local only (private code)' }, async () => {
+  const cut = await import('../lab/experiments/real-steps-cut.js');
+  const ctx = await import('../lab/experiments/real-steps-context.js');
+  const all = cut.cases();
+  assert.equal(all.length, 76);
+  assert.deepEqual(all.map((x) => x.id), ctx.cases().map((x) => x.id));
+  assert.equal(new Set(all.map((x) => x.repo)).size, 5);
+  const by = (m) => all.filter((x) => x.mutation === m);
+  assert.ok(by('original').every((x) => x.truth === 'good'));
+  assert.ok([...by('neighbor'), ...by('wrongAction')].every((x) => x.truth === 'bad'));
+  assert.ok(by('unclear').every((x) => x.truth === 'unclear'));
+  const held = by('unclear').filter((x) => x.heldOut).length;
+  assert.ok(held >= 7 && held <= 12, `${held} held out`);
+  for (const n of by('neighbor')) {
+    const own = all.find((x) => x.step === n.step && x.mutation === 'original');
+    assert.notEqual(n.code, own.code);
+    assert.equal(n.repo, own.repo, 'the wrong code comes from the same PR');
+  }
+  assert.equal(cut.request(all[0]).state.context, undefined);
+  const withCtx = all.find((x) => x.context);
+  assert.match(ctx.request(withCtx).state.context, /called by the step/);
+});
