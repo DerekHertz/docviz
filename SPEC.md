@@ -102,6 +102,22 @@ tokens and `--codex-rates`, shown with `~`.
 - Side panel: helper status, cards on this page (click to scroll), prefs, last pref change.
 - Claude Code plugin: `/docviz` starts the helper in the background.
 
+## PR mode (`docviz pr`)
+
+Moved in from reposwipe's `pr-diagrams` skill on 2026-10-29. A CLI command, not a helper route:
+the caller (usually an agent) picks the PR's main flow as 4–8 steps with their code, and docviz
+returns one PR comment.
+
+- One `flowchart TD`, at most 6 nodes, a node per step; changed steps carry `:::changed` with a
+  stroke-only `classDef` (a fill breaks GitHub's dark theme). Prefs are fixed: concept, strict.
+- Labels are plain words, overriding the identifier rule: the "Where in the code" table under the
+  diagram is where the real identifiers live, as links to the lines at `HEAD`.
+- `--glossary` adds the project's own terms to the prompt.
+- Cost: there is no extension or ledger here, so the comment's footer and stderr carry the total of
+  every call (card + repair), with `~` for Codex. A failed run still prints what it spent.
+- Mermaid is checked only when Playwright is found (docviz takes no dependency on it); the footer
+  says "not syntax-checked" otherwise.
+
 ## Later
 
 - Mascot that hops onto the page and "paints the picture" (own character — not Anthropic's).
