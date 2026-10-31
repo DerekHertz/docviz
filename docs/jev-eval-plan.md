@@ -23,6 +23,17 @@ the CLI runner described below: same scoring (`lab/metrics.js`), with the cases 
   flagged after relabelling "ssh or .git remote" as broken, 97–98% right when decided), but 44% /
   56% of can't-tell cases passed: Jev reads "do these lines do what the label says?" as "does
   anything conflict?". Moving cutoffs only fixes it by tuning on the same cases.
+- **D1, protection domains a change touches (Atlas security lens, tickets 03/10/11).** 20 real file
+  changes from public repos (docviz, dimsumden, second-lead) × 5 domains (secrets, untrusted input,
+  network, processes and files, access control) = 100 cases, labels by Claude. Jev (one request per
+  change) vs one text pattern per domain. Both catch 81% on the scored half (bar 90%); false alarms
+  Jev 3%, patterns 15%. Mechanical domains (secrets, processes/files, network): both catch all,
+  Jev with fewer alarms. Judgment domains (untrusted input, access): they miss *different* cases:
+  patterns miss a shell-command guard and a merge rule; Jev misses `securityLevel: 'strict'` and a
+  sync that strips tools from agent roles; both miss the latter. Several Jev "false alarms" look
+  like labels that were too narrow (needs the user's relabel). Next: relabel, add changes (only 2
+  network positives), and test a hybrid (patterns for mechanical domains, Jev for judgment ones,
+  either flags) on held-out changes before the Atlas shows any domain as more than a candidate.
 - **C3 on real PR steps (lab C3·real).** 19 steps from five of the author's projects (JS, TS, TSX,
   Python; three are private, so the snapshots from `lab/snapshot-real.mjs` stay local and gitignored); true / next step's code / wrong
   action / can't tell (half held out). Adopted check: 14/19 true pass, 0 flagged, 1/38 broken

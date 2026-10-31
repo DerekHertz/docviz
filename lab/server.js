@@ -184,6 +184,7 @@ async function runExperiment(exp, req, res, log) {
   log(`→ ${exp.meta.id}: ${cases.length} cases`);
 
   const results = [];
+  const runMemo = new Map(); // shared by an experiment's evaluations within this run
   let usd = 0;
   let next = 0;
   const worker = async () => {
@@ -192,7 +193,7 @@ async function runExperiment(exp, req, res, log) {
       send({ type: 'asking', id: c.id });
       const started = Date.now();
       try {
-        const r = await exp.evaluate(c, { render, ask: askJev });
+        const r = await exp.evaluate(c, { render, ask: askJev, run: runMemo });
         usd += r.usage.usd;
         const row = { id: c.id, flag: r.flag, prob: r.prob, probContra: r.probContra, choice: r.choice, probabilities: r.probabilities, confidence: r.confidence, answers: r.answers, usage: r.usage, asked: r.asked, ms: Date.now() - started };
         results.push(row);
