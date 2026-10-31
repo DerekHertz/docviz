@@ -1,0 +1,22 @@
+[
+  { "repo": "docviz", "sha": "d3da559", "file": "helper/jev.js", "touches": ["secrets", "untrusted", "network"] },
+  { "repo": "docviz", "sha": "d3da559", "file": "lab/render.js", "touches": ["untrusted", "processFs", "access"] },
+  { "repo": "docviz", "sha": "3d37957", "file": "helper/server.js", "touches": ["secrets", "untrusted", "network", "processFs", "access"] },
+  { "repo": "docviz", "sha": "3d37957", "file": "extension/ledger.js", "touches": [] },
+  { "repo": "docviz", "sha": "3d37957", "file": "helper/providers.js", "touches": ["untrusted", "processFs"] },
+  { "repo": "docviz", "sha": "3d37957", "file": "extension/content.js", "touches": ["untrusted", "access"] },
+  { "repo": "docviz", "sha": "3d37957", "file": ".github/workflows/ci.yml", "touches": ["processFs", "access"] },
+  { "repo": "docviz", "sha": "ea068fd", "file": "helper/prompts.js", "touches": ["untrusted"] },
+  { "repo": "docviz", "sha": "3d37957", "file": "extension/sidepanel.js", "touches": [] },
+  { "repo": "dimsumden", "sha": "c1e7b89f", "file": "scripts/risk-check.mjs", "touches": ["untrusted", "access"] },
+  { "repo": "dimsumden", "sha": "00d470ed", "file": "scripts/hooks/bash-guard.mjs", "touches": ["untrusted", "access"] },
+  { "repo": "dimsumden", "sha": "50b20fa1", "file": "apps/bridge/agents/claude-adapter.mjs", "touches": ["secrets", "processFs", "access"] },
+  { "repo": "dimsumden", "sha": "9bfa779d", "file": "apps/bridge/agents/host.mjs", "touches": ["processFs"] },
+  { "repo": "dimsumden", "sha": "5e2b8b4e", "file": "apps/bridge/project-policy.mjs", "touches": ["access"] },
+  { "repo": "dimsumden", "sha": "19d45507", "file": "apps/bridge/projects.mjs", "touches": ["processFs", "access"] },
+  { "repo": "dimsumden", "sha": "506e194b", "file": "scripts/den-roles-sync.mjs", "touches": ["processFs", "access"] },
+  { "repo": "immersive_language_learning", "sha": "311a6c5", "file": "supabase/migrations/20261029120100_rls.sql", "touches": ["access"] },
+  { "repo": "immersive_language_learning", "sha": "634035f", "file": "src/judge/syllables.ts", "touches": [] },
+  { "repo": "immersive_language_learning", "sha": "49a28fd", "file": "src/packet/Packet.tsx", "touches": [] },
+  { "repo": "immersive_language_learning", "sha": "bdb27f0", "file": "src/speech/browser.ts", "touches": [] }
+]

@@ -19,7 +19,11 @@
   },
   "homepage": "https://github.com/DerekHertz/docviz",
   "scripts": {
-    "check": "for f in helper/*.js extension/*.js; do node --check \"$f\" || exit 1; done",
-    "test": "node --test test/*.test.mjs"
+    "check": "for f in helper/*.js extension/*.js lab/*.js lab/experiments/*.js lab/page/*.js; do node --check \"$f\" || exit 1; done",
+    "test": "node --test test/*.test.mjs",
+    "lab": "node lab/server.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1"
   }
 }
