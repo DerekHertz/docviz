@@ -3,6 +3,9 @@
 Each check is adopted on its own: it ships only if its test passes the bar below, and a check that
 fails stays out (or goes back for a better question).
 
+**Frozen (2026-10-31):** no new experiments, reruns or v2 questions until the pipeline that says
+where Jev checks (and what it is given) is agreed. Adopted checks stay as they are.
+
 **Status (2026-10-30):** the lab is built (`docviz lab`, http://127.0.0.1:47830). The lab replaces
 the CLI runner described below: same scoring (`lab/metrics.js`), with the cases and decisions on screen.
 

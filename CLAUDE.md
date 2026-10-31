@@ -1,12 +1,14 @@
 # docviz
 
-Chrome extension (`extension/`, MV3, plain JS, no build step) + zero-dependency Node helper
+Chrome extension (`extension/`, MV3, plain JS, no build step) + Node helper
 (`helper/`) that runs the user's own `claude` / `codex` CLI. Decisions live in [SPEC.md](SPEC.md);
 read it before changing behavior.
 
 ## Rules
 
-- No dependencies and no build step, in either half. `extension/vendor/mermaid.min.js` is the one vendored file.
+- Dependencies are allowed once the user approves each one. Behavior models build on pstack's
+  `statechart` (TLA+ checked by TLC, drawn as Mermaid). The extension stays plain JS with no build
+  step; `extension/vendor/mermaid.min.js` is its one vendored file.
 - Every helper call must return `usage`, and the extension must charge it to the card and the
   spend ledger. Never add a call that spends without showing up in the card's cost breakdown.
 - Codex dollars are estimates (`estimated: true`, shown with `~`). Claude dollars come from the CLI.

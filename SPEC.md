@@ -14,7 +14,7 @@ card iframes ◀──specs──── cache + prefs  ◀──JSON──      
 ```
 
 - **Extension**: plain JS, no build step, loaded unpacked.
-- **Helper**: zero-dependency Node server on `127.0.0.1:47823`. Detects `claude` / `codex` on PATH;
+- **Helper**: Node server on `127.0.0.1:47823`. Detects `claude` / `codex` on PATH;
   Claude wins when both exist (overridable). Paired once with a code the helper prints; that code is
   the shared secret (`x-docviz-token`). Requests from non-extension origins are refused.
 - **One contract**: sections in → card specs out. Providers are swappable behind it (API keys are a
@@ -170,8 +170,10 @@ there; the lab keeps rerunning it as models and prompts change.
   needs a better question in `lab/decisions.json`. Only an adopted check moves into the product.
 - Spend: every call's cost is in the run and on the page. Jev cost is exact (input tokens ×
   $0.042/Mtok; output free). The key comes from `TYPESAFE_API_KEY`.
-- Playwright is a dev dependency, used to render cards to PNG for the lab. The extension and
-  the published helper still take no dependencies.
+- Playwright is a dev dependency, used to render cards to PNG for the lab.
+- The no-dependencies rule was dropped on 2026-10-31: dependencies are allowed once the user
+  approves each one, and behavior models build on pstack's `statechart`. The extension keeps no
+  build step.
 
 ## Later
 
