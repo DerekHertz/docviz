@@ -7,6 +7,7 @@ import { createServer } from 'node:http';
 import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { askJev } from '../helper/jev.js';
+import { judgeAgreement } from './l1.js';
 import { judge, judge3, decide, applyTruth } from './metrics.js';
 import { render } from './render.js';
 
@@ -55,6 +56,12 @@ function summarize(exp, run, decision) {
   const byId = Object.fromEntries(truth.map((c) => [c.id, c]));
   const bar = { ...exp.meta.bar, ...decision?.bar };
   // The previous run's answers, judged by today's bar: a change here is the model, not the bar.
+  if (exp.meta.mode === 'agreement') {
+    const prevPicks = runBefore(exp.meta.id, run)?.results.filter((r) => r.pick?.form) || null;
+    const before = prevPicks && Object.fromEntries(prevPicks.map((r) => [r.id, r.pick]));
+    const rows = run.results.filter((r) => byId[r.id] && r.pick?.form).map((r) => ({ ...byId[r.id], pick: r.pick, ms: r.decisionMs ?? r.ms, usd: r.usage?.usd || 0 }));
+    return judgeAgreement(rows, bar, before || undefined);
+  }
   const prev = runBefore(exp.meta.id, run)?.results.filter((r) => r.flag != null) || null;
   if (exp.meta.mode === 'three-way') {
     const before = prev && Object.fromEntries(prev.map((r) => [r.id, { flag: r.flag, verdict: decide(exp.meta.decide, r, bar) }]));
@@ -195,7 +202,7 @@ async function runExperiment(exp, req, res, log) {
       try {
         const r = await exp.evaluate(c, { render, ask: askJev, run: runMemo });
         usd += r.usage.usd;
-        const row = { id: c.id, flag: r.flag, prob: r.prob, probContra: r.probContra, probSpecific: r.probSpecific, choice: r.choice, probabilities: r.probabilities, confidence: r.confidence, answers: r.answers, usage: r.usage, asked: r.asked, ms: Date.now() - started };
+        const row = { id: c.id, flag: r.flag, prob: r.prob, probContra: r.probContra, probSpecific: r.probSpecific, choice: r.choice, probabilities: r.probabilities, confidence: r.confidence, pick: r.pick, decisionMs: r.decisionMs, answers: r.answers, usage: r.usage, asked: r.asked, ms: Date.now() - started };
         results.push(row);
         send({ type: 'case', ...row, usdSoFar: usd });
       } catch (err) {

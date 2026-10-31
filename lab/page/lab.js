@@ -75,6 +75,7 @@ async function openExperiment(id) {
 function bar() { return { ...state.exp.meta.bar, ...(state.exp.decision?.bar || {}) }; }
 
 const threeWay = () => state.exp?.meta.mode === 'three-way';
+const agreement = () => state.exp?.meta.mode === 'agreement';
 
 // Mirrors decide() in lab/metrics.js: an answer → pass / flag / review.
 function verdictOf(r) {
@@ -111,6 +112,12 @@ function outcome(c, r, t = state.t) {
   if (!r) return 'pending';
   if (r.error) return r.kind === 'render' ? 'unrendered' : 'error';
   if (threeWay()) return THREE[c.truth]?.[verdictOf(r)] || 'error';
+  if (agreement()) {
+    if (!r.pick?.form) return 'error';
+    if (!c.label) return 'unlabelled';
+    if (r.pick.form !== c.label.form) return 'formDiff';
+    return r.pick.kind === c.label.kind || r.pick.kind === c.label.alsoFine ? 'agree' : 'kindDiff';
+  }
   const flagged = r.flag >= t;
   if (c.bad) return flagged ? 'caught' : 'missed';
   return flagged ? 'alarm' : 'ok';
@@ -119,6 +126,7 @@ function outcome(c, r, t = state.t) {
 const OUTCOME = {
   caught: ['good', 'caught'], ok: ['good', 'correctly passed'], missed: ['bad', 'missed'],
   alarm: ['bad', 'false alarm'], reviewGood: ['warn', 'sent to review'], reviewBad: ['good', 'sent to review'],
+  agree: ['good', 'agrees with label'], formDiff: ['bad', 'different form'], kindDiff: ['warn', 'different kind'], unlabelled: ['plain', 'no label yet'],
   held: ['good', 'said can’t tell'], heldFlag: ['warn', 'flagged (can’t tell)'], overconfident: ['bad', 'passed, but can’t tell'],
   error: ['warn', 'Jev error'], unrendered: ['warn', 'card didn’t render'], pending: ['plain', 'not run'], asking: ['plain', 'Jev is looking…'],
 };
@@ -171,7 +179,9 @@ function controlsPanel() {
   return h('div', { class: 'panel' },
     h('div', { class: 'row bar-inputs', id: 'bar' },
       h('strong', {}, 'Pass bar'),
-      threeWay()
+      agreement()
+        ? [h('span', { class: 'muted' }, 'committed before the first run: kind ≥ 80%, form ≥ 75%, missed cards ≤ 10%, extra cards ≤ 30%, changed ≤ 5%, median ≤ 300 ms')]
+        : threeWay()
         ? [field('letThrough', 'broken let through ≤', 0.05), field('wronglyFlagged', 'good flagged ≤', 0.05),
           field('clearReview', 'clear → review ≤', 0.05), field('unclearPassed', 'can’t-tell passed ≤', 0.05),
           { bands: [field('passAt', 'pass at yes ≥', 0.05), field('flagAt', 'flag at yes ≤', 0.05)],
@@ -207,6 +217,23 @@ function scorePanel() {
   const b = bar();
   const live = liveRates(state.t);
   const panel = h('div', { class: 'panel', id: 'score' });
+  if (v && !state.running && v.mode === 'agreement') {
+    const b2 = bar();
+    panel.append(
+      h('div', { class: 'row' }, h('span', { class: 'verdict' }, v.pass ? 'Passes the bar' : 'Misses the bar'),
+        h('span', { class: 'muted' }, `${v.counts.labelled} labelled sections (${v.counts.cardWorthy} card-worthy, ${v.counts.none} no card)`)),
+      v.misses.length ? h('ul', { class: 'misses' }, v.misses.map((m) => h('li', {}, m))) : null,
+      h('div', { class: 'score' },
+        stat('kind agrees with label', pct(v.kindAgree), v.kindAgree >= b2.kindAgree, 'best kind or its acceptable second'),
+        stat('form agrees with label', pct(v.formAgree), v.formAgree >= b2.formAgree),
+        stat('card-worthy given no card', pct(v.missedCards), v.missedCards <= b2.missedCards),
+        stat('no-card given a card', pct(v.extraCards), v.extraCards <= b2.extraCards),
+        stat('decisions changed since last run', v.changed == null ? 'first run' : pct(v.changed), v.changed == null ? null : v.changed <= b2.changed),
+        stat('median decision time', v.p50Ms == null ? '—' : `${v.p50Ms} ms`, v.p50Ms == null ? null : v.p50Ms <= b2.p50Ms),
+        stat('Jev cost per section', usd(v.costPerCard), v.costPerCard <= b2.costPerCard)));
+    panel.prepend(compareView());
+    return panel;
+  }
   if (v && !state.running && v.mode === 'three-way') {
     const c = v.counts;
     panel.append(
@@ -242,7 +269,7 @@ function scorePanel() {
       h('span', { class: 'verdict' }, state.running ? 'Running…' : 'Not run yet'),
       h('span', { class: 'muted' }, `${live.done}/${state.exp.cases.length} answered · ${usd(live.spent)}`)));
   }
-  if (live.done) panel.append(calibrationView());
+  if (live.done && !agreement()) panel.append(calibrationView());
   if (threeWay()) { panel.prepend(compareView()); return panel; }
   if (live.done) panel.append(bandsView());
   panel.append(h('div', { class: 'slider' },
@@ -257,6 +284,15 @@ function scorePanel() {
 function compareView() {
   const group = state.list.filter((e) => e.group && e.group === state.exp.meta.group);
   if (group.length < 2) return '';
+  if (agreement()) {
+    return h('table', { class: 'kinds compare' },
+      h('thead', {}, h('tr', {}, ['Variant', 'kind agrees', 'form agrees', 'missed cards', 'extra cards', 'changed', 'median ms', 'bar'].map((x) => h('th', {}, x)))),
+      h('tbody', {}, group.map((e) => h('tr', { class: e.id === state.id ? 'here' : '' },
+        h('td', {}, h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); openExperiment(e.id); } }, e.variant || e.id)),
+        ['kindAgree', 'formAgree', 'missedCards', 'extraCards', 'changed'].map((k) => h('td', {}, e.verdict && e.verdict[k] != null ? pct(e.verdict[k]) : '—')),
+        h('td', {}, e.verdict?.p50Ms ?? '—'),
+        h('td', {}, e.verdict ? h('span', { class: `chip ${e.verdict.pass ? 'good' : 'bad'}` }, e.verdict.pass ? 'passes' : 'misses') : 'not run')))));
+  }
   const cell = (e, key) => (e.verdict ? pct(e.verdict[key]) : '—');
   return h('table', { class: 'kinds compare' },
     h('thead', {}, h('tr', {}, ['Variant', 'let through', 'good flagged', 'clear → review', 'can’t-tell passed', 'held out: passed', 'right when decided', 'cost/card', 'bar'].map((x) => h('th', {}, x)))),
@@ -412,9 +448,9 @@ function tile(c) {
       c.identifier
         ? h('div', {}, h('code', {}, c.identifier), h('span', { class: 'muted' }, ` in “${c.cardTitle}”`))
         : h('div', {}, h('span', { class: 'muted' }, 'step '), h('code', {}, c.fn), c.shownFn ? h('span', { class: 'muted' }, ' · code shown: ', h('code', {}, c.shownFn)) : null),
-      threeWay() ? meter3(r) : meter(r),
+      agreement() ? null : threeWay() ? meter3(r) : meter(r),
       h('div', { class: 'foot muted' },
-        h('span', {}, r?.error ? r.error.slice(0, 60) : r?.choice ? `Jev: ${CHOICE[r.choice] || r.choice} · confidence ${(r.confidence ?? 0).toFixed(2)}` : r?.probContra != null ? `shown ${r.prob.toFixed(2)} · contradicted ${r.probContra.toFixed(2)}` : yes == null ? '' : `Jev: yes ${yes.toFixed(2)}`),
+        h('span', {}, r?.error ? r.error.slice(0, 60) : r?.pick ? `Jev: ${r.pick.form}${r.pick.form === 'none' ? '' : ` · ${r.pick.kind}`} (${(r.confidence?.form ?? 0).toFixed(2)} / ${(r.confidence?.kind ?? 0).toFixed(2)}) · ${r.decisionMs ?? r.ms} ms` : r?.choice ? `Jev: ${CHOICE[r.choice] || r.choice} · confidence ${(r.confidence ?? 0).toFixed(2)}` : r?.probContra != null ? `shown ${r.prob.toFixed(2)} · contradicted ${r.probContra.toFixed(2)}` : yes == null ? '' : `Jev: yes ${yes.toFixed(2)}`),
         h('span', { class: 'spacer' }),
         r?.usage ? h('span', {}, usd(r.usage.usd)) : null,
         h('button', { title: threeWay() ? 'Change this case’s label: good → broken → can’t tell' : 'Flip this case between good and broken', onclick: () => flip(c) }, 'Disagree'))));
@@ -429,6 +465,7 @@ function meter(r) {
 }
 
 function truthChip(c) {
+  if (agreement()) return h('span', { class: `chip ${c.label ? 'plain' : 'warn'}` }, c.label ? `label: ${c.label.form}${c.label.form === 'none' ? '' : ` · ${c.label.kind}${c.label.alsoFine ? ` (or ${c.label.alsoFine})` : ''}`}` : 'no label yet');
   const t = c.truth || (c.bad ? 'bad' : 'good');
   const [tone, word] = { good: ['good', 'good'], bad: ['bad', 'broken'], unclear: ['warn', 'can’t tell'] }[t];
   return h('span', { class: `chip ${tone}` }, `${word} · ${c.mutation}`);
