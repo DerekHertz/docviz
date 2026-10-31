@@ -1,0 +1,266 @@
+{
+  "s01": {
+    "form": "diagram",
+    "kind": "sequence",
+    "alsoFine": "timeline",
+    "reason": "Emitter calls listeners synchronously in registration order, with setImmediate deferring work: ordering of calls between emitter and listeners."
+  },
+  "s02": {
+    "form": "diagram",
+    "kind": "flow",
+    "alsoFine": null,
+    "reason": "Branching error handling: no 'error' listener means throw and exit, a listener handles it, errorMonitor observes but still crashes."
+  },
+  "s03": {
+    "form": "diagram",
+    "kind": "sequence",
+    "alsoFine": null,
+    "reason": "Repeated emits against on() vs once() listeners, where once unregisters then calls: emitter-to-listener calls over time."
+  },
+  "s04": {
+    "form": "none",
+    "kind": "architecture",
+    "alsoFine": null,
+    "reason": "Single method returning the list of registered event names; nothing moves."
+  },
+  "s05": {
+    "form": "diagram",
+    "kind": "sequence",
+    "alsoFine": "flow",
+    "reason": "A promise awaiting an emitter resolves on the event, rejects on 'error', or rejects on abort: interaction between awaiter, emitter and signal with branching outcomes."
+  },
+  "s06": {
+    "form": "interactive",
+    "kind": "timeline",
+    "alsoFine": null,
+    "reason": "Callback fires after a tunable delay, with clamping of out-of-range delays to 1; changing delay is the point."
+  },
+  "s07": {
+    "form": "diagram",
+    "kind": "state",
+    "alsoFine": null,
+    "reason": "A scheduled timer either fires or is cancelled via clear* or AbortController, rejecting the promise with AbortError."
+  },
+  "s08": {
+    "form": "interactive",
+    "kind": "timeline",
+    "alsoFine": null,
+    "reason": "refresh() resets the start time and reschedules the fire time by the same duration, so when you call it relative to the duration determines when the callback fires."
+  },
+  "s09": {
+    "form": "none",
+    "kind": "timeline",
+    "alsoFine": null,
+    "reason": "One-line equivalence to setImmediate() plus link references; nothing to show."
+  },
+  "s10": {
+    "form": "interactive",
+    "kind": "sequence",
+    "alsoFine": "timeline",
+    "reason": "Producer and consumer exchange data through an internal buffer whose highWaterMark threshold controls pausing reads and write() returning false; a tunable buffer size."
+  },
+  "s11": {
+    "form": "diagram",
+    "kind": "flow",
+    "alsoFine": null,
+    "reason": "Pipeline chains streams, forwards errors, destroys streams on error and calls back on completion: error-handling behavior across a chain."
+  },
+  "s12": {
+    "form": "none",
+    "kind": "architecture",
+    "alsoFine": null,
+    "reason": "Introductory list of the four stream types and utility functions, followed by API reference."
+  },
+  "s13": {
+    "form": "none",
+    "kind": "state",
+    "alsoFine": null,
+    "reason": "Describes a single constructor option (objectMode) and what values streams carry; nothing moves."
+  },
+  "s14": {
+    "form": "diagram",
+    "kind": "flow",
+    "alsoFine": null,
+    "reason": "When the loop empties, beforeExit fires and a listener may schedule more work so the process continues, otherwise exit; not emitted for explicit exit."
+  },
+  "s15": {
+    "form": "diagram",
+    "kind": "flow",
+    "alsoFine": null,
+    "reason": "Exception handling branches: no handler prints and exits 1, a handler overrides it, exitCode decides the exit code, throws in the handler exit."
+  },
+  "s16": {
+    "form": "diagram",
+    "kind": "flow",
+    "alsoFine": null,
+    "reason": "A received signal goes to a listener if installed, otherwise the default behavior runs; several signals cannot be handled. Mostly a per-signal reference list, but with a clear branch."
+  },
+  "s17": {
+    "form": "none",
+    "kind": "architecture",
+    "alsoFine": null,
+    "reason": "A single read-only string property listing possible values."
+  },
+  "s18": {
+    "form": "diagram",
+    "kind": "timeline",
+    "alsoFine": null,
+    "reason": "exit() terminates synchronously before pending asynchronous stdout writes over later ticks complete, versus setting exitCode and exiting naturally."
+  },
+  "s19": {
+    "form": "diagram",
+    "kind": "sequence",
+    "alsoFine": "architecture",
+    "reason": "Two linked ports: postMessage on port2 delivers a 'message' event on port1."
+  },
+  "s20": {
+    "form": "diagram",
+    "kind": "sequence",
+    "alsoFine": null,
+    "reason": "Main thread asks the worker to stop and gets a promise fulfilled when the worker's 'exit' event fires; a short cross-thread interaction."
+  },
+  "s21": {
+    "form": "diagram",
+    "kind": "sequence",
+    "alsoFine": null,
+    "reason": "Caller, AbortController and fetch interact: abort rejects fetch with AbortError, or rejects the body read if the response already arrived."
+  },
+  "s22": {
+    "form": "diagram",
+    "kind": "flow",
+    "alsoFine": null,
+    "reason": "Whether credentials are sent depends on the credentials option, origin, SameSite and simple vs preflighted requests, with server header checks deciding success or network error."
+  },
+  "s23": {
+    "form": "diagram",
+    "kind": "flow",
+    "alsoFine": null,
+    "reason": "fetch rejects on network errors but fulfills on HTTP errors, so code branches on response.ok before reading the body."
+  },
+  "s24": {
+    "form": "diagram",
+    "kind": "state",
+    "alsoFine": null,
+    "reason": "First service worker moves through registered, installing, installed and activated, then controls new pages."
+  },
+  "s25": {
+    "form": "diagram",
+    "kind": "state",
+    "alsoFine": "timeline",
+    "reason": "New version installs and waits while the old version controls clients, then activates once they close or via skipWaiting."
+  },
+  "s26": {
+    "form": "diagram",
+    "kind": "flow",
+    "alsoFine": "sequence",
+    "reason": "Cache-first strategy: cache hit returns, otherwise network fetch and cache a clone, otherwise fallback response, otherwise error Response."
+  },
+  "s27": {
+    "form": "diagram",
+    "kind": "sequence",
+    "alsoFine": null,
+    "reason": "Browser preflights side-effecting requests with OPTIONS, server approves, then the actual request is sent."
+  },
+  "s28": {
+    "form": "none",
+    "kind": "sequence",
+    "alsoFine": null,
+    "reason": "A single response header and its syntax."
+  },
+  "s29": {
+    "form": "none",
+    "kind": "flow",
+    "alsoFine": null,
+    "reason": "A list of request types that use CORS; nothing moves."
+  },
+  "s30": {
+    "form": "diagram",
+    "kind": "timeline",
+    "alsoFine": "flow",
+    "reason": "Jobs are queued and pulled one at a time, microtasks drained before tasks, each running to completion: event-loop queue scheduling."
+  },
+  "s31": {
+    "form": "diagram",
+    "kind": "timeline",
+    "alsoFine": null,
+    "reason": "Each job runs to completion before the next, fixing the order of the two callbacks and blocking interaction while a long job runs."
+  },
+  "s32": {
+    "form": "diagram",
+    "kind": "sequence",
+    "alsoFine": null,
+    "reason": "Calls push and returns pop execution contexts between caller and callee frames, including generator suspend/resume and tail calls."
+  },
+  "s33": {
+    "form": "diagram",
+    "kind": "flow",
+    "alsoFine": null,
+    "reason": "Opening with a higher version fires upgradeneeded where stores are created or deleted, errors on duplicates, then onsuccess fires."
+  },
+  "s34": {
+    "form": "diagram",
+    "kind": "sequence",
+    "alsoFine": null,
+    "reason": "A new tab opens a higher version, old tabs' connections get versionchange and must close, onblocked fires until they do."
+  },
+  "s35": {
+    "form": "none",
+    "kind": "architecture",
+    "alsoFine": null,
+    "reason": "A list of libraries with links."
+  },
+  "s36": {
+    "form": "diagram",
+    "kind": "flow",
+    "alsoFine": null,
+    "reason": "Commit branches between initial render (appendChild everything) and re-render (apply only the differences), leaving unchanged nodes like the input alone."
+  },
+  "s37": {
+    "form": "diagram",
+    "kind": "timeline",
+    "alsoFine": "flow",
+    "reason": "Updates are queued during the event handler and processed in order during the next render, each updater receiving the previous result."
+  },
+  "s38": {
+    "form": "diagram",
+    "kind": "state",
+    "alsoFine": null,
+    "reason": "Development remount runs setup, cleanup, setup for an Effect, with cleanup undoing what setup did for widgets and subscriptions."
+  },
+  "s39": {
+    "form": "interactive",
+    "kind": "sequence",
+    "alsoFine": "timeline",
+    "reason": "Two fetches race and cleanup ignores the stale response; varying which response arrives first (network latency) shows why the ignore flag matters."
+  },
+  "s40": {
+    "form": "diagram",
+    "kind": "state",
+    "alsoFine": null,
+    "reason": "Pod moves among named phases Pending, Running, Succeeded, Failed, Unknown."
+  },
+  "s41": {
+    "form": "interactive",
+    "kind": "sequence",
+    "alsoFine": "timeline",
+    "reason": "kubectl, API server, kubelet, runtime and control plane coordinate shutdown, and the outcome (preStop, TERM, SIGKILL after grace plus 2s) depends on the tunable grace period."
+  },
+  "s42": {
+    "form": "interactive",
+    "kind": "timeline",
+    "alsoFine": null,
+    "reason": "Restart delay starts at 10s, doubles each restart and is capped at a configurable maximum: a retry backoff with tunable limits."
+  },
+  "s43": {
+    "form": "diagram",
+    "kind": "architecture",
+    "alsoFine": null,
+    "reason": "Control plane components and controllers and what each is responsible for."
+  },
+  "s44": {
+    "form": "diagram",
+    "kind": "architecture",
+    "alsoFine": "sequence",
+    "reason": "Controllers read desired state and act via the API server or external systems, with other components reacting: components and how they interact in a control loop."
+  }
+}

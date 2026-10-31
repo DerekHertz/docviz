@@ -202,7 +202,7 @@ async function runExperiment(exp, req, res, log) {
       try {
         const r = await exp.evaluate(c, { render, ask: askJev, run: runMemo });
         usd += r.usage.usd;
-        const row = { id: c.id, flag: r.flag, prob: r.prob, probContra: r.probContra, probSpecific: r.probSpecific, choice: r.choice, probabilities: r.probabilities, confidence: r.confidence, pick: r.pick, decisionMs: r.decisionMs, answers: r.answers, usage: r.usage, asked: r.asked, ms: Date.now() - started };
+        const row = { id: c.id, flag: r.flag, prob: r.prob, probContra: r.probContra, probSpecific: r.probSpecific, choice: r.choice, probabilities: r.probabilities, confidence: r.confidence, pick: r.pick, decisionMs: r.decisionMs, card: r.card, answers: r.answers, usage: r.usage, asked: r.asked, ms: Date.now() - started };
         results.push(row);
         send({ type: 'case', ...row, usdSoFar: usd });
       } catch (err) {
