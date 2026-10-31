@@ -42,6 +42,7 @@ claude plugin install docviz@docviz
 ```
 
 Then `/docviz` starts the helper in the background and shows the pairing code.
+With the plugin installed, `docviz` is on PATH (from the plugin's `bin/`); no npm install needed.
 
 ## Using it
 
