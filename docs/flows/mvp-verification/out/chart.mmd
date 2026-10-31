@@ -1,0 +1,45 @@
+---
+title: "One PR, from the agent's branch to merge"
+---
+stateDiagram-v2
+  state "Legend" as legend {
+    lg0: agents
+    lg1: you
+    lg2: done
+  }
+  class lg0 blue
+  class lg1 orange
+  class lg2 teal
+  s0: agent writing
+  s1: checked: nothing for you
+  s2: checked: look when you can
+  s3: checked: needs you
+  s4: PR open
+  s5: agent fixing
+  s6: held for you
+  s7: verified
+  s8: merged
+  [*] --> s0
+  s0 --> s1: the agent runs docviz
+  s0 --> s2: the agent runs docviz
+  s0 --> s3: the agent runs docviz
+  s1 --> s4: the agent opens the PR
+  s2 --> s4: the agent opens the PR
+  s3 --> s5: the agent fixes the code [rounds left]
+  s4 --> s6: it disagrees, or needs you
+  s4 --> s7: a second agent agrees
+  s5 --> s1: the agent runs docviz
+  s5 --> s2: the agent runs docviz
+  s5 --> s3: the agent runs docviz
+  s7 --> s8: merged
+  s7 --> s4: a new commit lands
+  s3 --> s4: the agent opens it flagged [2 rounds used]
+  class s0 blue
+  class s1 blue
+  class s2 blue
+  class s3 blue
+  class s4 blue
+  class s5 blue
+  class s6 orange
+  class s7 blue
+  class s8 teal
