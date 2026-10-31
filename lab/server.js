@@ -95,6 +95,42 @@ export async function startLab({ port = 47830, host = '127.0.0.1', log = console
         return res.end(readFileSync(join(PAGE, name)));
       }
 
+      // L1 blind side by side: who made each card stays hidden until the user has voted on it.
+      if (url.pathname === '/compare' && req.method === 'GET') {
+        res.writeHead(200, { 'content-type': 'text/html', 'content-security-policy': "default-src 'self'; img-src 'self'; style-src 'self'" });
+        return res.end(readFileSync(join(PAGE, 'compare.html')));
+      }
+      if (url.pathname.startsWith('/api/compare')) {
+        const pairs = readJson(join(RUNS, 'l1-sidebyside.json'), null);
+        if (!pairs) return json(404, { error: 'no side-by-side run yet: node lab/l1-sidebyside.mjs' });
+        const all = decisions();
+        const votes = all['l1-sidebyside']?.votes || {};
+        const reveal = (p) => (votes[p.id] ? { a: p.a.who, b: p.b.who, jevPick: p.jevPick, claudeKind: p.claudeKind, timing: p.timing } : null);
+        const strip = (card) => ({ title: card.title, kind: card.kind, caption: card.caption });
+        if (req.method === 'GET' && url.pathname === '/api/compare') {
+          return json(200, { at: pairs.at, cards: pairs.cards.map((p) => ({ id: p.id, heading: p.heading, source: p.source, a: strip(p.a.card), b: strip(p.b.card), vote: votes[p.id] || null, reveal: reveal(p) })) });
+        }
+        const im = url.pathname.match(/^\/api\/compare\/image\/(s\d+)\/([ab])$/);
+        if (req.method === 'GET' && im) {
+          const p = pairs.cards.find((x) => x.id === im[1]);
+          if (!p) return json(404, { error: 'no such pair' });
+          const png = await render(p[im[2]].card.mermaid, {}).catch((e) => { if (e.kind === 'render') return null; throw e; });
+          if (!png) return json(422, { error: 'render' });
+          res.writeHead(200, { 'content-type': 'image/png' });
+          return res.end(png);
+        }
+        if (req.method === 'POST' && url.pathname === '/api/compare/vote') {
+          const body = JSON.parse(await readBody(req));
+          const p = pairs.cards.find((x) => x.id === body.id);
+          if (!p || !['a', 'b', 'tie'].includes(body.choice)) return json(400, { error: 'id and choice (a, b or tie) needed' });
+          const vote = { choice: body.choice, note: String(body.note || '').slice(0, 500), preferred: body.choice === 'tie' ? 'tie' : p[body.choice].who, at: new Date().toISOString() };
+          all['l1-sidebyside'] = { ...all['l1-sidebyside'], votes: { ...votes, [p.id]: vote } };
+          writeFileSync(DECISIONS, `${JSON.stringify(all, null, 2)}\n`);
+          return json(200, { vote, reveal: { a: p.a.who, b: p.b.who, jevPick: p.jevPick, claudeKind: p.claudeKind, timing: p.timing } });
+        }
+        return json(404, { error: 'not found' });
+      }
+
       if (req.method === 'GET' && url.pathname === '/api/experiments') {
         const d = decisions();
         return json(200, Object.values(experiments).map((e) => {

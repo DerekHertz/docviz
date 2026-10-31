@@ -126,3 +126,11 @@ dialog pre.tall { max-height: 420px; }
 .tile.overconfident { border-color: var(--bad); border-width: 2px; }
 .two { display: flex; flex-direction: column; gap: 3px; }
 .meter.thin { height: 5px; }
+.compare-main { max-width: 1300px; margin: 0 auto; }
+.cmp-pair { margin-bottom: 28px; }
+.cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0; }
+@media (max-width: 800px) { .cmp-grid { grid-template-columns: 1fr; } }
+.cmp-card p { margin: 8px 0 0; }
+.cmp-shot { aspect-ratio: auto; min-height: 220px; background: var(--panel); }
+.cmp-shot img { max-height: 420px; }
+.cmp-note { flex: 1; min-width: 160px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }

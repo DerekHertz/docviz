@@ -110,7 +110,27 @@ the CLI runner described below: same scoring (`lab/metrics.js`), with the cases 
 **Queued (in order):**
 1. ~~*Apply the v2 asking style to C3 and D1*~~ done 2026-10-31: no improvement, not adopted (see the
    C3 v2 / D1 v2 results below).
-2. *L1, card layout, json-render style* (requested 2026-10-31). Instead of Claude choosing each card's
+2. *L1, card layout, json-render style* (requested 2026-10-31; **run 2026-10-31, waiting on the
+   user's side-by-side verdict at http://127.0.0.1:47830/compare**). Results:
+   - Setup: 44 real sections (Node.js, MDN, React, Kubernetes; pinned commits, licenses); labels by a
+     separate agent, blind (30 diagram, 8 none, 6 interactive; 11 with an acceptable second kind);
+     bar and labels committed before any run (d1f3768, 38623ab).
+   - jev-1.13 ×3: kind 86%, form 82–84%, card-worthy given none 11–14%, none given a card 13%,
+     decisions changed 0–5%, median 95 ms, $0.00005/section. jev-1.14 ×3: kind 83%, form 84%,
+     missed 11%, extra 0%, changed 2–5%, median 93 ms. Both miss the bar only on missed cards
+     (≤ 10%): 4 of 36 card-worthy sections given no card.
+   - Claude today (one run, $1.64): kind 69%, form 84%, missed 0%, extra 75% (it gives a card to
+     most no-card sections), 10.3 s median because it writes the card in the same call. Jev's kinds
+     agree with the labels more often than Claude's own (8 vs 4 on the 10 compared sections).
+   - Time saved: none. Fixing the kind doesn't make Claude write faster: 128.3 s free vs 133.7 s
+     with Jev's pick over 10 cards (Jev itself ~90 ms each).
+   - Caveat on the visuals: docviz draws `timeline` as a sequenceDiagram with notes, and Jev chose
+     timeline for 8 of the 10 compared sections where Claude chose sequence or flow, so many pairs
+     look alike. Labels are by a Claude agent; Claude-vs-label agreement measures disagreement
+     between two Claude readings, not truth.
+   - Side by side: 10 sections chosen by rule (every section where Jev's and Claude's kinds differ,
+     in hash order). An earlier set taken in fixture order was replaced before any vote. 2 diagrams
+     needed the product's repair call, charged to their side. Instead of Claude choosing each card's
    diagram type and layout, Jev picks the card form and diagram type for a doc section from a fixed
    set; Claude writes only the text. Evidence is thin: json-render's own repo had no Jev call at
    277df7f (dimsumden `docs/research/2026-10-31-jev-projects-patterns.md`). Design, fixed by the user:
