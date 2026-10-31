@@ -12,6 +12,8 @@ import { prCardPrompt, repairPrompt } from './prompts.js';
 export const MARKER = '<!-- docviz-pr-diagrams -->';
 const DOCVIZ_REPO = 'https://github.com/DerekHertz/docviz';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+// The reviewed checkout's .git/config is untrusted: switch off the settings that run commands.
+export const UNTRUSTED_GIT = ['-c', 'core.fsmonitor=', '-c', 'core.hooksPath=/dev/null'];
 
 /** The text from `from` up to `to` (exclusive; empty means the end) and its 1-based line range. */
 export function cut(text, from, to) {
@@ -58,13 +60,12 @@ export function prComment({ card, steps, sha, repoUrl, usage, checked, version }
 }
 
 // Syntax-checks with docviz's own Mermaid build in a headless browser. Playwright is
-// optional (docviz has no dependencies): found in the PR's repo or next to docviz, else skipped.
-async function mermaidChecker(repoRoot) {
+// optional (docviz has no dependencies): found next to docviz, else skipped. Never resolved
+// from the reviewed repo: its node_modules is untrusted code.
+async function mermaidChecker() {
   const bundle = join(ROOT, 'extension', 'vendor', 'mermaid.min.js');
   let chromium;
-  for (const base of [join(repoRoot, 'package.json'), join(ROOT, 'package.json')]) {
-    try { ({ chromium } = createRequire(base)('playwright')); break; } catch {}
-  }
+  try { ({ chromium } = createRequire(join(ROOT, 'package.json'))('playwright')); } catch {}
   if (!chromium || !existsSync(bundle)) return null;
   const browser = await chromium.launch();
   const tab = await browser.newPage();
@@ -85,7 +86,7 @@ function docvizVersion() {
 
 /** Returns { body, missing, usage }; throws with `usage` when the diagram can't be used. */
 export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: requested, model, log = () => {} }) {
-  const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim();
+  const git = (...a) => execFileSync('git', [...UNTRUSTED_GIT, ...a], { encoding: 'utf8' }).trim();
   const root = git('rev-parse', '--show-toplevel');
   const sha = git('rev-parse', 'HEAD');
   const repoUrl = repoWebUrl(git('remote', 'get-url', 'origin'));
@@ -113,7 +114,7 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
   };
 
   const card = await call(prCardPrompt({ page: { title: title || 'Pull request', url: prUrl }, steps, glossary }), 300_000);
-  const checker = await mermaidChecker(root);
+  const checker = await mermaidChecker();
   if (!checker) log('playwright not found: the diagram is not syntax-checked');
   try {
     let error = await checker?.check(card.mermaid);

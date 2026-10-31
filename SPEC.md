@@ -115,8 +115,10 @@ returns one PR comment.
 - `--glossary` adds the project's own terms to the prompt.
 - Cost: there is no extension or ledger here, so the comment's footer and stderr carry the total of
   every call (card + repair), with `~` for Codex. A failed run still prints what it spent.
-- Mermaid is checked only when Playwright is found (docviz takes no dependency on it); the footer
-  says "not syntax-checked" otherwise.
+- Mermaid is checked only when Playwright is found next to docviz (docviz takes no dependency on
+  it); the footer says "not syntax-checked" otherwise.
+- The reviewed checkout is untrusted: Playwright is never resolved from its `node_modules`, and
+  docviz's git calls there switch off `core.fsmonitor` and `core.hooksPath`.
 
 ## Later
 
