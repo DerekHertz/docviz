@@ -1,0 +1,12 @@
+#!/bin/sh
+# Claude Code puts a plugin's bin/ on PATH, so installing the plugin gives `docviz`.
+# Resolve symlinks to find this file's real folder, then run the helper next to it.
+self=$0
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case $link in
+    /*) self=$link ;;
+    *) self=${self%/*}/$link ;;
+  esac
+done
+exec node "${self%/*}/../helper/cli.js" "$@"
