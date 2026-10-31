@@ -110,8 +110,8 @@ the CLI runner described below: same scoring (`lab/metrics.js`), with the cases 
 **Queued (in order):**
 1. ~~*Apply the v2 asking style to C3 and D1*~~ done 2026-10-31: no improvement, not adopted (see the
    C3 v2 / D1 v2 results below).
-2. *L1, card layout, json-render style* (requested 2026-10-31; **run 2026-10-31, waiting on the
-   user's side-by-side verdict at http://127.0.0.1:47830/compare**). Results:
+2. *L1, card layout, json-render style* (requested 2026-10-31; run 2026-10-31). **Not adopted: fails the
+   side-by-side bar, 2 of 10.** Results:
    - Setup: 44 real sections (Node.js, MDN, React, Kubernetes; pinned commits, licenses); labels by a
      separate agent, blind (30 diagram, 8 none, 6 interactive; 11 with an acceptable second kind);
      bar and labels committed before any run (d1f3768, 38623ab).
@@ -128,6 +128,11 @@ the CLI runner described below: same scoring (`lab/metrics.js`), with the cases 
      timeline for 8 of the 10 compared sections where Claude chose sequence or flow, so many pairs
      look alike. Labels are by a Claude agent; Claude-vs-label agreement measures disagreement
      between two Claude readings, not truth.
+   - **User's blind verdict: Jev's layout preferred 1, tie 1, Claude's own layout preferred 8**
+     (bar ≥ 7 of 10 Jev-or-tie). Agreement with the agent's labels did not predict which card
+     explains the section better; the side-by-side was the deciding test. Caveat: the compare page
+     showed the diagrams small and blurry (rendered ≤ 1.5×, shrunk into half-width columns, no
+     zoom), so captions carried more of the judgment than the diagrams.
    - Side by side: 10 sections chosen by rule (every section where Jev's and Claude's kinds differ,
      in hash order). An earlier set taken in fixture order was replaced before any vote. 2 diagrams
      needed the product's repair call, charged to their side. Instead of Claude choosing each card's
