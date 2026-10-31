@@ -52,7 +52,7 @@ export function cases() {
     id: `${ch.id}:${domain}`, change: ch.id, card: ch.id, repo: ch.repo, sha: ch.sha, file: ch.file, diff: ch.diff,
     domain, mutation: domain, note: DOMAINS[domain].name, cardTitle: `${ch.repo} · ${ch.file}`,
     label: DOMAINS[domain].q, code: ch.diff,
-    bad: ch.touches.includes(domain), truth: ch.touches.includes(domain) ? 'bad' : 'good',
+    hunks: ch.hunks, bad: ch.touches.includes(domain), truth: ch.touches.includes(domain) ? 'bad' : 'good',
   })));
 }
 

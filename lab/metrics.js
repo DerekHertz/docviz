@@ -2,6 +2,7 @@
 // `flag` is the evaluator's probability that the case is bad, `bad` the truth.
 import { createHash } from 'node:crypto';
 import { decideStep, ADOPTED } from '../helper/checks.js';
+import { decideClaims } from './prs.js';
 
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] != null).map((k) => [k, o[k]]));
 
@@ -131,6 +132,7 @@ export function decide(rule, r, bar = {}) {
     return 'review';
   }
   if (rule.kind === 'two') return decideStep(r, { ...ADOPTED, ...pick(bar, ['supportedAt', 'contradictedAt']) });
+  if (rule.kind === 'claims') return decideClaims(r, bar);
   if (rule.kind === 'choice') {
     if (!r.choice) return null;
     if (bar.minConfidence && (r.confidence ?? 0) < bar.minConfidence) return 'review';

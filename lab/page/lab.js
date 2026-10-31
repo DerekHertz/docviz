@@ -85,6 +85,12 @@ function verdictOf(r) {
     if (r.prob == null) return null;
     return r.prob >= b.passAt ? 'pass' : r.prob <= b.flagAt ? 'flag' : 'review';
   }
+  if (rule.kind === 'claims') {
+    if (r.prob == null || r.probContra == null || r.probSpecific == null) return null;
+    if (r.probContra >= b.contradictedAt) return 'flag';
+    if (r.probSpecific < b.specificAt) return 'review';
+    return r.prob >= b.supportedAt ? 'pass' : 'review';
+  }
   if (rule.kind === 'two') {
     if (r.prob == null || r.probContra == null) return null;
     return r.probContra >= b.contradictedAt ? 'flag' : r.prob >= b.supportedAt ? 'pass' : 'review';
@@ -170,6 +176,7 @@ function controlsPanel() {
           field('clearReview', 'clear → review ≤', 0.05), field('unclearPassed', 'can’t-tell passed ≤', 0.05),
           { bands: [field('passAt', 'pass at yes ≥', 0.05), field('flagAt', 'flag at yes ≤', 0.05)],
             two: [field('supportedAt', 'shown at ≥', 0.05), field('contradictedAt', 'contradicted at ≥', 0.05)],
+            claims: [field('supportedAt', 'shown at ≥', 0.05), field('contradictedAt', 'contradicted at ≥', 0.05), field('specificAt', 'specific at ≥', 0.05)],
             choice: field('minConfidence', 'min confidence', 0.05) }[state.exp.meta.decide.kind]]
         : [field('catch', 'catch ≥', 0.05), field('falseAlarm', 'false alarms ≤', 0.05)],
       field('costPerCard', 'cost/card ≤ $', 0.0005), field('changed', 'decisions changed ≤', 0.01),
@@ -442,7 +449,7 @@ function meter3(r) {
       h('div', { class: 't', style: { left: `${b.flagAt * 100}%` } }),
       h('div', { class: 't', style: { left: `${b.passAt * 100}%` } }));
   }
-  if (state.exp.meta.decide.kind === 'two') {
+  if (state.exp.meta.decide.kind === 'two' || state.exp.meta.decide.kind === 'claims') {
     const b = bar();
     const v = verdictOf(r);
     return h('div', { class: 'two', title: r?.prob == null ? 'not answered' : `every claim shown ${r.prob.toFixed(2)} · contradicted ${(r.probContra ?? 0).toFixed(2)}` },

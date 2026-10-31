@@ -1,0 +1,16 @@
+[
+  { "repo": "docviz", "sha": "6b9607a", "falseClaim": "It also caches the rendered diagram between runs." },
+  { "repo": "docviz", "sha": "480a9f7", "falseClaim": "The launcher also installs Node when it is missing." },
+  { "repo": "docviz", "sha": "ea068fd", "falseClaim": "The comment is posted to the pull request automatically." },
+  { "repo": "dimsumden", "sha": "c1e7b89f", "falseClaim": "risk-check now also runs the project's full test suite before it reports." },
+  { "repo": "dimsumden", "sha": "00d470ed", "falseClaim": "bash-guard now also blocks every command that uses sudo." },
+  { "repo": "dimsumden", "sha": "50b20fa1", "falseClaim": "Credentials are now encrypted at rest in the registry." },
+  { "repo": "dimsumden", "sha": "19d45507", "falseClaim": "Removing a project now also deletes its checkout from disk." },
+  { "repo": "dimsumden", "sha": "9bfa779d", "falseClaim": "The target run now gets its own network with internet access." },
+  { "repo": "dimsumden", "sha": "de835ee5", "falseClaim": "The project guide is now fetched from the project's website." },
+  { "repo": "dimsumden", "sha": "171d4a4b", "falseClaim": "Remote MCP connections are now allowed for target runs." },
+  { "repo": "immersive_language_learning", "sha": "311a6c5", "falseClaim": "Learners can now update their own scores directly." },
+  { "repo": "immersive_language_learning", "sha": "634035f", "falseClaim": "Arabic numerals in heard text are now rejected." },
+  { "repo": "immersive_language_learning", "sha": "bdb27f0", "falseClaim": "Speech now falls back to a cloud recognizer when the browser has none." },
+  { "repo": "immersive_language_learning", "sha": "49a28fd", "falseClaim": "The take menu now closes itself after five seconds." }
+]

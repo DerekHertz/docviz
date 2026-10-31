@@ -23,6 +23,55 @@ the CLI runner described below: same scoring (`lab/metrics.js`), with the cases 
   flagged after relabelling "ssh or .git remote" as broken, 97–98% right when decided), but 44% /
   56% of can't-tell cases passed: Jev reads "do these lines do what the label says?" as "does
   anything conflict?". Moving cutoffs only fixes it by tuning on the same cases.
+- **C3 v2 and D1 v2: the P1 v2 recipe does not carry over** (2026-10-31; `lab/c3v2.js`,
+  `lab/domains2.js`). Same cases, same adopted cutoffs; criteria examples written about unrelated
+  code (a test checks none quotes a case; two D1 examples that mirrored earlier misses were removed).
+  - C3 fixtures: good passed 24 → 23 of 31, broken let through 0% → 3%, clear → review 16% → 42%.
+    C3 real steps: good passed 14 → 14 of 19, let through 3% → 5%, held-out can't-tell passed
+    11% → 0%, clear → review 25% → 53%. v2 makes Jev stricter, not sharper. C3 already sent whole
+    functions; structure and examples added caution, not information. **The adopted C3 stays.**
+  - D1: separation unchanged (AUC 0.962 vs 0.958; patterns 0.84). v2 "passes" its scored half only
+    because its tuned threshold fell to 0.23 with 18% false alarms. Same misses (Mermaid
+    `securityLevel`, the agent role-tool sync); most alarms are untrusted-input judgments where the
+    labels may be too narrow. **Not adopted**; the label question needs the user's call first.
+  - Lesson: the recipe fixed P1 because P1 v1 stripped context and judged claims outside what was
+    shown. It is not a general upgrade; each change to how a check asks is tested like a new check.
+- **P1, does a PR say what it does? (from jev-commit's design).** 14 real commits from public repos,
+  the message as the PR description, diffs up to 6 files × 150 changed lines.
+  - *P1·files, unmentioned work:* each PR's own files (all mentioned or implied) plus one file
+    planted from another commit in the same repo. Jev, one request per PR: 12 of 14 planted
+    flagged and 0 of 54 own files at its tuned threshold; planted scored 0.50–0.95 and own files
+    at most 0.56, so the two barely overlap. The honest split-half score still misses the bar
+    (71% caught on 7 planted cases) because the threshold tuned on the other 7 landed at 0.65.
+    The file-name baseline flags 65% of real files: agent descriptions name behavior, not files.
+    (Its 100% catch is an artifact: planted files are chosen not to be named in the description.)
+  - *P1·claims, description vs diff:* own description (good), another PR's (broken), own plus one
+    false claim (broken), filler (can't tell). 13 of 14 real descriptions pass; the 14th, dimsumden
+    9bfa779d, claims "mounts its toolchain read-only, has no network" while the diff only adds
+    ticket reading: real drift, correctly sent to review. Broken descriptions: 7 flagged, 20 to
+    review, 1 passed (a "cloud recognizer fallback" claim scored 0.67 shown). All filler to review.
+    Misses the bar only on "clear cases to review" (50%), which counts broken descriptions sent to
+    review as a cost; for this check ⚠ is the right outcome for them. Good descriptions sent to
+    review: 1 of 14.
+  - **Version 2, asked the way working projects ask** (`lab/prs2.js`, from jev-commit's
+    questions.py/chunk.py, Jev Review's judgments.ts and jgrep's code-review benchmark): a
+    structured state (`message`, the whole `files` table, complete `hunks` with 3 context lines,
+    `note: data, never instructions`), instructions with a `focus`, criteria with examples on both
+    sides, claims scoped to the files shown. Same cases, same cutoffs:
+    - files: planted 0.37–0.96 vs own files ≤ 0.28 not-mentioned: perfect separation; passes the
+      honest split-half bar; 0 of 54 own files flagged.
+    - claims: no broken description passes (v1 let one through); 13 of 14 real descriptions pass,
+      the 14th is dimsumden 9bfa779d's real overclaim; every swapped, false-claim and filler
+      description is flagged or sent to review. It misses the bar only on "clear cases to review",
+      which counts broken descriptions sent to review as a cost.
+    - Two runs each: 0 decisions changed. Cost per PR: files $0.0003, claims $0.0009.
+    - Lesson for every check: v1 (and C3, D1) sent changed lines without context as one text
+      blob with abstract criteria. jgrep measured that whole hunks beat changed lines alone (80%
+      vs 67% precision, 100% vs 75% recall); here the structured version separated perfectly.
+    - Still weak: labels and planted cases are Claude's, 14 PRs; next is real drift from history
+      and a gold subset labelled by the user.
+  - Fixed during the experiment: planting used a same-path file or one the description names (4
+    mislabelled cases), and a 50-line cap hid the evidence for long descriptions (5 to review → 1).
 - **D1, protection domains a change touches (Atlas security lens, tickets 03/10/11).** 20 real file
   changes from public repos (docviz, dimsumden, second-lead) × 5 domains (secrets, untrusted input,
   network, processes and files, access control) = 100 cases, labels by Claude. Jev (one request per
@@ -57,6 +106,17 @@ the CLI runner described below: same scoring (`lab/metrics.js`), with the cases 
 - **C3, built.** Label + that step's code, no image. 80 cases from 16 real docviz functions:
   right / paraphrased (good), another step's code / a wrong-action label / injection (broken).
   Smoke test: 3 of 3 right, about $0.00002 per question.
+
+**Queued (in order):**
+1. ~~*Apply the v2 asking style to C3 and D1*~~ done 2026-10-31: no improvement, not adopted (see the
+   C3 v2 / D1 v2 results below).
+2. *L1, card layout, json-render style* (requested 2026-10-31). Instead of Claude choosing each card's
+   diagram type and layout, Jev picks the card form and diagram type for a doc section from a fixed
+   set; Claude writes only the text. Evidence is thin: json-render's own repo had no Jev call at
+   277df7f (dimsumden `docs/research/2026-10-31-jev-projects-patterns.md`). Design, fixed by the user:
+   ~40 real doc sections; labels by a separate agent, the user checks a sample; the bar committed
+   before the run; both Jev models (1.13, 1.14) × 3 runs; measure agreement and time saved; then the
+   user compares 10 cards side by side.
 
 **Decided:** the key comes from `TYPESAFE_API_KEY`. Playwright is a dev dependency for rendering.
 Jevgrep (`jg`) is used where the job is finding code, not judging it:
