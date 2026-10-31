@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, chmodSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { cut, missingSteps, repoWebUrl, prComment, sumUsage, MARKER } from '../helper/pr.js';
@@ -87,7 +87,8 @@ test('without checks the comment says the steps were not checked', () => {
   assert.match(body, /steps not checked/);
 });
 
-test('docviz pr runs the CLI once and prints the comment with its cost', () => {
+// A reviewed repo with one commit and a fake `claude` on PATH; `prepare(repo)` runs after the commit.
+function prRepo(prepare = () => {}) {
   const bin = mkdtempSync(join(tmpdir(), 'fake-claude-'));
   const card = { sectionId: 'pr', kind: 'flow', title: 'T', mermaid: 'flowchart TD\n  pick["Pick forums"]:::changed\nclassDef changed stroke:#d29922,stroke-width:3px', caption: 'CAP', question: '', interactive: false, picture: '' };
   writeFileSync(join(bin, 'out.json'), JSON.stringify({ structured_output: card, total_cost_usd: 0.031, usage: { input_tokens: 10, output_tokens: 5 } }));
@@ -103,17 +104,24 @@ cat '${join(bin, 'out.json')}'
   git('remote', 'add', 'origin', 'git@github.com:o/r.git');
   mkdirSync(join(repo, 'src'));
   writeFileSync(join(repo, 'src', 'a.js'), 'x\nfunction pick() {}\nfunction later() {}\n');
-  git('add', '.');
+  git('add', 'src');
   git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'init');
   writeFileSync(join(repo, 'steps.json'), JSON.stringify({ steps: [
     { id: 'pick', label: 'Pick forums', changed: true, sources: [{ path: 'src/a.js', from: 'function pick', to: 'function later' }] },
   ] }));
+  prepare(repo);
 
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
   delete env.TYPESAFE_API_KEY;
-  const res = spawnSync('node', [CLI, 'pr', 'steps.json', '--pr', 'https://github.com/o/r/pull/1', '--provider', 'claude'], {
+  const run = () => spawnSync('node', [CLI, 'pr', 'steps.json', '--pr', 'https://github.com/o/r/pull/1', '--provider', 'claude'], {
     cwd: repo, encoding: 'utf8', env,
   });
+  return { repo, git, run };
+}
+
+test('docviz pr runs the CLI once and prints the comment with its cost', () => {
+  const { git, run } = prRepo();
+  const res = run();
   assert.equal(res.status, 0, res.stderr);
   assert.ok(res.stdout.startsWith(MARKER));
   assert.match(res.stdout, /CAP/);
@@ -123,4 +131,26 @@ cat '${join(bin, 'out.json')}'
   assert.match(res.stderr, /\$0\.03/);
   assert.match(res.stderr, /TYPESAFE_API_KEY not set: steps not checked/);
   assert.match(res.stdout, /steps not checked/);
+});
+
+test('docviz pr runs no code from the reviewed checkout: its playwright, fsmonitor or hooks', () => {
+  const marks = mkdtempSync(join(tmpdir(), 'pr-marks-'));
+  const { run } = prRepo((repo) => {
+    mkdirSync(join(repo, 'node_modules', 'playwright'), { recursive: true });
+    writeFileSync(join(repo, 'node_modules', 'playwright', 'package.json'), '{"name":"playwright","main":"index.js"}');
+    writeFileSync(join(repo, 'node_modules', 'playwright', 'index.js'),
+      `require('fs').writeFileSync(${JSON.stringify(join(marks, 'playwright'))}, 'ran'); throw new Error('planted');\n`);
+    const hooks = join(repo, 'hooks');
+    mkdirSync(hooks);
+    for (const h of ['post-index-change', 'reference-transaction', 'post-checkout']) {
+      writeFileSync(join(hooks, h), `#!/bin/sh\ntouch '${join(marks, 'hook')}'\n`);
+      chmodSync(join(hooks, h), 0o755);
+    }
+    execFileSync('git', ['-C', repo, 'config', 'core.hooksPath', hooks]);
+    execFileSync('git', ['-C', repo, 'config', 'core.fsmonitor', `touch '${join(marks, 'fsmonitor')}' #`]);
+  });
+  const res = run();
+  assert.equal(res.status, 0, res.stderr);
+  assert.ok(res.stdout.startsWith(MARKER));
+  for (const m of ['playwright', 'fsmonitor', 'hook']) assert.ok(!existsSync(join(marks, m)), `reviewed checkout ran its ${m}`);
 });

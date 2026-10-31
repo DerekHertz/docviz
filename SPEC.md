@@ -115,8 +115,10 @@ returns one PR comment.
 - `--glossary` adds the project's own terms to the prompt.
 - Cost: there is no extension or ledger here, so the comment's footer and stderr carry the total of
   every call (card + repair), with `~` for Codex. A failed run still prints what it spent.
-- Mermaid is checked only when Playwright is found (docviz takes no dependency on it); the footer
-  says "not syntax-checked" otherwise.
+- Mermaid is checked only when Playwright is found next to docviz (docviz takes no dependency on
+  it); the footer says "not syntax-checked" otherwise.
+- The reviewed checkout is untrusted: Playwright is never resolved from its `node_modules`, and
+  docviz's git calls there switch off `core.fsmonitor` and `core.hooksPath`.
 - Step checks (lab C3, `helper/checks.js`): with `TYPESAFE_API_KEY` set, Jev checks each step's
   label against its linked lines while the diagram is drawn, and the table gains a Check column:
   ✓ every claim shown, ⚠ review (a claim the lines don't show), ✗ contradicted. A failed check
