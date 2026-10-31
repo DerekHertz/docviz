@@ -93,6 +93,9 @@ tokens and `--codex-rates`, shown with `~`.
   A timeout kills the CLI before it reports, so that spend can't be recovered and isn't shown.
 - A breakdown batch that yields no usable cards has no card to charge. It counts in the side panel's
   "this page" total and in the toast, not in any card's breakdown.
+- A card dismissed (✕) while one of its calls runs (redraw, simulation, picture, syntax repair) has
+  no card to charge when the call returns. Its cost goes to the "this page" total the same way. If
+  the page itself is gone by then (navigated, tab closed), only the ledger keeps it.
 - Simpler / More detail check the budget first, so a blocked click doesn't move the saved depth.
 - Pictures repaint on a changed diagram only in `auto`; `off` hides 🎨. A cached picture whose PNG is
   gone is dropped from the cache so 🎨 paints again.

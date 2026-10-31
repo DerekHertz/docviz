@@ -98,10 +98,17 @@ const ledger = createLedger({
 });
 const record = (usage) => ledger.record(usage).catch((e) => console.warn('docviz: ledger write failed', e));
 
-// Charge a card for a call that spent but produced nothing usable.
-async function charge(key, what, usage) {
-  const rec = key && usage && (await getCard(key));
-  if (rec) await putCard({ ...rec, cost: addCost(rec.cost, what, usage) });
+// Charge a call to its card, applying the call's result to it. If the card was
+// dismissed while the call ran, the page total keeps the cost instead. If the
+// page itself is gone (navigated, tab closed), only the ledger has it.
+async function charge(key, tabId, what, usage, patch = {}) {
+  const rec = await getCard(key);
+  if (rec) return putCard({ ...rec, ...patch, cost: addCost(rec.cost, what, usage) });
+  if (!usage || tabId == null) return;
+  const state = await getTab(tabId);
+  if (!state.dismissed?.includes(key)) return;
+  state.unassigned = (state.unassigned || 0) + usage.usd;
+  await putTab(tabId, state);
 }
 
 let caps = null;
@@ -307,14 +314,11 @@ async function generate(key, adjust) {
     const { result: spec, usage } = await callHelper('card', { page: rec.page, section: rec.section, adjust, previous: rec.spec });
     spec.sectionId = rec.section.id;
     const what = adjust?.direction === 'simpler' ? 'simpler' : adjust?.direction === 'more' ? 'more detail' : adjust?.kind ? `as ${adjust.kind}` : 'diagram';
-    const cur = await getCard(key);
     // A new diagram makes the old picture stale.
-    await putCard({ ...cur, spec, cost: addCost(cur.cost, what, usage), status: 'ready', error: null, view: 'diagram', picture: null });
+    await charge(key, rec.tabId, what, usage, { spec, status: 'ready', error: null, view: 'diagram', picture: null });
     if ((await getSettings()).prefs.pictures === 'auto') picture(key);
   } catch (e) {
-    const cur = await getCard(key);
-    if (!cur) return;
-    await putCard({ ...cur, cost: addCost(cur.cost, 'failed attempt', e.usage), status: rec.spec ? 'ready' : 'error', error: e.message });
+    await charge(key, rec.tabId, 'failed attempt', e.usage, { status: rec.spec ? 'ready' : 'error', error: e.message });
   }
 }
 
@@ -346,11 +350,9 @@ async function explore(key) {
   await putCard({ ...rec, status: 'loading', loadingText: 'Reading the source and building a simulation… (1–3 min)' });
   try {
     const { result, usage } = await callHelper('explore', { page: rec.page, section: rec.section, card: rec.spec });
-    const cur = await getCard(key);
-    await putCard({ ...cur, explore: result, cost: addCost(cur.cost, 'simulation', usage), view: 'explore', status: 'ready', error: null });
+    await charge(key, rec.tabId, 'simulation', usage, { explore: result, view: 'explore', status: 'ready', error: null });
   } catch (e) {
-    const cur = await getCard(key);
-    if (cur) await putCard({ ...cur, cost: addCost(cur.cost, 'failed simulation', e.usage), status: 'ready', error: e.message });
+    await charge(key, rec.tabId, 'failed simulation', e.usage, { status: 'ready', error: e.message });
   }
 }
 
@@ -394,11 +396,9 @@ async function picture(key) {
     try {
       const { result, usage } = await callHelper('illustrate', { card: rec.spec });
       await chrome.storage.local.set({ [pkey]: result.imageId });
-      const cur = await getCard(key);
-      if (cur) await putCard({ ...cur, picture: { status: 'ready', imageId: result.imageId }, cost: addCost(cur.cost, 'picture', usage) });
+      await charge(key, rec.tabId, 'picture', usage, { picture: { status: 'ready', imageId: result.imageId } });
     } catch (e) {
-      const cur = await getCard(key);
-      if (cur) await putCard({ ...cur, picture: { status: 'error', error: e.message }, cost: addCost(cur.cost, 'failed picture', e.usage) });
+      await charge(key, rec.tabId, 'failed picture', e.usage, { picture: { status: 'error', error: e.message } });
     }
   } finally {
     painting.delete(key);
@@ -419,6 +419,8 @@ async function dismiss(key) {
   await toTab(rec.tabId, { type: 'remove', key });
   const state = await getTab(rec.tabId);
   state.keys = state.keys.filter((k) => k !== key);
+  // A call still running for this card charges the page total when it returns.
+  state.dismissed = [...(state.dismissed || []), key];
   await putTab(rec.tabId, state);
   await session.remove(`card:${key}`);
 }
@@ -446,16 +448,16 @@ const handlers = {
   'card:view': async ({ key, view }) => putCard({ ...(await getCard(key)), view }),
   'card:retry': ({ key }) => { generate(key, {}); },
   'card:repair': async ({ key, mermaid, error }) => {
+    const tabId = (await getCard(key))?.tabId;
     let out;
     try {
       out = await callHelper('repair', { mermaid, error });
     } catch (e) {
-      await charge(key, 'failed syntax repair', e.usage);
+      await charge(key, tabId, 'failed syntax repair', e.usage);
       throw e;
     }
     const { result, usage } = out;
-    const rec = await getCard(key);
-    if (rec) await putCard({ ...rec, cost: addCost(rec.cost, 'syntax repair', usage) });
+    await charge(key, tabId, 'syntax repair', usage);
     return result.mermaid;
   },
   'card:fix': async ({ key, mermaid }) => {
