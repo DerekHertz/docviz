@@ -44,11 +44,13 @@ export function sumUsage(list) {
   return { usd: list.reduce((n, u) => n + (u?.usd || 0), 0), estimated: list.some((u) => u?.estimated) };
 }
 
-// The extension's card-cost format (extension/settings.js money()), plus a real figure below a tenth
-// of a cent: a Jev check costs ~$0.00004, and "$0.000" would read as if the call cost nothing.
+// The extension's card-cost format (extension/settings.js money()) from a cent up; below a cent, two
+// significant digits. A Jev check costs ~$0.00004, and "$0.000" would read as if it cost nothing.
+// One rule for every figure, so a total and its parts agree: each is within 5% of what was spent.
 export const money = (u) => {
   const usd = u.usd || 0;
-  const figure = usd === 0 ? '$0' : usd < 0.0001 ? '<$0.0001' : `$${usd.toFixed(usd < 0.001 ? 4 : usd < 0.01 ? 3 : 2)}`;
+  const places = usd >= 0.01 ? 2 : 1 - Math.floor(Math.log10(usd));
+  const figure = usd === 0 ? '$0' : `$${usd >= 0.01 ? usd.toFixed(2) : usd.toFixed(places).replace(/\.?0+$/, '')}`;
   return `${u.estimated ? '~' : ''}${figure}`;
 };
 

@@ -6,9 +6,9 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, readFileSync, chmodSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { cut, missingSteps, repoWebUrl, prComment, sumUsage, money, MARKER } from '../helper/pr.js';
+import { cut, missingSteps, repoWebUrl, prComment, runPr, sumUsage, money, MARKER } from '../helper/pr.js';
 import { prCardPrompt } from '../helper/prompts.js';
-import { fakeStatechart, fakeSpec, fakeChart } from './fake-statechart.mjs';
+import { fakeStatechart, fakeSpec, fakeChart, fakeRepo } from './fake-statechart.mjs';
 
 const CLI = resolve('helper/cli.js');
 
@@ -48,16 +48,36 @@ test('usage adds up, and an estimate stays an estimate', () => {
   assert.deepEqual(sumUsage([{ usd: 0.03, estimated: false }, { usd: 0.01, estimated: true }]), { usd: 0.04, estimated: true });
 });
 
-test('money shows a real figure below a tenth of a cent, so every call shows up in the cost', () => {
+test('money shows a real figure below a cent: two significant digits, never $0 for a call that spent', () => {
   const m = (usd, estimated = false) => money({ usd, estimated });
   assert.equal(m(0), '$0');
-  assert.equal(m(0.00004), '<$0.0001');
+  assert.equal(m(0.00004), '$0.00004');
   assert.equal(m(0.0002), '$0.0002');
-  assert.equal(m(0.00012), '$0.0001');
+  assert.equal(m(0.00012), '$0.00012');
+  assert.equal(m(0.000124), '$0.00012');
   assert.equal(m(0.004), '$0.004');
+  assert.equal(m(0.0095), '$0.0095');
+  assert.equal(m(0.00999), '$0.01');
   assert.equal(m(0.004, true), '~$0.004');
   assert.equal(m(0.031), '$0.03');
   assert.equal(m(1.5), '$1.50');
+});
+
+// Rule 6's one honest rule for figures: each figure is within 5% of what was spent, so a total
+// never reads as a different amount than its parts (no "$0.0001" over parts of "<$0.0001").
+test('money: every figure is within 5% of the spend, and a total agrees with its parts', () => {
+  const value = (s) => Number(s.replace(/^~?\$/, ''));
+  for (let e = -7; e <= 1; e++) {
+    for (const k of [1, 1.2, 2.5, 4, 4.96, 5, 7.77, 9.94, 9.96]) {
+      const usd = k * 10 ** e;
+      const shown = money({ usd, estimated: false });
+      assert.match(shown, /^\$\d/, `${usd} → ${shown}`);
+      assert.ok(Math.abs(value(shown) - usd) <= 0.05 * usd + 0.005 * (usd >= 0.01), `${usd} → ${shown}`);
+    }
+  }
+  const parts = [0.00004, 0.00008];
+  const total = parts.reduce((a, b) => a + b);
+  assert.deepEqual([...parts, total].map((usd) => money({ usd })), ['$0.00004', '$0.00008', '$0.00012']);
 });
 
 test('the comment links each step to its lines and shows the cost', () => {
@@ -91,7 +111,7 @@ test('step checks add a column and a footer line, with their cost broken out', (
   assert.match(body, /\| Rank them \|  \| .* \| ⚠ review \|/);
   assert.match(body, /\| Post it \|  \| .* \| ✗ doesn’t match \|/);
   assert.match(body, /steps checked by Jev: 1 ✓, 1 ⚠, 1 ✗/);
-  assert.match(body, /cost \$0\.04 \(diagram \$0\.04, step checks <\$0\.0001\)/);
+  assert.match(body, /cost \$0\.04 \(diagram \$0\.04, step checks \$0\.00006\)/);
 });
 
 test('without checks the comment says the steps were not checked', () => {
@@ -292,4 +312,34 @@ test('docviz pr fails before spending when --base is not a commit', () => {
   assert.equal(res.status, 2);
   assert.match(res.stderr, /--base no-such-ref: not a commit/);
   assert.doesNotMatch(res.stderr, /cost:/);
+});
+
+// Rule 6: every model call docviz makes shows up in the comment's cost, model checks (Behavior) included.
+test('the comment’s cost adds the model-step checks to the total and names them in the footer', async () => {
+  const { repo, git, put, spec, chart, statechart } = fakeRepo();
+  git('remote', 'add', 'origin', 'git@github.com:o/r.git');
+  put('src/door.js', 'function open() { lock(); }\nfunction shut() {}\n');
+  put('.atlas/models/door/Door.tla', spec({ exit: 0, report: '# Door\n\n## Rules that hold\nShut\n', chart: chart('  s0 --> s1: you kick it\n') }));
+  put('steps.json', JSON.stringify({
+    card: { caption: 'CAP', mermaid: 'flowchart TD\n  open["You open it"]:::changed\n  classDef changed stroke:#d29922,stroke-width:3px' },
+    steps: [{ id: 'open', label: 'You open it', changed: true, sources: [{ path: 'src/door.js', from: 'function open', to: 'function shut' }] }],
+  }));
+  git('add', '.');
+  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'head');
+  // The PR step costs $0.00004; the model's step ("You open the door.") $0.00008.
+  const ask = async (req) => ({ answers: { supported: { noul: 0.9 }, contradicted: { noul: 0.05 } },
+    usage: { provider: 'jev', usd: req.state.label === 'You open it' ? 0.00004 : 0.00008, estimated: false } });
+  const env = { DOCVIZ_STATECHART: process.env.DOCVIZ_STATECHART, TLA2TOOLS: process.env.TLA2TOOLS };
+  const cwd = process.cwd();
+  Object.assign(process.env, { DOCVIZ_STATECHART: statechart, TLA2TOOLS: statechart });
+  process.chdir(repo);
+  let r;
+  try {
+    r = await runPr({ stepsFile: 'steps.json', prUrl: 'https://github.com/o/r/pull/1', ask, trustAtlas: true });
+  } finally {
+    process.chdir(cwd);
+    for (const [k, v] of Object.entries(env)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+  assert.ok(Math.abs(r.usage.usd - 0.00012) < 1e-12, `total ${r.usage.usd}`);
+  assert.match(r.body, /cost \$0\.00012 \(step checks \$0\.00004, model checks \$0\.00008\); TLC runs locally, free\.<\/sub>/);
 });
