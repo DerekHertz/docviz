@@ -396,11 +396,12 @@ export async function runBehavior({ root, git, base, trust = false, ask, check =
 
   // A malformed model (atlas.js names its folder and field) is reported as it is, trusted or not:
   // nothing runs on it. Malformed at head, neither side runs; at base only, the head still runs.
+  // A removed model (no head) isn't run either: "Model <name> removed" says what happened to it.
   const malformed = touched.flatMap((n) => {
     const { head: h, base: b } = pair(n);
-    return h?.error ? [{ model: n, side: 'head', error: h.error }] : b?.error ? [{ model: n, side: 'base', error: b.error }] : [];
+    return h?.error ? [{ model: n, side: 'head', error: h.error }] : h && b?.error ? [{ model: n, side: 'base', error: b.error }] : [];
   });
-  const runnable = touched.filter((n) => !pair(n).head?.error);
+  const runnable = touched.filter((n) => pair(n).head && !pair(n).head.error);
 
   // Run each runnable model at base and head (in parallel), when trusted and the tools are there.
   let runs = [];

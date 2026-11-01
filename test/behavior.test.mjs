@@ -321,3 +321,12 @@ test('atlasChanges: a removed model, and a removed .atlas/, are named', () => {
     { kind: 'model-removed', model: 'order' },
   ]);
 });
+
+test('runBehavior: a removed model is named, never run or charted, and the rules only it checked go unchecked', async () => {
+  const { repo, git, base, tools } = fakeRepo();
+  rmSync(join(repo, '.atlas/models/door'), { recursive: true });
+  const b = await runBehavior({ root: repo, git, base: { sha: base, how: 'test' }, trust: true, ask: asks({}), tools });
+  assert.deepEqual(b.runs, []);
+  assert.deepEqual(b.findings.map((f) => `${f.kind}:${f.model ?? ''}:${f.status ?? ''}`), ['model-removed:door:', 'rule::unchecked']);
+  assert.doesNotMatch(b.section(() => ''), /#### door/);
+});
