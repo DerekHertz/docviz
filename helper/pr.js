@@ -19,12 +19,18 @@ const DOCVIZ_REPO = 'https://github.com/DerekHertz/docviz';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 export { UNTRUSTED_GIT };
 
-/** The text from `from` up to `to` (exclusive; empty means the end) and its 1-based line range. */
+// A marker as the reader sees it: newlines and tabs written out, so it fits on one line.
+const shown = (marker) => `“${JSON.stringify(marker).slice(1, -1)}”`;
+
+/**
+ * The text from `from` up to `to` (exclusive; empty means the end) and its 1-based line range.
+ * A marker that isn't there throws: a missing `to` never widens the cut to the end of the file.
+ */
 export function cut(text, from, to) {
   const a = from ? text.indexOf(from) : 0;
-  if (a < 0) throw new Error(`marker not found: ${from}`);
-  let b = to ? text.indexOf(to, a + 1) : -1;
-  if (b < 0) b = text.length;
+  if (a < 0) throw new Error(`\`from\` marker ${shown(from)} not found`);
+  const b = to ? text.indexOf(to, a + 1) : text.length;
+  if (b < 0) throw new Error(`\`to\` marker ${shown(to)} not found after \`from\``);
   const lineOf = (i) => text.slice(0, i).split('\n').length;
   return { text: text.slice(a, b), start: lineOf(a), end: lineOf(Math.max(a, b - 1)) };
 }

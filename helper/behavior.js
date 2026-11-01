@@ -6,7 +6,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { readAtlasAt, readAtlasDir, covers } from './atlas.js';
 import { checkSteps } from './checks.js';
@@ -279,15 +279,23 @@ export function behaviorSection({ base, findings, models = [], modelSteps = [], 
   const extra = findings.filter((f) => f.kind === 'extra-rule');
   if (extra.length) out.push(`Checked, not one of your rules: ${extra.map((f) => `${f.name} ${f.status} (${f.model})`).join(', ')}.`, '');
   if (modelSteps.length) {
+    const code = (s) => (s.codeError ? `⚠ ${s.codeError.replace(/\|/g, '\\|')}` : s.cuts.map(link).join('<br>') || '—');
     out.push('**Model steps checked against their code**', '', '| Step | Code | Check |', '|---|---|---|',
-      ...modelSteps.map((s) => `| ${s.label} | ${s.cuts.map(link).join('<br>') || '—'} | ${CHECK[s.verdict] || '—'} |`), '');
+      ...modelSteps.map((s) => `| ${s.label} | ${code(s)} | ${CHECK[s.verdict] || '—'} |`), '');
   }
   return out.join('\n');
 }
 
 // ---------- the whole pass ----------
 
-const cutAt = (root) => (src) => ({ path: src.path, ...cut(readFileSync(resolve(root, src.path), 'utf8'), src.from, src.to) });
+// A model step's code at head. model.json is the repo's text: a path outside the checkout is never read.
+const cutAt = (root) => (src) => {
+  const file = resolve(root, src.path);
+  if (relative(root, file).startsWith('..') || isAbsolute(relative(root, file))) throw new Error(`${src.path}: outside the repo`);
+  let text;
+  try { text = readFileSync(file, 'utf8'); } catch { throw new Error(`${src.path}: no such file at head`); }
+  try { return { path: src.path, ...cut(text, src.from, src.to) }; } catch (e) { throw new Error(`${src.path}: ${e.message}`); }
+};
 
 /**
  * `git(...args)` returns git's raw stdout in the reviewed checkout; `root` is its top level.
@@ -347,7 +355,7 @@ export async function runBehavior({ root, git, base, trust = false, ask, check =
     const m = pair(n).head;
     if (!m || m.error) return [];
     return m.steps.map((s) => {
-      try { return { model: n, id: s.action, label: s.label, cuts: s.sources.map(cutAt(root)) }; } catch (e) { return { model: n, id: s.action, label: s.label, cuts: [], error: e.message }; }
+      try { return { model: n, id: s.action, label: s.label, cuts: s.sources.map(cutAt(root)) }; } catch (e) { return { model: n, id: s.action, label: s.label, cuts: [], error: e.message, codeError: e.message }; }
     });
   });
   const canCheck = check && (ask || process.env.TYPESAFE_API_KEY);

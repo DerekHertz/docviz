@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseChart, parseReport, delta, markChart, ruleFindings, behaviorSection, runBehavior, isSource, statechartError } from '../helper/behavior.js';
@@ -179,4 +179,28 @@ test('runBehavior: a model that fails at head is an error; no atlas, no base and
   const none = await runBehavior({ root: bare, git: (...a) => execFileSync('git', ['-C', bare, ...a], { encoding: 'utf8' }), base: { sha: null, how: 'no base commit: pass --base <ref>' }, trust: true, tools });
   assert.deepEqual(none.findings.map((f) => `${f.kind}:${f.status}`), ['atlas:absent']);
   assert.match(none.section(() => ''), /No `\.atlas\/` here/);
+});
+
+// A missing marker never widens a step to the end of its file, and never hides as a bare "—".
+test('runBehavior: a model step whose marker is missing is unchecked, naming the step, its file and the marker', async () => {
+  const { repo, git, put, base, tools } = fakeRepo();
+  const json = JSON.parse(readFileSync(join(repo, '.atlas/models/door/model.json'), 'utf8'));
+  json.steps = [
+    { action: 'Open', label: 'You open the door.', sources: [{ path: 'src/door.js', from: 'function open', to: 'function close' }] },
+    { action: 'Shut', label: 'You shut the door.', sources: [{ path: 'src/door.js', from: 'function slam', to: '' }] },
+    { action: 'Lock', label: 'You lock the door.', sources: [{ path: 'src/lock.js', from: 'function lock', to: '' }] },
+  ];
+  put('.atlas/models/door/model.json', JSON.stringify(json));
+  let asked = 0;
+  const b = await runBehavior({ root: repo, git, base: { sha: base, how: 'test' }, trust: true, ask: async (req) => { asked++; return asks({})(req); }, tools });
+  const steps = b.findings.filter((f) => f.kind === 'step');
+  assert.deepEqual(steps.map((s) => [s.id, s.verdict, s.error]), [
+    ['Open', 'unchecked', 'src/door.js: `to` marker “function close” not found after `from`'],
+    ['Shut', 'unchecked', 'src/door.js: `from` marker “function slam” not found'],
+    ['Lock', 'unchecked', 'src/lock.js: no such file at head'],
+  ]);
+  assert.equal(asked, 0, 'Jev is not asked about a step with no code');
+  const md = b.section((c) => c.path);
+  assert.match(md, /\| You open the door\. \| ⚠ src\/door\.js: `to` marker “function close” not found after `from` \| — \|/);
+  assert.match(md, /\| You shut the door\. \| ⚠ src\/door\.js: `from` marker “function slam” not found \| — \|/);
 });

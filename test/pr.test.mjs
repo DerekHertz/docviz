@@ -17,7 +17,11 @@ test('cut keeps the text between markers and its 1-based line range', () => {
   assert.deepEqual(cut(text, 'function go', 'function stop'),
     { text: 'function go() {\n  run();\n}\n', start: 3, end: 5 });
   assert.equal(cut(text, '', '').start, 1);
-  assert.throws(() => cut(text, 'nope', ''), /marker not found: nope/);
+  assert.throws(() => cut(text, 'nope', ''), /`from` marker “nope” not found/);
+  // A `to` that isn't there never widens the cut to the end of the file.
+  assert.throws(() => cut(text, 'function go', 'function halt'), /`to` marker “function halt” not found after `from`/);
+  assert.throws(() => cut(text, 'function stop', 'function go'), /`to` marker “function go” not found after `from`/);
+  assert.equal(cut(text, 'function stop', '').end, 6);
 });
 
 test('repo urls become https links', () => {
