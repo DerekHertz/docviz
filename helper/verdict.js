@@ -31,6 +31,9 @@ export const TABLE = [
   { kind: 'model-failed', level: 'needs', // a model fails to run at head, or TLC errors
     when: (f) => f.kind === 'run' && f.side === 'head',
     text: (f) => `${f.model} didn’t run at head: ${f.error}`, ref: (f) => f.model },
+  { kind: 'rule-fixed', level: 'look', // a rule broke at base and holds at head: the PR changed it, so never "nothing"
+    when: (f) => f.kind === 'rule' && f.status === 'holds' && f.atBase === 'breaks',
+    text: (f) => `${f.name} now holds; it broke before`, ref: (f) => f.model },
   { kind: 'behavior-changed', level: 'look', // behavior changed (Delta.changed) with rules holding
     when: (f) => f.kind === 'delta' && f.changed === true,
     text: (f) => `${f.model} behaves differently: ${changes(f)}`, ref: (f) => f.model },

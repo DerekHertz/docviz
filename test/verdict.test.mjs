@@ -13,6 +13,7 @@ test('the table has DESIGN.md’s rows in order, ending in "nothing"', () => {
     ['rule-breaks', 'needs'],
     ['contradicted', 'needs'],
     ['model-failed', 'needs'],
+    ['rule-fixed', 'look'],
     ['behavior-changed', 'look'],
     ['step-unconfirmed', 'look'],
     ['uncovered', 'look'],
@@ -46,6 +47,15 @@ test('each finding takes the first row it matches', () => {
   assert.equal(level({ kind: 'extra-rule', model: 'order', name: 'NeverNegative', status: 'holds' }), 'look');
   assert.equal(level(rule('holds')), 'nothing');
   assert.equal(level(rule('untouched')), 'nothing');
+});
+
+test('a rule that broke at base and holds at head is a finding to look at, never "nothing"', () => {
+  const v = verdict([rule('holds', { atBase: 'breaks' }), step('pass')]);
+  assert.equal(v.level, 'look');
+  assert.deepEqual(v.reasons.map((r) => [r.kind, r.text, r.ref]), [['rule-fixed', 'ShipsPaid now holds; it broke before', 'order']]);
+  assert.match(verdictLines(v), /^\*\*Look when you can\*\*\n\n- ⚠ ShipsPaid now holds; it broke before\n$/);
+  assert.equal(verdict([rule('holds', { atBase: 'holds' })]).level, 'nothing');
+  assert.equal(verdict([rule('breaks', { atBase: 'breaks' })]).level, 'needs');
 });
 
 test('an unknown finding kind is never "nothing" (rule 1)', () => {
