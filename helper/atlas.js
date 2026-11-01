@@ -63,7 +63,11 @@ export function stripTla(text) {
   for (let i = 0; i < text.length; i++) {
     const two = text.slice(i, i + 2);
     if (depth) {
-      if (two === '(*') { depth++; i++; } else if (two === '*)') { depth--; i++; } else if (text[i] === '\n') out += '\n';
+      if (two === '(*') { depth++; i++; } else if (two === '*)') {
+        depth--; i++;
+        // A comment that opens its line leaves no indent, so `(* x *) B == 2` still starts a definition.
+        if (!depth && /(^|\n)\s*$/.test(out)) { out = out.replace(/[ \t]*$/, ''); while (text[i + 1] === ' ' || text[i + 1] === '\t') i++; }
+      } else if (text[i] === '\n') out += '\n';
     } else if (two === '(*') { depth = 1; i++; out += ' '; } else if (two === '\\*') {
       while (i < text.length && text[i] !== '\n') i++;
       i--;

@@ -185,6 +185,7 @@ test('stripTla: one pass, so a (* in a line comment or a string opens no block',
   assert.equal(stripTla('X (* a (* nested *) b *) Y'), 'X   Y');
   assert.equal(stripTla('(* one\ntwo *)Z'), ' \nZ');
   assert.equal(squeezeTla('S  ==\n "a    b"'), 'S == "a    b"');
+  assert.equal(stripTla('A == 1\n(* x *) B == 2\n  (* y *) C'), 'A == 1\nB == 2\nC');
 });
 
 test('cfgRules: a block comment in the config names no rule', () => {

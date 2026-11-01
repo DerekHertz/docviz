@@ -342,6 +342,11 @@ test('atlasChanges: a rule weakened between a (* in a line comment and a later *
     [{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }]);
 });
 
+test('atlasChanges: a comment that opens a definition line changes nothing', () => {
+  const lead = (c) => atlasOf({ spec: SPEC.replace('ShipsPaid == state', `${c}ShipsPaid == state`) });
+  assert.deepEqual(atlasChanges({ before: lead(''), head: lead('(* x *) '), changed: ['.atlas/models/order/Order.tla'] }), []);
+});
+
 test('atlasChanges: a removed model, and a removed .atlas/, are named', () => {
   assert.deepEqual(atlasChanges({ before: atlasOf({ models: ['order', 'cart'] }), head: atlasOf(), changed: ['.atlas/models/cart/model.json'] }),
     [{ kind: 'model-removed', model: 'cart' }]);
