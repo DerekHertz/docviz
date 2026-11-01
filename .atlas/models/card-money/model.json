@@ -1,0 +1,28 @@
+{
+  "about": "One docviz card and the money its calls spend. Moved from prototype/pr1-pipeline/model/ (PR #1's head).",
+  "spec": "CardSpend.tla",
+  "config": "CardSpend.cfg",
+  "view": "view.mjs",
+  "code": ["extension/background.js"],
+  "steps": [
+    { "action": "YouBreakDown", "label": "Before any helper call starts, it is refused if today’s budget is used up.",
+      "sources": [{ "path": "extension/background.js", "from": "async function callHelper(", "to": "// Every call is charged to the ledger" }] },
+    { "action": "CardArrives", "label": "When the card comes back, the call’s cost is recorded in the ledger and added to the card’s cost.",
+      "sources": [{ "path": "extension/background.js", "from": "async function callHelper(", "to": "// Every call is charged to the ledger" },
+                  { "path": "extension/background.js", "from": "async function generate(", "to": "// Simpler / More detail" }] },
+    { "action": "CallFails", "label": "When the call fails after spending, its cost is still recorded and added to the card as a failed attempt.",
+      "sources": [{ "path": "extension/background.js", "from": "async function callHelper(", "to": "// Every call is charged to the ledger" },
+                  { "path": "extension/background.js", "from": "async function generate(", "to": "// Simpler / More detail" }] },
+    { "action": "TimesOut", "label": "When the helper reports no cost (a timeout), nothing is recorded or charged.",
+      "sources": [{ "path": "extension/background.js", "from": "async function callHelper(", "to": "// Every call is charged to the ledger" }] },
+    { "action": "YouPressSimpler", "label": "Pressing Simpler is refused before the saved depth moves when today’s budget is used up; otherwise the depth moves and the card redraws.",
+      "sources": [{ "path": "extension/background.js", "from": "async function adjust(", "to": "async function explore(" }] },
+    { "action": "YouRetry", "label": "Pressing Retry redraws the card.",
+      "sources": [{ "path": "extension/background.js", "from": "'card:retry'", "to": "'card:repair'" }] },
+    { "action": "YouDismiss", "label": "Dismissing removes the card record, even while one of its calls is still running.",
+      "sources": [{ "path": "extension/background.js", "from": "async function dismiss(", "to": "// ---------- optional highlight chip" }] },
+    { "action": "LateReturn", "label": "When a redraw comes back after its card was dismissed, the cost is recorded in the ledger but added to no card.",
+      "sources": [{ "path": "extension/background.js", "from": "async function callHelper(", "to": "// Every call is charged to the ledger" },
+                  { "path": "extension/background.js", "from": "async function generate(", "to": "// Simpler / More detail" }] }
+  ]
+}
