@@ -35,6 +35,19 @@ export const TABLE = [
   { kind: 'rule-fixed', level: 'look', // a rule broke at base and holds at head: the PR changed it, so never "nothing"
     when: (f) => f.kind === 'rule' && f.status === 'holds' && f.atBase === 'breaks',
     text: (f) => `${f.name} now holds; it broke before`, ref: (f) => f.model },
+  { kind: 'rules-changed', level: 'look', // rules.md changed: an agent never edits it (rule 2), and docviz can't know who did
+    when: (f) => f.kind === 'rules-changed',
+    text: (f) => {
+      const parts = [['added', f.added], ['removed', f.removed], ['reworded', f.reworded]].filter(([, l]) => l.length).map(([k, l]) => `${k} ${l.join(', ')}`);
+      return `Your rules changed: ${parts.join('; ') || '`.atlas/rules.md` was edited outside any rule'}`;
+    } },
+  { kind: 'rule-redefined', level: 'look', // a rule's TLA+ definition changed: the change is the reason, whatever it became
+    when: (f) => f.kind === 'rule-redefined',
+    text: (f) => `${f.name}’s definition in the model changed (${f.model})`, ref: (f) => f.model },
+  { kind: 'model-removed', level: 'look', // a model, or all of .atlas/, removed
+    when: (f) => f.kind === 'model-removed' || (f.kind === 'atlas' && f.status === 'removed'),
+    text: (f) => (f.kind === 'atlas' ? '`.atlas/` removed: no model checks this repo any more' : `Model ${f.model} removed`),
+    ref: (f) => f.model },
   { kind: 'behavior-changed', level: 'look', // behavior changed (Delta.changed) with rules holding
     when: (f) => f.kind === 'delta' && f.changed === true,
     text: (f) => `${f.model} behaves differently: ${changes(f)}`, ref: (f) => f.model },

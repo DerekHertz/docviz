@@ -14,6 +14,9 @@ test('the table has DESIGN.md’s rows in order, ending in "nothing"', () => {
     ['contradicted', 'needs'],
     ['model-failed', 'needs'],
     ['rule-fixed', 'look'],
+    ['rules-changed', 'look'],
+    ['rule-redefined', 'look'],
+    ['model-removed', 'look'],
     ['behavior-changed', 'look'],
     ['step-unconfirmed', 'look'],
     ['uncovered', 'look'],
@@ -114,4 +117,28 @@ test('a model invariant that breaks is "needs you", with its path, rules.md or n
 test('rules.md text that isn’t a rule is a reason to look, in its own words', () => {
   const v = verdict([{ kind: 'rules-problem', text: 'rules.md: line 3 `## Spend Shows` is not a rule heading (## Name, one word)' }]);
   assert.deepEqual(v.reasons.map((r) => [r.level, r.kind, r.text]), [['look', 'rules-gap', 'rules.md: line 3 `## Spend Shows` is not a rule heading (## Name, one word)']]);
+});
+
+// Rule 2: an agent never edits rules.md. docviz can't know who did, so any change goes to the user.
+test('a PR that changes rules.md is "look", naming the rules added, removed and reworded', () => {
+  const v = verdict([{ kind: 'rules-changed', added: ['Fast'], removed: ['NoKeptMoney'], reworded: ['ShipsPaid'] }, step('pass')]);
+  assert.equal(v.level, 'look');
+  assert.deepEqual(v.reasons.map((r) => [r.kind, r.text]), [['rules-changed', 'Your rules changed: added Fast; removed NoKeptMoney; reworded ShipsPaid']]);
+  assert.equal(verdict([{ kind: 'rules-changed', added: [], removed: [], reworded: [] }]).reasons[0].text,
+    'Your rules changed: `.atlas/rules.md` was edited outside any rule');
+});
+
+test('a rule whose TLA+ definition changed is "look", whatever it changed to', () => {
+  const v = verdict([{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }, rule('holds'), step('pass')]);
+  assert.equal(v.level, 'look');
+  assert.deepEqual(v.reasons.map((r) => [r.kind, r.text, r.ref]), [['rule-redefined', 'ShipsPaid’s definition in the model changed (order)', 'order']]);
+});
+
+test('a removed model, or a removed .atlas/, is named, and other findings still count', () => {
+  const v = verdict([{ kind: 'model-removed', model: 'order' }, { kind: 'uncovered', path: 'src/order.js' }]);
+  assert.equal(v.level, 'look');
+  assert.deepEqual(v.reasons.map((r) => [r.kind, r.text]), [['model-removed', 'Model order removed'], ['uncovered', '`src/order.js`']]);
+  const gone = verdict([{ kind: 'atlas', status: 'removed' }, { kind: 'model-removed', model: 'order' }, rule('breaks', { path: ['x'] })]);
+  assert.equal(gone.level, 'needs');
+  assert.deepEqual(gone.reasons.map((r) => r.text), ['ShipsPaid breaks in order, ending “x”', '`.atlas/` removed: no model checks this repo any more', 'Model order removed']);
 });
