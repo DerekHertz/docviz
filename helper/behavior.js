@@ -334,29 +334,38 @@ export async function runBehavior({ root, git, base, trust = false, ask, check =
   const touched = names.filter((n) => [...headModels, ...baseModels].some((m) => m.name === n && changed.some((p) => covers(m, p))));
   const pair = (n) => ({ head: headModels.find((m) => m.name === n), base: baseModels.find((m) => m.name === n) });
 
-  // Run each touched model at base and head (in parallel), when trusted and the tools are there.
+  // A malformed model (atlas.js names its folder and field) is reported as it is, trusted or not:
+  // nothing runs on it. Malformed at head, neither side runs; at base only, the head still runs.
+  const malformed = touched.flatMap((n) => {
+    const { head: h, base: b } = pair(n);
+    return h?.error ? [{ model: n, side: 'head', error: h.error }] : b?.error ? [{ model: n, side: 'base', error: b.error }] : [];
+  });
+  const runnable = touched.filter((n) => !pair(n).head?.error);
+
+  // Run each runnable model at base and head (in parallel), when trusted and the tools are there.
   let runs = [];
-  if (touched.length) {
+  if (runnable.length) {
     const t = trust ? (tools || findTools()) : { why: 'pass --trust-atlas on your own repo' };
-    if (t.why) findings.push({ kind: 'not-run', models: touched, why: t.why });
+    if (t.why) findings.push({ kind: 'not-run', models: runnable, why: t.why });
     else {
-      log(`running ${touched.join(', ')} at base and head`);
-      runs = (await Promise.all(touched.flatMap((n) => {
+      log(`running ${runnable.join(', ')} at base and head`);
+      runs = (await Promise.all(runnable.flatMap((n) => {
         const { head: h, base: b } = pair(n);
-        return [b && (b.error ? { model: n, side: 'base', error: b.error } : runModel(b, 'base', t)),
-          h && (h.error ? { model: n, side: 'head', error: h.error } : runModel(h, 'head', t))];
+        return [b && !b.error && runModel(b, 'base', t), h && runModel(h, 'head', t)];
       }))).filter(Boolean);
     }
   }
-  for (const r of runs) if (r.error) findings.push({ kind: 'run', model: r.model, side: r.side, error: r.error });
+  for (const r of [...malformed, ...runs]) if (r.error) findings.push({ kind: 'run', model: r.model, side: r.side, error: r.error });
   findings.push(...ruleFindings({ rules: head?.rules ?? null, runs, models: headModels, touched }));
 
   const models = [];
-  for (const n of runs.length ? touched : []) {
+  for (const n of touched) {
+    const bad = malformed.find((r) => r.model === n);
     const h = runs.find((r) => r.model === n && r.side === 'head');
     const b = runs.find((r) => r.model === n && r.side === 'base');
-    if (h?.error) { models.push({ name: n, side: 'head', error: h.error }); continue; }
-    if (b?.error) continue;
+    const headError = bad?.side === 'head' ? bad.error : h?.error;
+    if (headError) { models.push({ name: n, side: 'head', error: headError }); continue; }
+    if ((!h && !b) || bad || b?.error) continue;
     const d = delta(n, b || null, h || null);
     findings.push({ kind: 'delta', ...d });
     models.push({ name: n, delta: d, mermaid: h?.mermaid ? markChart(h.mermaid, d) : '' });

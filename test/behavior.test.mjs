@@ -237,3 +237,20 @@ test('runBehavior: rules.md text that isn’t a rule is a finding the section sh
   assert.deepEqual(p, [{ kind: 'rules-problem', text: 'rules.md: line 4 `## Stays Shut` is not a rule heading (## Name, one word)' }]);
   assert.match(b.section(() => ''), /⚠ rules\.md: line 4 `## Stays Shut` is not a rule heading \(## Name, one word\)/);
 });
+
+test('runBehavior: a malformed model.json is an error naming the model and the field, and TLC never runs', async () => {
+  const { repo, git, put, base } = fakeRepo();
+  const marks = mkdtempSync(join(tmpdir(), 'sc-marks-'));
+  const statechart = join(marks, 'statechart');
+  writeFileSync(statechart, `#!/bin/sh\ntouch '${join(marks, 'ran')}'\nexit 2\n`);
+  chmodSync(statechart, 0o755);
+  put('.atlas/models/door/model.json', JSON.stringify({ spec: 'Door.tla', config: 'Door.cfg', code: 'src/door.js', steps: [] }));
+  for (const trust of [true, false]) {
+    const b = await runBehavior({ root: repo, git, base: { sha: base, how: 'test' }, trust, ask: asks({}), tools: { statechart, env: process.env } });
+    const run = b.findings.find((f) => f.kind === 'run');
+    assert.deepEqual(run, { kind: 'run', model: 'door', side: 'head', error: '.atlas/models/door/model.json: `code` must be an array of paths (strings)' }, `trust ${trust}`);
+    assert.ok(!b.findings.some((f) => f.kind === 'not-run' && f.models.includes('door')), `trust ${trust}`);
+    assert.match(b.section(() => ''), /#### door\n\nDidn’t run at head: \.atlas\/models\/door\/model\.json: `code` must be an array/);
+  }
+  assert.ok(!existsSync(join(marks, 'ran')), 'statechart ran on a malformed model');
+});
