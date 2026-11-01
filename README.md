@@ -101,6 +101,8 @@ docviz serve [--port 47823] [--host 127.0.0.1] [--provider auto|claude|codex] [-
              [--codex-rates in,cached,out,image]   # USD per 1M tokens, and per picture
 docviz code     # print the pairing code
 docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M]
+docviz pr --rules [--glossary FILE]   # the rules for a diagram an agent writes itself
+docviz pr --lint <steps.json>         # check the "card" in steps.json
 ```
 
 ## Diagrams on pull requests
@@ -123,6 +125,12 @@ file). `--glossary` passes a file of your project's terms (a `CONTEXT.md`) so la
 comment's footer shows what it cost. If [Playwright](https://playwright.dev) is installed next to
 docviz (never taken from the PR's repo, whose code is untrusted), the diagram is syntax-checked with docviz's own Mermaid build and
 repaired once on error; otherwise the footer says it wasn't checked.
+
+An agent that already knows the PR writes the diagram itself: `docviz pr --rules` prints the rules,
+the agent adds `"card": { "caption": "...", "mermaid": "..." }` to `steps.json`, and
+`docviz pr --lint steps.json` checks it (flowchart TD, at most 6 nodes, a node per step carrying
+the step's label, `:::changed` on changed steps only, no `fill`). With a card, `docviz pr` makes
+no Claude or Codex call; the plugin's `pr-diagram` skill walks an agent through it.
 
 ## Troubleshooting
 

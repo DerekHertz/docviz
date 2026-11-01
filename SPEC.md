@@ -113,6 +113,18 @@ returns one PR comment.
 - Labels are plain words, overriding the identifier rule: the "Where in the code" table under the
   diagram is where the real identifiers live, as links to the lines at `HEAD`.
 - `--glossary` adds the project's own terms to the prompt.
+- Two ways to get the diagram (2026-10-31). **Agent path** (the default for an agent): the calling
+  agent already has the PR in context, so it writes the diagram. `docviz pr --rules [--glossary F]`
+  prints the rules `prCardPrompt` sends (one source, `helper/prompts.js`); the agent adds
+  `card: { caption, mermaid }` to `steps.json`; `docviz pr --lint steps.json` checks it, one failure
+  per line, exit 1: Mermaid parses (when Playwright is found), first line `flowchart TD`, at most 6
+  nodes, a node per step id, each node's label equal to its step's label, `:::changed` exactly on
+  changed steps, no `fill` in a `classDef`. `docviz pr` with a card lints it again, stops on a
+  failure, and makes no Claude or Codex call, so no nested model loop and no `usage` goes missing:
+  the agent's tokens are its own, and the footer says "Diagram by the calling agent" with Jev's
+  cost only. Labels equal the step labels so Jev's step check covers what the picture shows. The
+  `skills/pr-diagram` skill walks an agent through it. **Fallback path** (a person at a terminal,
+  no `card`): docviz asks `claude` or `codex` for the card and repairs it once, as below.
 - Cost: there is no extension or ledger here, so the comment's footer and stderr carry the total of
   every call (card + repair), with `~` for Codex. A failed run still prints what it spent.
 - Mermaid is checked only when Playwright is found next to docviz (docviz takes no dependency on

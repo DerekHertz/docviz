@@ -2,13 +2,15 @@
 // docviz [serve] [--port N] [--host H] [--provider auto|claude|codex] [--model M] [--codex-rates in,cached,out,image] [--new-code]
 // docviz lab [--port 47830]   (repo checkout only: the lab needs Playwright)
 // docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M] [--codex-rates ...] [--no-check]
+// docviz pr --rules [--glossary FILE]   |   docviz pr --lint <steps.json>
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { randomInt } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { startServer } from './server.js';
 import { setCodexRates } from './providers.js';
-import { runPr, money } from './pr.js';
+import { runPr, lintDoc, money } from './pr.js';
+import { prAgentRules } from './prompts.js';
 
 const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'docviz');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
@@ -19,7 +21,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith('--')) { if (i === 0) opts.cmd = a; else opts.args.push(a); continue; }
     const key = a.slice(2);
-    if (key === 'new-code' || key === 'help' || key === 'no-check') opts[key] = true;
+    if (key === 'new-code' || key === 'help' || key === 'no-check' || key === 'rules') opts[key] = true;
     else opts[key] = argv[++i];
   }
   return opts;
@@ -44,7 +46,7 @@ function loadConfig(regenerate) {
 }
 
 const opts = parseArgs(process.argv.slice(2));
-if (opts.help || !['serve', 'code', 'pr', 'lab'].includes(opts.cmd) || (opts.cmd === 'pr' && (!opts.args[0] || !opts.pr))) {
+if (opts.help || !['serve', 'code', 'pr', 'lab'].includes(opts.cmd) || (opts.cmd === 'pr' && !opts.rules && !opts.lint && (!opts.args[0] || !opts.pr))) {
   console.log(`docviz — local helper for the docviz Chrome extension
 
   docviz serve [--port 47823] [--host 127.0.0.1] [--provider auto|claude|codex] [--model M] [--new-code]
@@ -52,13 +54,35 @@ if (opts.help || !['serve', 'code', 'pr', 'lab'].includes(opts.cmd) || (opts.cmd
   docviz code            print the pairing code
   docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M] [--no-check]
                          print a PR comment: one diagram of the PR's flow, code links, its cost.
-                         With TYPESAFE_API_KEY set, Jev checks each step's label against its code
+                         With TYPESAFE_API_KEY set, Jev checks each step's label against its code.
+                         A "card": { "caption", "mermaid" } in steps.json is used as is: no model call
+  docviz pr --rules [--glossary FILE]
+                         print the rules for the diagram an agent writes itself
+  docviz pr --lint <steps.json>
+                         check that card: one failure per line, exit 1 if any
   docviz lab [--port 47830]
                          open the lab: try a check (Jev first) on known-good and known-broken cases`);
   process.exit(opts.help ? 0 : 1);
 }
 
 if (opts['codex-rates']) setCodexRates(opts['codex-rates']);
+
+if (opts.cmd === 'pr' && opts.rules) {
+  console.log(prAgentRules(opts.glossary ? readFileSync(opts.glossary, 'utf8') : ''));
+  process.exit(0);
+}
+
+if (opts.cmd === 'pr' && opts.lint) {
+  try {
+    const { errors, parsed } = await lintDoc(JSON.parse(readFileSync(opts.lint, 'utf8')));
+    if (errors.length) console.log(errors.join('\n'));
+    else console.log(parsed ? 'ok' : 'ok (Mermaid not parsed: playwright not found)');
+    process.exit(errors.length ? 1 : 0);
+  } catch (e) {
+    console.error(e.message);
+    process.exit(2);
+  }
+}
 
 if (opts.cmd === 'pr') {
   const log = (m) => console.error(m);

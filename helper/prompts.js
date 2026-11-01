@@ -182,10 +182,10 @@ Then write "html": ONE self-contained HTML document.
 // `docviz pr`: the one diagram on a pull request, for a reader deciding whether to merge.
 const PR_PREFS = { depth: 'concept', style: 'strict', coverage: 'all', thinkFirst: false };
 const PR_RULES = `This card is the one diagram on a pull request. The reader decides whether to merge without reading the code, often in GitHub's dark theme.
-- Draw the whole flow as ONE flowchart TD with one node per STEP below, in order, using each step's id as the node id. Add at most one extra node, only for a fallback the reader must see. At most 6 nodes in total: merge adjacent steps when there are more.
-- Node labels: at most 5 plain words, no code names, no parentheses (the table under the diagram links the code), e.g. A["Rank the results"]. This overrides the identifier rule: the code links carry the real names.
+- Draw the whole flow as ONE flowchart TD (the first line is "flowchart TD") with one node per step, in order, using each step's id as the node id. Add no node that is not a step: only step labels are checked against the code. At most 6 nodes in total: with more steps, merge adjacent steps first.
+- Node labels: the step's label, word for word, e.g. A["Rank the results"]. A label claims only what its linked lines show, so step labels are at most 5 plain words, no code names, no parentheses (the table under the diagram links the code). This overrides the identifier rule: the code links carry the real names.
 - Edge labels: only on a branch, at most 3 words (e.g. "3+ likes", "fails"). No labels on straight edges.
-- Steps marked NEW must be drawn with :::changed, and the diagram must end with exactly: classDef changed stroke:#d29922,stroke-width:3px
+- Steps marked NEW (changed: true) must be drawn with :::changed, and no other node may carry it. The diagram must end with exactly: classDef changed stroke:#d29922,stroke-width:3px
   Never set fill or color: the theme picks them, and a fill makes text unreadable in dark mode.
 - Caption: at most two short sentences. First what this PR changes for the user, then the one thing that keeps it safe or cheap.
 - Kind is always "flow". Question "". Interactive false. Picture "".`;
@@ -198,6 +198,10 @@ export function prCardPrompt({ page, steps, glossary }) {
       + s.cuts.map((c) => `// ${c.path}:${c.start}-${c.end}\n${c.text}`).join('\n\n')).join('\n\n'),
   };
   const job = cardPrompt({ page, section, prefs: PR_PREFS });
-  const rules = glossary ? `${PR_RULES}\n\nName things in labels and caption with this project's own terms:\n${glossary}` : PR_RULES;
-  return { ...job, system: `${job.system}\n\n${rules}` };
+  return { ...job, system: `${job.system}\n\n${prRules(glossary)}` };
 }
+
+const prRules = (glossary) => (glossary ? `${PR_RULES}\n\nName things in labels and caption with this project's own terms:\n${glossary}` : PR_RULES);
+
+/** What `docviz pr --rules` prints: the rules an agent drawing the PR diagram itself writes under. */
+export const prAgentRules = (glossary) => `${MERMAID_RULES}\n\n${prRules(glossary)}`;

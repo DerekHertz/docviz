@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { complete, detectProviders, pickProvider } from './providers.js';
 import { prCardPrompt, repairPrompt } from './prompts.js';
 import { checkSteps } from './checks.js';
+import { lintCard } from './lint.js';
 
 export const MARKER = '<!-- docviz-pr-diagrams -->';
 const DOCVIZ_REPO = 'https://github.com/DerekHertz/docviz';
@@ -50,9 +51,11 @@ function checkSummary(checks) {
  * `checks` (one per step, from helper/checks.js) adds a Check column; without it the footer says
  * the steps weren't checked. `costs` breaks the total into diagram and step checks.
  */
-export function prComment({ card, steps, sha, repoUrl, usage, checked, version, checks, costs }) {
+export function prComment({ card, steps, sha, repoUrl, usage, checked, version, checks, costs, drawnBy }) {
   const link = (c) => `[\`${c.path}:${c.start}-${c.end}\`](${repoUrl}/blob/${sha}/${c.path}#L${c.start}-L${c.end})`;
-  const cost = costs ? `${money(usage)} (diagram ${money(costs.diagram)}, step checks ${money(costs.checks)})` : money(usage);
+  const agent = drawnBy === 'agent';
+  const cost = costs ? `${money(usage)} (diagram ${money(costs.diagram)}, step checks ${money(costs.checks)})`
+    : `${money(usage)}${agent && checks ? ' (step checks)' : ''}`;
   return [
     MARKER,
     '## How this PR works',
@@ -72,7 +75,7 @@ export function prComment({ card, steps, sha, repoUrl, usage, checked, version, 
     checks?.some((c) => c.verdict === 'review' || c.verdict === 'flag')
       ? '\n⚠ the label claims something these lines don’t show (a person should look); ✗ the lines contradict the label.' : '',
     '',
-    `<sub>Diagram by [docviz](${DOCVIZ_REPO}) \`${version}\`, ${checked ? 'checked against Mermaid 11' : 'not syntax-checked'}, ${checks ? checkSummary(checks) : 'steps not checked'}, cost ${cost}.</sub>`,
+    `<sub>Diagram by ${agent ? 'the calling agent, formatted by ' : ''}[docviz](${DOCVIZ_REPO}) \`${version}\`, ${checked ? 'checked against Mermaid 11' : 'not syntax-checked'}, ${checks ? checkSummary(checks) : 'steps not checked'}, cost ${cost}.</sub>`,
   ].join('\n') + '\n';
 }
 
@@ -96,6 +99,20 @@ async function mermaidChecker() {
   };
 }
 
+/** Lint errors for a steps document's card, with whether Mermaid parsed it (false when Playwright is missing). */
+export async function lintDoc({ steps, card }) {
+  const errors = lintCard(steps, card);
+  if (!card?.mermaid?.trim()) return { errors, parsed: false };
+  const checker = await mermaidChecker();
+  try {
+    const error = await checker?.check(card.mermaid);
+    if (error) errors.push(`Mermaid does not parse: ${error.split('\n')[0]}`);
+  } finally {
+    await checker?.close();
+  }
+  return { errors, parsed: !!checker };
+}
+
 function docvizVersion() {
   try { return execFileSync('git', ['-C', ROOT, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch {}
   return JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
@@ -109,7 +126,15 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
   const repoUrl = repoWebUrl(git('remote', 'get-url', 'origin'));
   if (git('status', '--porcelain', '--untracked-files=no')) log('warning: uncommitted changes; links point at HEAD as committed');
 
-  const steps = JSON.parse(readFileSync(resolve(stepsFile), 'utf8')).steps.map((s) => ({
+  const doc = JSON.parse(readFileSync(resolve(stepsFile), 'utf8'));
+  let parsed = false;
+  if (doc.card) {
+    const lint = await lintDoc(doc);
+    if (lint.errors.length) throw new Error(lint.errors.join('\n'));
+    parsed = lint.parsed;
+    if (!parsed) log('playwright not found: the diagram is not syntax-checked');
+  }
+  const steps = doc.steps.map((s) => ({
     ...s,
     cuts: s.sources.map((src) => {
       try { return { path: src.path, ...cut(readFileSync(resolve(root, src.path), 'utf8'), src.from, src.to) }; } catch (e) { throw new Error(`${src.path}: ${e.message}`); }
@@ -117,7 +142,7 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
   }));
   const glossary = glossaryFile ? readFileSync(resolve(glossaryFile), 'utf8') : '';
 
-  const provider = pickProvider(requested || 'auto', detectProviders());
+  const provider = doc.card ? null : pickProvider(requested || 'auto', detectProviders());
   const spent = [];
   const call = async (job, timeoutMs) => {
     try {
@@ -135,33 +160,39 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
   if (check && !canCheck) log('TYPESAFE_API_KEY not set: steps not checked');
   const checking = canCheck ? checkSteps(steps, ask ? { ask } : {}) : null;
 
-  let card;
-  try {
-    card = await call(prCardPrompt({ page: { title: title || 'Pull request', url: prUrl }, steps, glossary }), 300_000);
-  } catch (e) {
-    const checks = await checking;
-    throw Object.assign(e, { usage: sumUsage([...spent, ...(checks || []).map((c) => c.usage)]) });
-  }
-  const checker = await mermaidChecker();
-  if (!checker) log('playwright not found: the diagram is not syntax-checked');
-  try {
-    let error = await checker?.check(card.mermaid);
-    if (error) {
-      card.mermaid = (await call(repairPrompt({ mermaid: card.mermaid, error }), 120_000)).mermaid;
-      error = await checker.check(card.mermaid);
-    }
-    if (error) {
+  // The fallback for a person at a terminal: a model draws the diagram, and a second call repairs it.
+  const draw = async () => {
+    let card;
+    try {
+      card = await call(prCardPrompt({ page: { title: title || 'Pull request', url: prUrl }, steps, glossary }), 300_000);
+    } catch (e) {
       const checks = await checking;
-      throw Object.assign(new Error(`diagram doesn't parse: ${error.split('\n')[0]}`), { usage: sumUsage([...spent, ...(checks || []).map((c) => c.usage)]) });
+      throw Object.assign(e, { usage: sumUsage([...spent, ...(checks || []).map((c) => c.usage)]) });
     }
-  } finally {
-    await checker?.close();
-  }
+    const checker = await mermaidChecker();
+    if (!checker) log('playwright not found: the diagram is not syntax-checked');
+    try {
+      let error = await checker?.check(card.mermaid);
+      if (error) {
+        card.mermaid = (await call(repairPrompt({ mermaid: card.mermaid, error }), 120_000)).mermaid;
+        error = await checker.check(card.mermaid);
+      }
+      if (error) {
+        const checks = await checking;
+        throw Object.assign(new Error(`diagram doesn't parse: ${error.split('\n')[0]}`), { usage: sumUsage([...spent, ...(checks || []).map((c) => c.usage)]) });
+      }
+    } finally {
+      await checker?.close();
+    }
+    return { card, parsed: !!checker };
+  };
+  const drawnBy = doc.card ? 'agent' : 'docviz';
+  const { card, parsed: checked } = doc.card ? { card: doc.card, parsed } : await draw();
 
   const checks = await checking;
   for (const c of checks || []) if (c.error) log(`step ${c.id} not checked: ${c.error}`);
-  const costs = checks ? { diagram: sumUsage(spent), checks: sumUsage(checks.map((c) => c.usage)) } : null;
+  const costs = checks && !doc.card ? { diagram: sumUsage(spent), checks: sumUsage(checks.map((c) => c.usage)) } : null;
   const usage = sumUsage([...spent, ...(checks || []).map((c) => c.usage)]);
-  const body = prComment({ card, steps, sha, repoUrl, usage, checked: !!checker, version: docvizVersion(), checks, costs });
+  const body = prComment({ card, steps, sha, repoUrl, usage, checked, version: docvizVersion(), checks, costs, drawnBy });
   return { body, missing: missingSteps(steps, card.mermaid), usage, checks };
 }
