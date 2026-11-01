@@ -1,0 +1,290 @@
+{
+  "base": "921e385",
+  "head": "3d37957",
+  "usd": 0.00051408,
+  "rows": [
+    {
+      "id": "YouBreakDown",
+      "label": "Before any helper call starts, it is refused if today’s budget is used up.",
+      "head": {
+        "id": "YouBreakDown",
+        "verdict": "pass",
+        "prob": 0.78,
+        "probContra": 0.09,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 802,
+          "outputTokens": 39,
+          "usd": 0.000033684000000000005,
+          "estimated": false
+        }
+      },
+      "base": {
+        "id": "YouBreakDown",
+        "verdict": "review",
+        "prob": 0.03,
+        "probContra": 0.41,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 733,
+          "outputTokens": 39,
+          "usd": 0.000030786,
+          "estimated": false
+        }
+      },
+      "cuts": [
+        "extension/background.js:61-89"
+      ]
+    },
+    {
+      "id": "CardArrives",
+      "label": "When the card comes back, the call’s cost is recorded in the ledger and added to the card’s cost.",
+      "head": {
+        "id": "CardArrives",
+        "verdict": "pass",
+        "prob": 0.61,
+        "probContra": 0.11,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 1079,
+          "outputTokens": 39,
+          "usd": 0.000045318,
+          "estimated": false
+        }
+      },
+      "base": {
+        "id": "CardArrives",
+        "verdict": "flag",
+        "prob": 0.05,
+        "probContra": 0.71,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 880,
+          "outputTokens": 39,
+          "usd": 0.00003696,
+          "estimated": false
+        }
+      },
+      "cuts": [
+        "extension/background.js:61-89",
+        "extension/background.js:304-319"
+      ]
+    },
+    {
+      "id": "CallFails",
+      "label": "When the call fails after spending, its cost is still recorded and added to the card as a failed attempt.",
+      "head": {
+        "id": "CallFails",
+        "verdict": "pass",
+        "prob": 0.82,
+        "probContra": 0.07,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 1078,
+          "outputTokens": 39,
+          "usd": 0.000045276000000000005,
+          "estimated": false
+        }
+      },
+      "base": {
+        "id": "CallFails",
+        "verdict": "review",
+        "prob": 0.07,
+        "probContra": 0.44,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 879,
+          "outputTokens": 39,
+          "usd": 0.000036918,
+          "estimated": false
+        }
+      },
+      "cuts": [
+        "extension/background.js:61-89",
+        "extension/background.js:304-319"
+      ]
+    },
+    {
+      "id": "TimesOut",
+      "label": "When the helper reports no cost (a timeout), nothing is recorded or charged.",
+      "head": {
+        "id": "TimesOut",
+        "verdict": "review",
+        "prob": 0.17,
+        "probContra": 0.44,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 801,
+          "outputTokens": 39,
+          "usd": 0.000033642,
+          "estimated": false
+        }
+      },
+      "base": {
+        "id": "TimesOut",
+        "verdict": "review",
+        "prob": 0.1,
+        "probContra": 0.37,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 732,
+          "outputTokens": 39,
+          "usd": 0.000030744,
+          "estimated": false
+        }
+      },
+      "cuts": [
+        "extension/background.js:61-89"
+      ]
+    },
+    {
+      "id": "YouPressSimpler",
+      "label": "Pressing Simpler is refused before the saved depth moves when today’s budget is used up; otherwise the depth moves and the card redraws.",
+      "head": {
+        "id": "YouPressSimpler",
+        "verdict": "review",
+        "prob": 0.23,
+        "probContra": 0.33,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 631,
+          "outputTokens": 39,
+          "usd": 0.000026502,
+          "estimated": false
+        }
+      },
+      "base": {
+        "id": "YouPressSimpler",
+        "verdict": "flag",
+        "prob": 0.03,
+        "probContra": 0.58,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 582,
+          "outputTokens": 39,
+          "usd": 0.000024444000000000002,
+          "estimated": false
+        }
+      },
+      "cuts": [
+        "extension/background.js:333-341"
+      ]
+    },
+    {
+      "id": "YouRetry",
+      "label": "Pressing Retry redraws the card.",
+      "head": {
+        "id": "YouRetry",
+        "verdict": "review",
+        "prob": 0.39,
+        "probContra": 0.14,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 482,
+          "outputTokens": 39,
+          "usd": 0.000020244,
+          "estimated": false
+        }
+      },
+      "base": {
+        "id": "YouRetry",
+        "verdict": "review",
+        "prob": 0.34,
+        "probContra": 0.13,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 482,
+          "outputTokens": 39,
+          "usd": 0.000020244,
+          "estimated": false
+        }
+      },
+      "cuts": [
+        "extension/background.js:447-447"
+      ]
+    },
+    {
+      "id": "YouDismiss",
+      "label": "Dismissing removes the card record, even while one of its calls is still running.",
+      "head": {
+        "id": "YouDismiss",
+        "verdict": "review",
+        "prob": 0.15,
+        "probContra": 0.27,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 559,
+          "outputTokens": 39,
+          "usd": 0.000023478,
+          "estimated": false
+        }
+      },
+      "base": {
+        "id": "YouDismiss",
+        "verdict": "review",
+        "prob": 0.14,
+        "probContra": 0.3,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 559,
+          "outputTokens": 39,
+          "usd": 0.000023478,
+          "estimated": false
+        }
+      },
+      "cuts": [
+        "extension/background.js:416-424"
+      ]
+    },
+    {
+      "id": "LateReturn",
+      "label": "When a redraw comes back after its card was dismissed, the cost is recorded in the ledger but added to no card.",
+      "head": {
+        "id": "LateReturn",
+        "verdict": "review",
+        "prob": 0.19,
+        "probContra": 0.45,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 1080,
+          "outputTokens": 39,
+          "usd": 0.00004536,
+          "estimated": false
+        }
+      },
+      "base": {
+        "id": "LateReturn",
+        "verdict": "review",
+        "prob": 0.06,
+        "probContra": 0.35,
+        "usage": {
+          "provider": "jev",
+          "model": "jev-1.14.0",
+          "inputTokens": 881,
+          "outputTokens": 39,
+          "usd": 0.000037002,
+          "estimated": false
+        }
+      },
+      "cuts": [
+        "extension/background.js:61-89",
+        "extension/background.js:304-319"
+      ]
+    }
+  ]
+}

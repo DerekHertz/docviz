@@ -1,0 +1,20 @@
+{
+  "about": "docviz PR #1 at its head: per-card costs, the daily budget, pictures. 1,079 lines.",
+  "source": ".",
+  "sha": "3d37957ec2387a043bef09b9ec9f16c6b5e8f348",
+  "origin": "https://github.com/DerekHertz/docviz.git",
+  "pr": "https://github.com/DerekHertz/docviz/pull/1",
+  "title": "ELI5 depth, per-card costs + daily budget, expand view, Codex pictures",
+  "steps": [
+    { "id": "budget", "label": "A helper call is refused once today's budget is used up", "changed": true,
+      "sources": [{ "path": "extension/background.js", "from": "async function callHelper(", "to": "// Every call is charged to the ledger" }] },
+    { "id": "ledger", "label": "Each call's cost is recorded in the spend ledger", "changed": true,
+      "sources": [{ "path": "extension/background.js", "from": "const ledger = createLedger(", "to": "// Charge a card for a call" }] },
+    { "id": "redraw", "label": "A redrawn card adds the call's cost to its breakdown", "changed": true,
+      "sources": [{ "path": "extension/background.js", "from": "async function generate(", "to": "async function learn(" }] },
+    { "id": "blocked", "label": "A Simpler click over budget is refused before the depth moves", "changed": true,
+      "sources": [{ "path": "extension/background.js", "from": "async function adjust(", "to": "async function explore(" }] },
+    { "id": "picture", "label": "A picture is painted once per card text and never paid twice", "changed": true,
+      "sources": [{ "path": "extension/background.js", "from": "async function picture(", "to": "async function dismiss(" }] }
+  ]
+}

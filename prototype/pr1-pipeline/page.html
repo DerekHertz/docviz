@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PR 1 Pipeline</title>
+<style>
+  :root { --paper:#f5efe3; --ink:#2b2622; --soft:#6d645a; --red:#b3261e; --blue:#2f5d8a; --card:#fbf7ef; --line:#d8cdb9; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#1f1c18; --ink:#ece4d6; --soft:#a89d8e; --red:#e2675e; --blue:#7fa7d1; --card:#2a2621; --line:#4a4339; } }
+  :root[data-theme="dark"] { --paper:#1f1c18; --ink:#ece4d6; --soft:#a89d8e; --red:#e2675e; --blue:#7fa7d1; --card:#2a2621; --line:#4a4339; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:17px/1.55 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; }
+  main { max-width: 1060px; margin: 0 auto; padding: 40px 16px 80px; }
+  .kicker { letter-spacing:.08em; color:var(--soft); font-size:14px; }
+  h1 { font-weight:400; font-size: clamp(34px, 6vw, 58px); margin: 4px 0 0; letter-spacing:.01em; }
+  h2 { font-weight:400; font-size: 30px; margin: 0; }
+  .sub { font-style: italic; color: var(--soft); margin: 2px 0 0; }
+  .verdict { margin: 28px 0 8px; padding: 18px 20px; border: 2px solid var(--red); border-radius: 10px; background: var(--card); }
+  .verdict b { color: var(--red); }
+  .plate { margin-top: 56px; display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 24px; align-items: start; }
+  .plate.wide { grid-template-columns: minmax(0,1fr); }
+  @media (max-width: 820px) { .plate { grid-template-columns: minmax(0,1fr); } }
+  .chart { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow-x: auto; }
+  .chart svg { width: 100%; max-width: none !important; height: auto; }
+  aside { display: grid; gap: 14px; }
+  .box { border: 1.5px solid var(--ink); border-radius: 8px; padding: 12px 14px; background: var(--card); font-size: 15px; }
+  .box .h { font-size: 13px; letter-spacing:.06em; color: var(--soft); margin-bottom: 4px; }
+  .rule { font-style: italic; margin: 6px 0; }
+  .stamp { display:inline-block; border: 2px solid var(--red); color: var(--red); border-radius: 6px; padding: 0 8px; font-size: 13px; transform: rotate(-4deg); margin-left: 6px; }
+  .stamp.ok { border-color: var(--blue); color: var(--blue); transform: rotate(3deg); }
+  .key span { display:inline-block; width: 26px; border-top: 2.5px solid var(--red); vertical-align: middle; margin-right: 8px; }
+  .key span.chg { border-top: 2.5px dashed var(--blue); }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 400; color: var(--soft); font-size: 13px; letter-spacing: .05em; }
+  td.step { font-style: italic; white-space: nowrap; }
+  td.v { font-size: 18px; text-align: center; white-space: nowrap; }
+  td.v small { display:block; font-size: 11px; color: var(--soft); }
+  .pass { color: var(--blue); } .flag { color: var(--red); } .review { color: #b07d16; }
+  .cuts { font-size: 12px; color: var(--soft); margin-top: 2px; }
+  .cuts a { color: var(--soft); }
+  .tbl { overflow-x: auto; }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; overflow-x: auto; font: 14px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  pre .fired { color: var(--red); } pre .ok { color: var(--blue); } pre .note { color: var(--soft); }
+  ol li { margin: 8px 0; }
+  .dim { color: var(--soft); font-size: 14px; }
+</style></head>
+<body><main>
+  <div class="kicker">docviz pipeline, prototype · PR #1</div>
+  <h1>One card and its money</h1>
+  <p class="sub">1,079 lines across 26 files, read as 8 states and the 2 rules you wrote</p>
+
+  <div class="verdict">
+    <b>A person needs to see this PR.</b> It fixes one rule (the budget is now checked before every call)
+    and leaves the other broken on one path: dismiss a card while it redraws, and the call still spends,
+    but the cost lands on no card. That gap is still in <code>main</code> today.
+  </div>
+
+  <section class="plate">
+    <div><div class="kicker">I · before</div><h2>The base</h2><p class="sub">no ledger, no budget</p>
+      <div class="chart"><pre class="mermaid">stateDiagram-v2
+  s0: not drawn yet
+  s1: drawing
+  s2: failed
+  s3: on the page
+  s4: dismissed
+  s5: redrawing
+  s6: dismissed, call still out
+  s7: on the page, budget used up
+  [*] --&gt; s0
+  s0 --&gt; s1: you break down the page
+  s1 --&gt; s2: the call fails after spending or the call times out
+  s1 --&gt; s3: the card comes back
+  s2 --&gt; s4: you dismiss it
+  s2 --&gt; s5: you press Retry
+  s3 --&gt; s4: you dismiss it
+  s3 --&gt; s5: you press Simpler
+  s5 --&gt; s6: you dismiss it
+  s5 --&gt; s7: the call fails after spending or the card comes back or the call times out
+  s6 --&gt; s4: the call comes back to no card
+  s7 --&gt; s4: you dismiss it
+  s7 --&gt; s5: you press Simpler
+  class s0 bugPath
+  class s1 bugPath
+  class s2 mayBreak
+  class s2 bugPath
+  class s3 breaks
+  class s3 bugPath
+  class s4 mayBreak
+  class s5 mayBreak
+  class s5 bugPath
+  class s6 mayBreak
+  class s7 mayBreak
+  class s7 bugPath
+
+classDef bugPath stroke:#b3261e,stroke-width:2.5px
+classDef mayBreak fill:#f7d9d6,stroke:#b3261e,stroke-width:2.5px,color:#8c1d16
+classDef breaks fill:#f7d9d6,stroke:#b3261e,stroke-width:2.5px,color:#8c1d16
+classDef changed stroke:#2f5d8a,stroke-width:2.5px,stroke-dasharray:5 3</pre></div></div>
+    <aside>
+      <div class="box"><div class="h">the rules</div>
+        <p class="rule">“Never add a call that spends without showing up in the card’s cost breakdown.”<span class="stamp">broken</span></p>
+        <p class="rule">“The budget check runs before every call.”<span class="stamp">broken</span></p>
+        <div class="dim">From CLAUDE.md and SPEC.md, checked by TLC against the base.</div></div>
+      <div class="box"><div class="h">the path TLC found</div>
+        not drawn yet → <i>you break down the page</i> → drawing → <i>the card comes back</i> → on the page. Nothing was ever charged.</div>
+    </aside>
+  </section>
+
+  <section class="plate">
+    <div><div class="kicker">II · after</div><h2>PR #1</h2><p class="sub">what changed, drawn on top</p>
+      <div class="chart"><pre class="mermaid">stateDiagram-v2
+  s0: not drawn yet
+  s1: drawing
+  s2: failed
+  s3: on the page
+  s4: dismissed
+  s5: redrawing
+  s6: dismissed, call still out
+  s7: on the page, budget used up
+  [*] --&gt; s0
+  s0 --&gt; s1: you break down the page
+  s1 --&gt; s2: the call times out or the call fails after spending
+  s1 --&gt; s3: the card comes back
+  s2 --&gt; s4: you dismiss it
+  s2 --&gt; s5: you press Retry
+  s3 --&gt; s4: you dismiss it
+  s3 --&gt; s5: you press Simpler
+  s5 --&gt; s6: you dismiss it
+  s5 --&gt; s7: the call times out or the call fails after spending or the card comes back
+  s6 --&gt; s4: the call comes back to no card
+  s7 --&gt; s4: you dismiss it
+  class s0 bugPath
+  class s1 bugPath
+  class s2 bugPath
+  class s4 mayBreak
+  class s4 bugPath
+  class s5 bugPath
+  class s6 bugPath
+
+classDef bugPath stroke:#b3261e,stroke-width:2.5px
+classDef mayBreak fill:#f7d9d6,stroke:#b3261e,stroke-width:2.5px,color:#8c1d16
+classDef breaks fill:#f7d9d6,stroke:#b3261e,stroke-width:2.5px,color:#8c1d16
+classDef changed stroke:#2f5d8a,stroke-width:2.5px,stroke-dasharray:5 3
+class s7 changed</pre></div></div>
+    <aside>
+      <div class="box"><div class="h">the rules</div>
+        <p class="rule">“The budget check runs before every call.”<span class="stamp ok">now holds</span></p>
+        <p class="rule">“Never add a call that spends without showing up in the card’s cost breakdown.”<span class="stamp">broken on 1 path</span></p></div>
+      <div class="box key"><div class="h">key</div>
+        <div><span></span>the path TLC found</div>
+        <div><span class="chg"></span>changed by this PR: <i>budget used up</i> lost its <i>you press Simpler</i> arrow</div></div>
+      <div class="box"><div class="h">the path TLC found</div>
+        … failed → <i>you press Retry</i> → redrawing → <i>you dismiss it</i> → dismissed, call still out →
+        <i>the call comes back to no card</i> → dismissed.
+        <div class="dim" style="margin-top:6px">In code: <a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L310-L317">generate()</a> reads the dismissed card, <code>cur.cost</code> throws, and the catch returns uncharged. Reachable: ✕ stays clickable while a card loads. Not yet reproduced in a browser.</div></div>
+    </aside>
+  </section>
+
+  <section class="plate wide">
+    <div><div class="kicker">III · does the model match the code?</div><h2>Each step, checked by Jev</h2>
+      <p class="sub">the adopted step check, unchanged: every claim shown / anything contradicted. ✓ pass · ⚠ review · ✗ contradicted</p>
+      <div class="tbl"><table>
+        <tr><th>step</th><th>what the model claims, and its code at PR #1</th><th>PR #1</th><th>base</th></tr>
+        
+  <tr>
+    <td class="step">you break down the page</td>
+    <td>Before any helper call starts, it is refused if today’s budget is used up.<div class="cuts"><a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L61-L89">background.js:61</a></div></td>
+    <td class="v pass">✓<small>0.78 / 0.09</small></td>
+    <td class="v review">⚠<small>0.03 / 0.41</small></td>
+  </tr>
+  <tr>
+    <td class="step">the card comes back</td>
+    <td>When the card comes back, the call’s cost is recorded in the ledger and added to the card’s cost.<div class="cuts"><a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L61-L89">background.js:61</a> · <a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L304-L319">background.js:304</a></div></td>
+    <td class="v pass">✓<small>0.61 / 0.11</small></td>
+    <td class="v flag">✗<small>0.05 / 0.71</small></td>
+  </tr>
+  <tr>
+    <td class="step">the call fails after spending</td>
+    <td>When the call fails after spending, its cost is still recorded and added to the card as a failed attempt.<div class="cuts"><a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L61-L89">background.js:61</a> · <a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L304-L319">background.js:304</a></div></td>
+    <td class="v pass">✓<small>0.82 / 0.07</small></td>
+    <td class="v review">⚠<small>0.07 / 0.44</small></td>
+  </tr>
+  <tr>
+    <td class="step">the call times out</td>
+    <td>When the helper reports no cost (a timeout), nothing is recorded or charged.<div class="cuts"><a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L61-L89">background.js:61</a></div></td>
+    <td class="v review">⚠<small>0.17 / 0.44</small></td>
+    <td class="v review">⚠<small>0.10 / 0.37</small></td>
+  </tr>
+  <tr>
+    <td class="step">you press Simpler</td>
+    <td>Pressing Simpler is refused before the saved depth moves when today’s budget is used up; otherwise the depth moves and the card redraws.<div class="cuts"><a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L333-L341">background.js:333</a></div></td>
+    <td class="v review">⚠<small>0.23 / 0.33</small></td>
+    <td class="v flag">✗<small>0.03 / 0.58</small></td>
+  </tr>
+  <tr>
+    <td class="step">you press Retry</td>
+    <td>Pressing Retry redraws the card.<div class="cuts"><a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L447-L447">background.js:447</a></div></td>
+    <td class="v review">⚠<small>0.39 / 0.14</small></td>
+    <td class="v review">⚠<small>0.34 / 0.13</small></td>
+  </tr>
+  <tr>
+    <td class="step">you dismiss it</td>
+    <td>Dismissing removes the card record, even while one of its calls is still running.<div class="cuts"><a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L416-L424">background.js:416</a></div></td>
+    <td class="v review">⚠<small>0.15 / 0.27</small></td>
+    <td class="v review">⚠<small>0.14 / 0.30</small></td>
+  </tr>
+  <tr>
+    <td class="step">the call comes back to no card</td>
+    <td>When a redraw comes back after its card was dismissed, the cost is recorded in the ledger but added to no card.<div class="cuts"><a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L61-L89">background.js:61</a> · <a href="https://github.com/DerekHertz/docviz/blob/3d37957ec2387a043bef09b9ec9f16c6b5e8f348/extension/background.js#L304-L319">background.js:304</a></div></td>
+    <td class="v review">⚠<small>0.19 / 0.45</small></td>
+    <td class="v review">⚠<small>0.06 / 0.35</small></td>
+  </tr>
+      </table></div>
+      <p class="dim">Jev spend for all 16 questions: $0.00051. 3 of 8 steps pass at PR #1; 0 of 8 pass at the base.</p></div>
+  </section>
+
+  <section class="plate wide">
+    <div><div class="kicker">IV · the pipeline, as it ran</div><h2>Which branches fired</h2>
+<pre>on PR #1 (base 921e385 → head 3d37957):
+  modules moved = extension/ (12 files), helper/ (4), test/ (2), CI and docs      <span class="note">[code]</span>
+  for the module "card money" (extension/background.js, ledger.js):
+    model exists?  no → written for this prototype                               <span class="note">[Claude, by hand here]</span>
+    TLC on base:   both rules break                                              <span class="note">[formal, local, free]</span>
+    TLC on head:   <span class="ok">budget-first holds</span>; <span class="fired">spend-shows breaks on 1 path</span>
+    Jev, model vs head code:  3 ✓, 5 ⚠, 0 ✗                                   <span class="note">[Jev]</span>
+    Jev, model vs base code:  0 ✓  → every step looks changed, so Claude can't be skipped
+  route the human:
+    <span class="fired">a rule breaks (TLC)          → show the bug path, block        ← fired</span>
+    model contradicts code (Jev) → back to the authoring agent      (no ✗)
+    behavior changed             → chart with the change on top     (also true)
+    only structure moved         → one line in the log
+</pre></div>
+  </section>
+
+  <section class="plate wide">
+    <div><div class="kicker">V · what the prototype says</div><h2>What it settled, and what it didn't</h2>
+    <ol>
+      <li><b>The picture stays the same size however big the PR is.</b> 1,079 lines became 8 states and 11 arrows in plain words, and the one thing to look at is in red.</li>
+      <li><b>TLC found a real gap that has survived to <code>main</code>.</b> It took seconds and cost nothing, and your two sentences were the only spec it needed.</li>
+      <li><b>Jev can't confirm the bug itself</b> (the late-return step scored 0.19). The bug is a throw caught three lines later. TLC finds the path; a person or Claude confirms it in the code.</li>
+      <li><b>Jev passes a step only when its whole claim fits in the linked code.</b> Retry (→ generate), Simpler (→ learn) and dismiss-while-running cross functions or depend on timing, and went to review. Each model step should link every function it passes through, and the TLA+ action already lists them.</li>
+      <li><b>"Skip Claude when nothing changed" is untested.</b> No step passed at both base and head, because this PR changed nearly everything it touched. It needs a PR that leaves most steps alone.</li>
+      <li><b>Left out of the model:</b> pictures, Explore, the breakdown's batches, concurrent cards, the soft cap's overshoot. A redraw always ends at "budget used up" because the budget is only 2 calls.</li>
+    </ol></div>
+  </section>
+</main>
+<script src="../../extension/vendor/mermaid.min.js"></script>
+<script>
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light';
+  mermaid.initialize({ startOnLoad: true, securityLevel: 'strict', theme: 'base',
+    themeVariables: { fontFamily: '"Iowan Old Style", Palatino, Georgia, serif', fontSize: '16px',
+      primaryColor: dark ? '#2a2621' : '#fbf7ef', primaryBorderColor: dark ? '#ece4d6' : '#2b2622',
+      primaryTextColor: dark ? '#ece4d6' : '#2b2622', lineColor: dark ? '#ece4d6' : '#2b2622',
+      textColor: dark ? '#ece4d6' : '#2b2622', background: 'transparent',
+      edgeLabelBackground: dark ? '#2a2621' : '#fbf7ef' } });
+</script>
+</body></html>

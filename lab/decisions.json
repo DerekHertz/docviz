@@ -1,0 +1,94 @@
+{
+  "identifier-visible": {
+    "verdict": "adopt",
+    "note": "",
+    "at": "2026-10-30T16:45:16.137Z"
+  },
+  "step-matches-choice": {
+    "verdict": "retry",
+    "note": "",
+    "at": "2026-10-30T16:45:22.005Z"
+  },
+  "step-matches-code": {
+    "verdict": "retry",
+    "note": "",
+    "at": "2026-10-30T16:46:28.733Z"
+  },
+  "labels:C3": {
+    "overrides": {
+      "remote:paraphrase": "bad"
+    }
+  },
+  "step-matches-two": {
+    "bar": {
+      "supportedAt": 0.6
+    },
+    "at": "2026-10-30T17:04:59.395Z",
+    "verdict": "adopt",
+    "note": "Adopted 2026-10-30 at shown ≥ 0.6, contradicted ≥ 0.5. Two runs: 0% broken let through, 3% good flagged, 14–16% clear cases to review, 0% held-out can’t-tell passed, 98% right when decided, 2 of 112 decisions changed between runs (both toward review). Limits: one codebase, labels written by Claude, 16 held-out cases; recheck on real docviz PR diagrams."
+  },
+  "l1-sidebyside": {
+    "votes": {
+      "s39": {
+        "choice": "b",
+        "note": "",
+        "preferred": "jev",
+        "at": "2026-10-31T19:40:31.713Z"
+      },
+      "s25": {
+        "choice": "b",
+        "note": "",
+        "preferred": "claude",
+        "at": "2026-10-31T19:42:29.120Z"
+      },
+      "s11": {
+        "choice": "b",
+        "note": "",
+        "preferred": "claude",
+        "at": "2026-10-31T19:44:31.214Z"
+      },
+      "s05": {
+        "choice": "a",
+        "note": "",
+        "preferred": "claude",
+        "at": "2026-10-31T19:47:21.787Z"
+      },
+      "s31": {
+        "choice": "b",
+        "note": "",
+        "preferred": "claude",
+        "at": "2026-10-31T19:49:28.530Z"
+      },
+      "s30": {
+        "choice": "a",
+        "note": "",
+        "preferred": "claude",
+        "at": "2026-10-31T19:50:48.394Z"
+      },
+      "s18": {
+        "choice": "tie",
+        "note": "",
+        "preferred": "tie",
+        "at": "2026-10-31T19:53:42.096Z"
+      },
+      "s41": {
+        "choice": "a",
+        "note": "",
+        "preferred": "claude",
+        "at": "2026-10-31T19:54:44.032Z"
+      },
+      "s14": {
+        "choice": "b",
+        "note": "",
+        "preferred": "claude",
+        "at": "2026-10-31T19:57:27.447Z"
+      },
+      "s06": {
+        "choice": "b",
+        "note": "",
+        "preferred": "claude",
+        "at": "2026-10-31T19:58:18.015Z"
+      }
+    }
+  }
+}

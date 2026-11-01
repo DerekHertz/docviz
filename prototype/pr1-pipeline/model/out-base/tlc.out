@@ -1,0 +1,42 @@
+TLC2 Version 2.19 of 08 August 2024 (rev: 5a47802)
+Warning: Please run the Java VM which executes TLC with a throughput optimized garbage collector by passing the "-XX:+UseParallelGC" property.
+(Use the -nowarning option to disable this warning.)
+Running breadth-first search Model-Checking with fp 0 and seed -8442309461484079247 with 1 worker on 8 cores with 1986MB heap and 64MB offheap memory [pid: 1006485] (Linux 6.18.54.1-microsoft-standard-WSL2 amd64, Ubuntu 21.0.12.1 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /home/dhertzell/docviz/prototype/pr1-pipeline/model/CardSpend.tla
+Parsing file /tmp/statechart-GEswiD/statechart-BbSvCF/tmp-verdict-1/Naturals.tla
+Semantic processing of module Naturals
+Semantic processing of module CardSpend
+Starting... (2026-10-31 14:59:42)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-10-31 14:59:43.
+Error: Invariant SpendShows is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ startedOver = FALSE
+/\ shown = 0
+/\ card = "none"
+/\ paid = 0
+/\ calling = FALSE
+/\ lost = 0
+
+State 2: <YouBreakDown line 19, col 17 to line 19, col 98 of module CardSpend>
+/\ startedOver = FALSE
+/\ shown = 0
+/\ card = "drawing"
+/\ paid = 0
+/\ calling = TRUE
+/\ lost = 0
+
+State 3: <CardArrives line 20, col 16 to line 21, col 66 of module CardSpend>
+/\ startedOver = FALSE
+/\ shown = 0
+/\ card = "shown"
+/\ paid = 1
+/\ calling = FALSE
+/\ lost = 0
+
+3 states generated, 3 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 3.
+The average outdegree of the complete state graph is 1 (minimum is 1, the maximum 1 and the 95th percentile is 1).
+Finished in 00s at (2026-10-31 14:59:43)
+

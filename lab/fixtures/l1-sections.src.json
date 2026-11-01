@@ -1,0 +1,266 @@
+[
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/events.md",
+  "sha": "4fa5145b06d788a26341c039eab2e8f5f161f93b",
+  "heading": "Asynchronous vs. synchronous"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/events.md",
+  "sha": "4fa5145b06d788a26341c039eab2e8f5f161f93b",
+  "heading": "Error events"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/events.md",
+  "sha": "4fa5145b06d788a26341c039eab2e8f5f161f93b",
+  "heading": "Handling events only once"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/events.md",
+  "sha": "4fa5145b06d788a26341c039eab2e8f5f161f93b",
+  "heading": "`emitter.eventNames()`"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/events.md",
+  "sha": "4fa5145b06d788a26341c039eab2e8f5f161f93b",
+  "heading": "`events.once(emitter, name[, options])`"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/timers.md",
+  "sha": "11a9998549216ecfb783d82c06d09e014f710066",
+  "heading": "`setTimeout(callback[, delay[, ...args]])`"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/timers.md",
+  "sha": "11a9998549216ecfb783d82c06d09e014f710066",
+  "heading": "Cancelling timers"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/timers.md",
+  "sha": "11a9998549216ecfb783d82c06d09e014f710066",
+  "heading": "`timeout.refresh()`"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/timers.md",
+  "sha": "11a9998549216ecfb783d82c06d09e014f710066",
+  "heading": "`timersPromises.scheduler.yield()`"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/stream.md",
+  "sha": "b7ca36421c5e213eb5a6b01ef8bc69d5cd03e3aa",
+  "heading": "Buffering"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/stream.md",
+  "sha": "b7ca36421c5e213eb5a6b01ef8bc69d5cd03e3aa",
+  "heading": "`stream.pipeline(streams, callback)`"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/stream.md",
+  "sha": "b7ca36421c5e213eb5a6b01ef8bc69d5cd03e3aa",
+  "heading": "Types of streams"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/stream.md",
+  "sha": "b7ca36421c5e213eb5a6b01ef8bc69d5cd03e3aa",
+  "heading": "Object mode"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/process.md",
+  "sha": "ee982dbf48397bad3be955feca339338ce73fe97",
+  "heading": "Event: `'beforeExit'`"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/process.md",
+  "sha": "ee982dbf48397bad3be955feca339338ce73fe97",
+  "heading": "Event: `'uncaughtException'`"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/process.md",
+  "sha": "ee982dbf48397bad3be955feca339338ce73fe97",
+  "heading": "Signal events"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/process.md",
+  "sha": "ee982dbf48397bad3be955feca339338ce73fe97",
+  "heading": "`process.arch`"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/process.md",
+  "sha": "ee982dbf48397bad3be955feca339338ce73fe97",
+  "heading": "`process.exit([code])`"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/worker_threads.md",
+  "sha": "03fcd8b8a248ea2792924ff1ad79c80e5410a3a1",
+  "heading": "Class: `MessageChannel`"
+ },
+ {
+  "repo": "nodejs/node",
+  "path": "doc/api/worker_threads.md",
+  "sha": "03fcd8b8a248ea2792924ff1ad79c80e5410a3a1",
+  "heading": "`worker.terminate()`"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/api/fetch_api/using_fetch/index.md",
+  "sha": "fe1d7fb9b67ce826c4a748ce00e7b35ac4a54c7f",
+  "heading": "Canceling a request"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/api/fetch_api/using_fetch/index.md",
+  "sha": "fe1d7fb9b67ce826c4a748ce00e7b35ac4a54c7f",
+  "heading": "Including credentials"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/api/fetch_api/using_fetch/index.md",
+  "sha": "fe1d7fb9b67ce826c4a748ce00e7b35ac4a54c7f",
+  "heading": "Checking response status"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/api/service_worker_api/using_service_workers/index.md",
+  "sha": "cce594ebff79d155da35415eeebb144251355cce",
+  "heading": "Initial installation"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/api/service_worker_api/using_service_workers/index.md",
+  "sha": "cce594ebff79d155da35415eeebb144251355cce",
+  "heading": "Replacing an existing service worker"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/api/service_worker_api/using_service_workers/index.md",
+  "sha": "cce594ebff79d155da35415eeebb144251355cce",
+  "heading": "Recovering failed requests"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/http/guides/cors/index.md",
+  "sha": "210eb1d964922bbae94774dc6676ce92056e0423",
+  "heading": "Functional overview"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/http/guides/cors/index.md",
+  "sha": "210eb1d964922bbae94774dc6676ce92056e0423",
+  "heading": "Access-Control-Allow-Methods"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/http/guides/cors/index.md",
+  "sha": "210eb1d964922bbae94774dc6676ce92056e0423",
+  "heading": "What requests use CORS?"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/javascript/reference/execution_model/index.md",
+  "sha": "43bd841296433b2c1adb8fa9d819212f86b37358",
+  "heading": "Job queue and event loop"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/javascript/reference/execution_model/index.md",
+  "sha": "43bd841296433b2c1adb8fa9d819212f86b37358",
+  "heading": "\"Run-to-completion\""
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/javascript/reference/execution_model/index.md",
+  "sha": "43bd841296433b2c1adb8fa9d819212f86b37358",
+  "heading": "Stack and execution contexts"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/api/indexeddb_api/using_indexeddb/index.md",
+  "sha": "f5ea8950d5cc7bc42691e0bb8a3e634160814bac",
+  "heading": "Creating or updating the version of the database"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/api/indexeddb_api/using_indexeddb/index.md",
+  "sha": "f5ea8950d5cc7bc42691e0bb8a3e634160814bac",
+  "heading": "Version changes while a web app is open in another tab"
+ },
+ {
+  "repo": "mdn/content",
+  "path": "files/en-us/web/api/indexeddb_api/using_indexeddb/index.md",
+  "sha": "f5ea8950d5cc7bc42691e0bb8a3e634160814bac",
+  "heading": "Libraries"
+ },
+ {
+  "repo": "reactjs/react.dev",
+  "path": "src/content/learn/render-and-commit.md",
+  "sha": "abe931a8cb3aee3e8b15ef7e187214789164162a",
+  "heading": "Step 3: React commits changes to the DOM"
+ },
+ {
+  "repo": "reactjs/react.dev",
+  "path": "src/content/learn/queueing-a-series-of-state-updates.md",
+  "sha": "e377252563aaec455d98f0c325ec989bef09065e",
+  "heading": "Updating the same state multiple times before the next render"
+ },
+ {
+  "repo": "reactjs/react.dev",
+  "path": "src/content/learn/synchronizing-with-effects.md",
+  "sha": "b440d6698f6e21d56a78b10f625bd23191183588",
+  "heading": "How to handle the Effect firing twice in development?"
+ },
+ {
+  "repo": "reactjs/react.dev",
+  "path": "src/content/learn/synchronizing-with-effects.md",
+  "sha": "b440d6698f6e21d56a78b10f625bd23191183588",
+  "heading": "Fetching data"
+ },
+ {
+  "repo": "kubernetes/website",
+  "path": "content/en/docs/concepts/workloads/pods/pod-lifecycle.md",
+  "sha": "d1897c760fce0b1a3aca728e83331b8e4c908bc5",
+  "heading": "Pod phase"
+ },
+ {
+  "repo": "kubernetes/website",
+  "path": "content/en/docs/concepts/workloads/pods/pod-lifecycle.md",
+  "sha": "d1897c760fce0b1a3aca728e83331b8e4c908bc5",
+  "heading": "Pod Termination Flow"
+ },
+ {
+  "repo": "kubernetes/website",
+  "path": "content/en/docs/concepts/workloads/pods/pod-lifecycle.md",
+  "sha": "d1897c760fce0b1a3aca728e83331b8e4c908bc5",
+  "heading": "Configurable container restart delay"
+ },
+ {
+  "repo": "kubernetes/website",
+  "path": "content/en/docs/concepts/architecture/_index.md",
+  "sha": "61fcd63f2ac547fccff664cf89d90adeb28043dd",
+  "heading": "Control plane components"
+ },
+ {
+  "repo": "kubernetes/website",
+  "path": "content/en/docs/concepts/architecture/controller.md",
+  "sha": "7e64c2db8236a6b7325cf82ec050783a1b0a3850",
+  "heading": "Controller pattern"
+ }
+]
