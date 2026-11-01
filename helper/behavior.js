@@ -24,7 +24,7 @@ const run$ = promisify(execFile);
 //   { kind: 'not-run', models: string[], why }
 //   { kind: 'run', model, side, error }                         a model failed to load or to run
 //   { kind: 'rule', name, text, status: 'holds'|'breaks'|'untouched'|'unchecked', model?, path?, atBase? }
-//   { kind: 'extra-rule', model, name, status }                 a model's invariant not in rules.md
+//   { kind: 'extra-rule', model, name, status, path? }          a model's invariant not in rules.md (all of them, with no rules.md)
 //   { kind: 'delta', model, changed, added, removed }
 //   { kind: 'step', source: 'pr'|'model', model?, id, label, verdict, error? }
 //   { kind: 'uncovered', path }                                 a changed source file no model covers
@@ -190,7 +190,8 @@ export async function runModel(model, side, { statechart, env }, timeoutMs = 120
 /**
  * Each of the user's rules: breaks or holds in a touched model's head run, untouched when only
  * models this PR didn't touch check it, unchecked when a touched model didn't run or no model
- * checks it. Then each touched model's invariant that isn't one of the user's rules.
+ * checks it. Then each touched model's invariant that isn't one of the user's rules (with no
+ * rules.md, every one of them): a break is still a break, with its path.
  */
 export function ruleFindings({ rules, runs, models, touched }) {
   const head = runs.filter((r) => r.side === 'head' && !r.error && touched.includes(r.model));
@@ -211,12 +212,14 @@ export function ruleFindings({ rules, runs, models, touched }) {
     const any = checkedBy(name, models.map((m) => m.name));
     return any.length ? { kind: 'rule', name, text, status: 'untouched', model: any[0] } : { kind: 'rule', name, text, status: 'unchecked', model: null };
   });
-  if (!rules) return out;
-  const mine = new Set(rules.map((r) => r.name));
+  const mine = new Set((rules || []).map((r) => r.name));
   for (const m of models.filter((x) => touched.includes(x.name))) {
     const r = head.find((x) => x.model === m.name);
     const extra = [...m.rules, ...(r?.breaks.map((b) => b.rule) || [])].filter((n, i, a) => !mine.has(n) && a.indexOf(n) === i);
-    for (const name of extra) out.push({ kind: 'extra-rule', model: m.name, name, status: statusIn(r ? [r] : [], name)?.status || 'unchecked' });
+    for (const name of extra) {
+      const at = statusIn(r ? [r] : [], name);
+      out.push({ kind: 'extra-rule', model: m.name, name, status: at?.status || 'unchecked', ...(at?.path && { path: at.path }) });
+    }
   }
   return out;
 }
@@ -277,7 +280,12 @@ export function behaviorSection({ base, findings, models = [], modelSteps = [], 
   if (has('atlas', 'no-rules')) out.push('No `.atlas/rules.md`: none of these rules are yours yet. Write one `## Name` per rule, with your sentence under it.', '');
   else if (rules.length) out.push('**Your rules** (`.atlas/rules.md`)', '', ...rules.map(ruleLine), '');
   const extra = findings.filter((f) => f.kind === 'extra-rule');
-  if (extra.length) out.push(`Checked, not one of your rules: ${extra.map((f) => `${f.name} ${f.status} (${f.model})`).join(', ')}.`, '');
+  const broke = extra.filter((f) => f.status === 'breaks');
+  if (broke.length) {
+    out.push(...broke.map((f) => [`- ✗ **${f.name}** breaks in ${f.model} (not one of your rules)`, ...(f.path || []).map((p, i) => `  ${i + 1}. ${p}`)].join('\n')), '');
+  }
+  const rest = extra.filter((f) => f.status !== 'breaks');
+  if (rest.length) out.push(`Checked, not one of your rules: ${rest.map((f) => `${f.name} ${f.status} (${f.model})`).join(', ')}.`, '');
   if (modelSteps.length) {
     const code = (s) => (s.codeError ? `⚠ ${s.codeError.replace(/\|/g, '\\|')}` : s.cuts.map(link).join('<br>') || '—');
     out.push('**Model steps checked against their code**', '', '| Step | Code | Check |', '|---|---|---|',

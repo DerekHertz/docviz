@@ -204,3 +204,27 @@ test('runBehavior: a model step whose marker is missing is unchecked, naming the
   assert.match(md, /\| You open the door\. \| ⚠ src\/door\.js: `to` marker “function close” not found after `from` \| — \|/);
   assert.match(md, /\| You shut the door\. \| ⚠ src\/door\.js: `from` marker “function slam” not found \| — \|/);
 });
+
+// With no rules.md the models still check their invariants, and a break is still a break, with its path.
+test('ruleFindings: with no rules.md, a touched model’s invariants are findings; a break keeps its path', () => {
+  const runs = [{ model: 'card-money', side: 'head', holds: ['BudgetFirst'], breaks: [{ rule: 'SpendShows', path: ['a', 'go: b'] }] }];
+  const f = ruleFindings({ rules: null, runs, models: [{ name: 'card-money', rules: ['SpendShows', 'BudgetFirst'] }], touched: ['card-money'] });
+  assert.deepEqual(f, [
+    { kind: 'extra-rule', model: 'card-money', name: 'SpendShows', status: 'breaks', path: ['a', 'go: b'] },
+    { kind: 'extra-rule', model: 'card-money', name: 'BudgetFirst', status: 'holds' },
+  ]);
+});
+
+test('runBehavior: no rules.md still reports the broken invariant, with its path, and says rules.md is missing', async () => {
+  const { repo, git, put, spec, chart, base, tools } = fakeRepo();
+  rmSync(join(repo, '.atlas/rules.md'));
+  put('.atlas/models/door/Door.tla', spec({ exit: 1, report: '# Door\n\n## Shut breaks\nThe shortest path has 1 step:\n0. shut\n1. you kick it: open\n\n## Rules that hold\nNoDeadlock\n',
+    chart: chart('  s0 --> s1: you kick it\n') }));
+  const b = await runBehavior({ root: repo, git, base: { sha: base, how: 'test' }, trust: true, ask: asks({}), tools });
+  assert.deepEqual(b.findings.map((f) => `${f.kind}:${f.status ?? f.changed ?? f.verdict}:${f.name || ''}`),
+    ['atlas:no-rules:', 'extra-rule:breaks:Shut', 'delta:true:', 'step:pass:']);
+  assert.deepEqual(b.findings[1].path, ['shut', 'you kick it: open']);
+  const md = b.section((c) => c.path);
+  assert.match(md, /No `\.atlas\/rules\.md`/);
+  assert.match(md, /- ✗ \*\*Shut\*\* breaks in door \(not one of your rules\)\n  1\. shut\n  2\. you kick it: open/);
+});
