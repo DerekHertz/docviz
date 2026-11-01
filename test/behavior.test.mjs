@@ -312,6 +312,13 @@ test('atlasChanges: an invariant whose definition changed, even to TRUE; a new o
     [{ kind: 'rule-redefined', model: 'order', name: 'NoKeptMoney' }]);
 });
 
+test('atlasChanges: a rule weakened through an operator it calls is redefined; an unrelated operator is not', () => {
+  const viaHelper = (paid, other = 'Other == 1') => atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', `Paid == ${paid}\n${other}\nShipsPaid == state = "shipped" => Paid`) });
+  assert.deepEqual(atlasChanges({ before: viaHelper('charged'), head: viaHelper('TRUE'), changed: ['.atlas/models/order/Order.tla'] }),
+    [{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }]);
+  assert.deepEqual(atlasChanges({ before: viaHelper('charged'), head: viaHelper('charged', 'Other == 2'), changed: ['.atlas/models/order/Order.tla'] }), []);
+});
+
 test('atlasChanges: a removed model, and a removed .atlas/, are named', () => {
   assert.deepEqual(atlasChanges({ before: atlasOf({ models: ['order', 'cart'] }), head: atlasOf(), changed: ['.atlas/models/cart/model.json'] }),
     [{ kind: 'model-removed', model: 'cart' }]);

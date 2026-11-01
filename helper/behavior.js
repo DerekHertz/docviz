@@ -255,6 +255,20 @@ const definitionIn = (model, name) => {
   return null;
 };
 
+// A name's definition plus those of every operator it calls, so a rule weakened through a helper
+// (`Safe == TRUE` under `Rule == x => Safe`) reads as changed.
+const meaningIn = (model, name) => {
+  const seen = new Map();
+  const visit = (n) => {
+    if (seen.has(n)) return;
+    const d = definitionIn(model, n);
+    seen.set(n, d);
+    if (d) for (const id of d.replace(/"[^"]*"/g, '').split('==').slice(1).join('==').match(/[A-Za-z_]\w*/g) || []) visit(id);
+  };
+  visit(name);
+  return seen.get(name) && [...seen].filter(([, d]) => d).sort(([a], [b]) => byText(a, b)).map(([, d]) => d).join('\n');
+};
+
 /**
  * Pure: what the PR did to `.atlas/` itself, base (`before`) against head. rules.md changed: the
  * user's rules added, removed or reworded (rule 2 says no agent edits it; docviz can't know who
@@ -277,7 +291,7 @@ export function atlasChanges({ before, head, changed }) {
     if (!h) { out.push({ kind: 'model-removed', model: b.name }); continue; }
     if (b.error || h.error) continue;
     for (const name of [...new Set([...b.rules, ...h.rules, ...mine])]) {
-      const [was, now] = [definitionIn(b, name), definitionIn(h, name)];
+      const [was, now] = [meaningIn(b, name), meaningIn(h, name)];
       if (was && now && was !== now) out.push({ kind: 'rule-redefined', model: b.name, name });
     }
   }
