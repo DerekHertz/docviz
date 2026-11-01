@@ -104,6 +104,49 @@ test('no .atlas/ is null; no rules.md is rules: null; a broken model.json is an 
   assert.match(bad.error, /model\.json/);
 });
 
+// model.json is the repo's text: its shape is checked here, so nothing later trips on it.
+test('a model.json of the wrong shape is an error naming the model folder and the field', () => {
+  const bad = (json) => {
+    const f = files();
+    f['.atlas/models/order/model.json'] = typeof json === 'string' ? json : JSON.stringify(json);
+    return atlasFrom(f).models[0];
+  };
+  const err = (json) => bad(json).error;
+  const D = '.atlas/models/order/model.json';
+  assert.equal(err('null'), `${D}: must be an object, not null`);
+  assert.equal(err('[1]'), `${D}: must be an object, not an array`);
+  assert.equal(err('"x"'), `${D}: must be an object, not a string`);
+  assert.equal(err({ ...MODEL, spec: 3 }), `${D}: \`spec\` must be a file name (a string)`);
+  assert.equal(err({ ...MODEL, config: undefined }), `${D}: \`config\` must be a file name (a string)`);
+  assert.equal(err({ ...MODEL, view: 1 }), `${D}: \`view\` must be a file name (a string)`);
+  assert.equal(err({ ...MODEL, code: 'src/order.js' }), `${D}: \`code\` must be an array of paths (strings)`);
+  assert.equal(err({ ...MODEL, code: ['src/a.js', null] }), `${D}: \`code[1]\` must be a path (a string)`);
+  assert.equal(err({ ...MODEL, code: undefined }), `${D}: \`code\` must be an array of paths (strings)`);
+  assert.equal(err({ ...MODEL, steps: { Ship: {} } }), `${D}: \`steps\` must be an array of { action, label, sources }`);
+  assert.equal(err({ ...MODEL, steps: [null] }), `${D}: \`steps[0]\` must be an object { action, label, sources }`);
+  const s0 = MODEL.steps[0];
+  assert.equal(err({ ...MODEL, steps: [{ ...s0, action: 7 }] }), `${D}: \`steps[0].action\` must be a string`);
+  assert.equal(err({ ...MODEL, steps: [{ ...s0, label: null }] }), `${D}: \`steps[0].label\` must be a string`);
+  assert.equal(err({ ...MODEL, steps: [{ ...s0, sources: 'src/order.js' }] }), `${D}: \`steps[0].sources\` must be an array of { path, from, to }`);
+  assert.equal(err({ ...MODEL, steps: [{ ...s0, sources: [{ path: 'src/order.js', from: 'x' }] }] }), `${D}: \`steps[0].sources[0].to\` must be a string`);
+  assert.equal(err({ ...MODEL, steps: [{ ...s0, sources: [7] }] }), `${D}: \`steps[0].sources[0]\` must be an object { path, from, to }`);
+  assert.match(err('{ nope'), /^\.atlas\/models\/order\/model\.json: not JSON \(/);
+  // A bad model still has the safe shape covers() reads, keeping its code paths when those are valid.
+  const m = bad({ ...MODEL, steps: 'oops' });
+  assert.deepEqual([m.code, m.steps, m.rules], [MODEL.code, [], []]);
+  assert.ok(covers(m, 'src/order.js'));
+  assert.ok(!covers(bad('null'), 'src/order.js'));
+  assert.equal(bad({ ...MODEL, view: undefined }).error, undefined);
+});
+
+test('a model whose files are missing names its folder', () => {
+  const f = files();
+  delete f['.atlas/models/order/Order.cfg'];
+  assert.equal(atlasFrom(f).models[0].error, '.atlas/models/order: model.json names Order.cfg, which isn’t there');
+  delete f['.atlas/models/order/model.json'];
+  assert.equal(atlasFrom(f).models[0].error, '.atlas/models/order: no model.json');
+});
+
 test('a model covers its code paths, a directory prefix, and its own folder', () => {
   const m = atlasFrom(files()).models[0];
   assert.ok(covers(m, 'src/order.js'));

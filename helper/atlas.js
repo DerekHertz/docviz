@@ -75,6 +75,32 @@ export function cfgRules(cfg) {
 export const covers = (model, path) =>
   path.startsWith(`${model.dir}/`) || model.code.some((c) => (c.endsWith('/') ? path.startsWith(c) : path === c));
 
+const kind = (v) => (v === null ? 'null' : Array.isArray(v) ? 'an array' : `a ${typeof v}`);
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const isString = (v) => typeof v === 'string';
+
+/** model.json's shape, checked at the boundary: the first field that's wrong, in words, or null. */
+export function modelShapeError(json) {
+  if (!isObject(json)) return `must be an object, not ${kind(json)}`;
+  for (const f of ['spec', 'config']) if (!isString(json[f]) || !json[f]) return `\`${f}\` must be a file name (a string)`;
+  if (json.view != null && (!isString(json.view) || !json.view)) return '`view` must be a file name (a string)';
+  if (!Array.isArray(json.code)) return '`code` must be an array of paths (strings)';
+  const c = json.code.findIndex((x) => !isString(x) || !x);
+  if (c >= 0) return `\`code[${c}]\` must be a path (a string)`;
+  if (!Array.isArray(json.steps)) return '`steps` must be an array of { action, label, sources }';
+  for (const [i, step] of json.steps.entries()) {
+    const at = `steps[${i}]`;
+    if (!isObject(step)) return `\`${at}\` must be an object { action, label, sources }`;
+    for (const f of ['action', 'label']) if (!isString(step[f])) return `\`${at}.${f}\` must be a string`;
+    if (!Array.isArray(step.sources)) return `\`${at}.sources\` must be an array of { path, from, to }`;
+    for (const [j, src] of step.sources.entries()) {
+      if (!isObject(src)) return `\`${at}.sources[${j}]\` must be an object { path, from, to }`;
+      for (const f of ['path', 'from', 'to']) if (!isString(src[f])) return `\`${at}.sources[${j}].${f}\` must be a string`;
+    }
+  }
+  return null;
+}
+
 /** Pure: an Atlas from a map of repo paths to file text (only `.atlas/**` is read). Null when there's none. */
 export function atlasFrom(files) {
   const paths = Object.keys(files).filter((p) => p.startsWith(`${ATLAS}/`)).sort();
@@ -85,14 +111,20 @@ export function atlasFrom(files) {
     const dir = `${MODELS}${name}`;
     const own = Object.fromEntries(paths.filter((p) => p.startsWith(`${dir}/`)).map((p) => [p.slice(dir.length + 1), files[p]]));
     const base = { name, dir, spec: null, config: null, view: null, code: [], steps: [], rules: [], files: own };
+    if (own['model.json'] == null) return { ...base, error: `${dir}: no model.json` };
     let json;
     try { json = JSON.parse(own['model.json']); } catch (e) {
-      return { ...base, error: own['model.json'] == null ? 'no model.json' : `model.json: ${e.message}` };
+      return { ...base, error: `${dir}/model.json: not JSON (${e.message})` };
     }
-    const model = { ...base, spec: json.spec, config: json.config, view: json.view || null, code: json.code || [], steps: json.steps || [] };
+    const shape = modelShapeError(json);
+    if (shape) {
+      // Keep valid code paths, so a change to the code it names still counts as touching this model.
+      const code = Array.isArray(json?.code) && json.code.every((c) => isString(c) && c) ? json.code : [];
+      return { ...base, code, error: `${dir}/model.json: ${shape}` };
+    }
+    const model = { ...base, spec: json.spec, config: json.config, view: json.view || null, code: json.code, steps: json.steps };
     const missing = [model.spec, model.config, model.view].filter((f) => f && own[f] == null);
-    if (!model.spec || !model.config) return { ...model, error: 'model.json needs spec and config' };
-    if (missing.length) return { ...model, error: `missing ${missing.join(', ')}` };
+    if (missing.length) return { ...model, error: `${dir}: model.json names ${missing.join(', ')}, which ${missing.length > 1 ? 'aren’t' : 'isn’t'} there` };
     return { ...model, rules: cfgRules(own[model.config]) };
   });
   const parsed = rulesMd == null ? { rules: null, problems: [] } : parseRules(rulesMd);
