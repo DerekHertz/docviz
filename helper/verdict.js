@@ -40,7 +40,7 @@ export const TABLE = [
     ref: (f) => f.id },
   { kind: 'uncovered', level: 'look', // a changed source file no model covers
     when: (f) => f.kind === 'uncovered',
-    text: (f) => `\`${f.path}\``, ref: (f) => f.path },
+    text: (f) => `\`${f.path}\``, ref: (f) => f.path, group: () => 'Changed code no model covers' },
   { kind: 'not-run', level: 'look', // `.atlas/` absent, or models not run
     when: (f) => (f.kind === 'atlas' && (f.status === 'absent' || f.status === 'no-base')) || f.kind === 'not-run'
       || (f.kind === 'run' && f.side === 'base') || (f.kind === 'delta' && f.changed === null) || (f.kind === 'rule' && f.status === 'unchecked' && f.model),
@@ -49,9 +49,9 @@ export const TABLE = [
       'not-run': () => `${f.models.join(', ')} not run: ${f.why}`,
       run: () => `${f.model} didn’t run at base (${f.error}), so its change isn’t known`,
       delta: () => `${f.model}: behavior not compared (no chart drawn)`,
-      rule: () => `${f.name} not checked: ${f.model} didn’t run`,
+      rule: () => f.name,
     })[f.kind](),
-    ref: (f) => f.model || f.name },
+    ref: (f) => f.model || f.name, group: (f) => f.kind === 'rule' && `Rules not checked (${f.model} didn’t run)` },
   { kind: 'rules-gap', level: 'look', // rules.md missing or a model invariant not in it
     when: (f) => (f.kind === 'atlas' && f.status === 'no-rules') || f.kind === 'extra-rule' || (f.kind === 'rule' && f.status === 'unchecked' && !f.model),
     text: (f) => ({
@@ -72,7 +72,8 @@ const UNKNOWN = { kind: 'unknown', level: 'look', text: (f) => `docviz can’t j
 export function verdict(findings) {
   const matched = findings.map((f) => {
     const row = TABLE.find((r) => r.when(f)) || UNKNOWN;
-    return { level: row.level, kind: row.kind, text: row.text(f), ...(row.ref?.(f) && { ref: row.ref(f) }), rank: LEVELS.indexOf(row.level) * 100 + TABLE.indexOf(row) };
+    const group = row.group?.(f);
+    return { level: row.level, kind: row.kind, text: row.text(f), ...(row.ref?.(f) && { ref: row.ref(f) }), ...(group && { group }), rank: LEVELS.indexOf(row.level) * 100 + TABLE.indexOf(row) };
   });
   const reasons = matched.filter((r) => r.level !== 'nothing').map((r, i) => ({ ...r, i }))
     .sort((a, b) => a.rank - b.rank || a.i - b.i)
@@ -82,18 +83,17 @@ export function verdict(findings) {
 
 const HEADLINE = { needs: '**Needs you**', look: '**Look when you can**', nothing: '**Nothing for you**' };
 const MARK = { needs: '✗', look: '⚠' };
-const GROUPED = { uncovered: 'Changed code no model covers' };
-
-/** The comment's opening: the verdict line, then its reasons (files no model covers on one line). */
+/** The comment's opening: the verdict line, then its reasons; reasons of one group (files no model covers, rules a model didn't check) share a line. */
 export function verdictLines(v) {
   if (v.level === 'nothing') return `${HEADLINE.nothing}\n\nNo rule breaks, every step is confirmed, and no behavior changed.\n`;
   const lines = [];
+  const seen = new Set();
   for (const r of v.reasons) {
-    if (GROUPED[r.kind]) {
-      if (lines.some((l) => l.kind === r.kind)) continue;
-      const all = v.reasons.filter((x) => x.kind === r.kind).map((x) => x.text);
-      lines.push({ kind: r.kind, text: `- ${MARK[r.level]} ${GROUPED[r.kind]}: ${all.join(', ')}` });
-    } else lines.push({ kind: r.kind, text: `- ${MARK[r.level]} ${r.text}` });
+    if (!r.group) lines.push(`- ${MARK[r.level]} ${r.text}`);
+    else if (!seen.has(r.group)) {
+      seen.add(r.group);
+      lines.push(`- ${MARK[r.level]} ${r.group}: ${v.reasons.filter((x) => x.group === r.group).map((x) => x.text).join(', ')}`);
+    }
   }
-  return [HEADLINE[v.level], '', ...lines.map((l) => l.text)].join('\n') + '\n';
+  return [HEADLINE[v.level], '', ...lines].join('\n') + '\n';
 }

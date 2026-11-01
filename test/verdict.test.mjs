@@ -75,6 +75,7 @@ test('the verdict opens the comment: its line, then the reasons, worst first', (
   assert.match(lines, /- ✗ PR step “A paid order ships” is contradicted by its code/);
   assert.match(lines, /- ⚠ PR step “Post it” not checked: Jev 500/);
   assert.match(lines, /- ⚠ Changed code no model covers: `src\/a\.js`, `src\/b\.js`/);
+  assert.match(verdictLines(verdict([rule('unchecked'), rule('unchecked', { name: 'NoKeptMoney' })])), /\n- ⚠ Rules not checked \(order didn’t run\): ShipsPaid, NoKeptMoney\n$/);
   assert.match(verdictLines(verdict([])), /^\*\*Nothing for you\*\*\n\nNo rule breaks, every step is confirmed/);
   assert.match(verdictLines(verdict([step('review')])), /^\*\*Look when you can\*\*/);
 
