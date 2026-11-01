@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseChart, parseReport, delta, markChart, ruleFindings, behaviorSection, runBehavior, isSource } from '../helper/behavior.js';
+import { parseChart, parseReport, delta, markChart, ruleFindings, behaviorSection, runBehavior, isSource, statechartError } from '../helper/behavior.js';
 import { fakeRepo } from './fake-statechart.mjs';
 
 const BASE_CHART = readFileSync('prototype/pr1-pipeline/model/out-base/chart.mmd', 'utf8');
@@ -117,6 +117,12 @@ test('the behavior section quotes each rule word for word, with the path to a br
   assert.match(md, /  1\. not drawn yet\n  2\. you dismiss it: dismissed/);
   assert.match(md, /✓ \*\*BudgetFirst\*\* holds: “The budget check runs before every call\.”/);
   assert.match(md, /\*\*Unmodelled\*\* is checked by no model: “Nobody checks me\.”/);
+});
+
+test('a statechart failure reads in two lines, naming the model folder, not the temp copy', () => {
+  const stderr = 'SANY could not read Order.tla (exit 1):\nFatal errors while parsing TLA+ spec in file /tmp/docviz-x/m/Order.tla\n\ntla2sany.semantic.AbortException\n*** Abort messages: 1\n\nException in thread "main" tla2sany.xml.XMLExportingException: spec null\n\tat tla2sany.xml.XMLExporter.main(XMLExporter.java:110)\n';
+  assert.equal(statechartError(stderr, '/tmp/docviz-x/m', '.atlas/models/order'),
+    'SANY could not read Order.tla (exit 1): Fatal errors while parsing TLA+ spec in file .atlas/models/order/Order.tla');
 });
 
 const asks = (verdicts) => async (req) => {

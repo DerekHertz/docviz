@@ -152,6 +152,11 @@ export function findTools(env = process.env) {
   return { statechart, env };
 }
 
+/** statechart's stderr in two lines, without Java's stack trace, naming the model's own folder rather than the temp copy. */
+export const statechartError = (stderr, tmp, dir) => stderr.split('\n').map((l) => l.trim())
+  .filter((l) => l && !/^(at |Exception in thread|\*\*\*|tla2sany\.)/.test(l))
+  .slice(0, 2).join(' ').split(tmp).join(dir).replace(/:$/, '');
+
 /** One statechart run on a model's files, copied into a temp folder: the checkout is never written. */
 export async function runModel(model, side, { statechart, env }, timeoutMs = 120_000) {
   const dir = mkdtempSync(join(tmpdir(), `docviz-${model.name}-${side}-`));
@@ -166,7 +171,7 @@ export async function runModel(model, side, { statechart, env }, timeoutMs = 120
     try {
       await run$(statechart, args, { cwd: join(dir, 'm'), env, timeout: timeoutMs, maxBuffer: 16 << 20 });
     } catch (e) {
-      if (e.code !== 1) return fail((e.stderr || e.message || '').trim().split('\n').filter(Boolean).slice(-3).join(' ') || `statechart exited ${e.code}`);
+      if (e.code !== 1) return fail(statechartError(e.stderr || e.message || '', join(dir, 'm'), model.dir) || `statechart exited ${e.code}`);
     }
     const report = parseReport(readFileSync(join(out, 'report.md'), 'utf8'));
     const chartFile = join(out, 'chart.mmd');
