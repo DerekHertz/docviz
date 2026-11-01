@@ -143,8 +143,10 @@ returns one PR comment.
   `helper/context.js`) didn't help overall and let a wrong link pass on its helper's code, so it is
   not used.
 - The comment, top to bottom: marker, verdict and its reasons, diagram and step table, Behavior,
-  Modules moved, and last the footer with every model call's cost. Below a tenth of a cent the
-  cost keeps its figure (`$0.0002`, `<$0.0001`), so a Jev check never reads as `$0.000`.
+  Modules moved, and last the footer with every model call's cost: the total and its parts
+  (diagram, step checks, model checks). Below a cent a figure keeps two significant digits
+  (`$0.00004`, `$0.00012`), so a Jev check never reads as `$0.000` and every figure, total or part,
+  is within 5% of what was spent.
 - Base: one commit for both Behavior and Modules moved (`helper/moved-git.js` `resolveBase`):
   `--base REF`, else the merge base with `origin/main`, else `HEAD~1`; the comment says which. A bad
   `--base` fails before any model call.
@@ -154,6 +156,13 @@ returns one PR comment.
   A finding no row knows, an unchecked step (no key, `--no-check`, Jev error), code no model covers,
   or a model that didn't run is "look" or worse, never "nothing". A rule that broke at base and
   holds at head is "look" too ("ShipsPaid now holds; it broke before"): the PR changed it.
+  Changes to `.atlas/` itself are "look" (2026-10-31): a PR that edits `rules.md` ("Your rules
+  changed: added …; removed …; reworded …"; agents never edit it, and docviz can't tell who did);
+  a rule whose TLA+ definition changed between base and head, comments and spacing aside ("ShipsPaid's
+  definition in the model changed (order)"; weakening it to `TRUE` is caught by the change itself);
+  a model, or all of `.atlas/`, removed ("Model order removed"), with the other findings still
+  applying. A model invariant that breaks is "needs you" whether or not it is in `rules.md`, and
+  with no `rules.md` at all: a break is a break, shown with its path.
 - Behavior (`helper/behavior.js`): the reviewed repo's `.atlas/` (`helper/atlas.js`) holds
   `rules.md` (one `## Name` per rule, the user's sentence under it; agents never write it) and
   `models/<name>/` (TLA+ spec, cfg, view, `model.json` linking each action to its lines). Each
@@ -164,6 +173,12 @@ returns one PR comment.
   models run only with `--trust-atlas`; TLC needs `TLA2TOOLS` and `JAVA`, statechart is found in
   pstack's plugin cache or `DOCVIZ_STATECHART`. TLC is local and free; model-step checks are in the
   footer as "model checks".
+- `.atlas/` is the reviewed repo's text, checked where it is read and never dropped silently: a
+  `rules.md` heading that isn't `## Name` (one TLA+ word), a rule with no sentence, a repeated
+  name, or prose with no rule heading is a "look" reason naming its line; a `model.json` of the
+  wrong shape is that model's error, naming its folder and the field, and nothing runs on it; a
+  model step whose `from` or `to` marker isn't in its file is unchecked ("look"), naming the step,
+  the file and the marker (a missing `to` never widens the cut to the end of the file).
 
 ## Lab (`docviz lab`)
 
