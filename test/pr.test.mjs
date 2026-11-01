@@ -144,6 +144,10 @@ test('docviz pr --trust-atlas runs the touched model at base and head and adds t
   const env = { DOCVIZ_STATECHART: statechart, TLA2TOOLS: statechart };
   const trusted = runEnv(env, '--trust-atlas');
   assert.equal(trusted.status, 0, trusted.stderr);
+  // No Jev key here, so the steps are unchecked: never "nothing".
+  assert.ok(trusted.stdout.startsWith(`${MARKER}\n**Look when you can**\n\n- ⚠ door behaves differently: 1 step added\n`), trusted.stdout.slice(0, 300));
+  assert.match(trusted.stdout, /- ⚠ PR step “Pick forums” not checked: TYPESAFE_API_KEY not set/);
+  assert.match(trusted.stderr, /verdict: look/);
   assert.match(trusted.stdout, /### Behavior\n\nCompared with `\w{7}` \(HEAD~1 \(no origin\/main\)\)/);
   // One base for both sections, and the footer with every cost comes last.
   const at = (s) => trusted.stdout.indexOf(s);

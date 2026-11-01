@@ -12,6 +12,7 @@ import { checkSteps } from './checks.js';
 import { lintCard } from './lint.js';
 import { movedSinceBase, resolveBase } from './moved-git.js';
 import { runBehavior } from './behavior.js';
+import { verdict, verdictLines } from './verdict.js';
 import { UNTRUSTED_GIT } from './git.js';
 
 export const MARKER = '<!-- docviz-pr-diagrams -->';
@@ -62,9 +63,9 @@ function checkSummary(checks) {
  * the steps weren't checked. `costs` breaks the total into what spent it: diagram, step checks,
  * model checks (a single part is named without its figure, which is the total). `sections`
  * (markdown: Behavior, Modules moved) go after the step table, before the footer; `tlc` says TLC
- * ran, at no cost.
+ * ran, at no cost. `verdict` (helper/verdict.js verdictLines) opens the comment.
  */
-export function prComment({ card, steps, sha, repoUrl, usage, checked, version, checks, costs, drawnBy, sections = [], tlc = false }) {
+export function prComment({ card, steps, sha, repoUrl, usage, checked, version, checks, costs, drawnBy, sections = [], tlc = false, verdict }) {
   const link = codeLink(repoUrl, sha);
   const agent = drawnBy === 'agent';
   const parts = costs ? [['diagram', costs.diagram], ['step checks', costs.checks], ['model checks', costs.models]].filter(([, u]) => u)
@@ -74,6 +75,7 @@ export function prComment({ card, steps, sha, repoUrl, usage, checked, version, 
     + (tlc ? '; TLC runs locally, free' : '');
   return [
     MARKER,
+    ...(verdict ? [verdict.trimEnd(), ''] : []),
     '## How this PR works',
     '',
     card.caption,
@@ -233,9 +235,17 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
     ...(!doc.card && { diagram: sumUsage(spent) }), ...(checks && { checks: sumUsage(checks.map((c) => c.usage)) }), ...(models && { models }),
   } : null;
   const usage = sumUsage([...spent, ...(await otherSpend())]);
+  // The PR's own steps are findings too: one unchecked (no key, --no-check, Jev error) is never "nothing".
+  const notChecked = check ? 'TYPESAFE_API_KEY not set' : 'step checks off';
+  const prSteps = steps.map((s, i) => {
+    const error = checks ? checks[i]?.error : notChecked;
+    return { kind: 'step', source: 'pr', id: s.id, label: s.label, verdict: checks?.[i]?.verdict || 'unchecked', ...(error && { error }) };
+  });
+  const v = verdict([...prSteps, ...behavior.findings]);
+  log(`verdict: ${v.level}`);
   const body = prComment({
     card, steps, sha, repoUrl, usage, checked, version: docvizVersion(), checks, costs, drawnBy,
-    sections: [behavior.section(codeLink(repoUrl, sha)), movedPart.markdown], tlc: behavior.runs.length > 0,
+    sections: [behavior.section(codeLink(repoUrl, sha)), movedPart.markdown], tlc: behavior.runs.length > 0, verdict: verdictLines(v),
   });
-  return { body, missing: missingSteps(steps, card.mermaid), usage, checks, moved: movedPart.moved, behavior };
+  return { body, missing: missingSteps(steps, card.mermaid), usage, checks, moved: movedPart.moved, behavior, verdict: v };
 }
