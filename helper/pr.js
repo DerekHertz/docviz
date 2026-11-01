@@ -10,12 +10,13 @@ import { complete, detectProviders, pickProvider } from './providers.js';
 import { prCardPrompt, repairPrompt } from './prompts.js';
 import { checkSteps } from './checks.js';
 import { lintCard } from './lint.js';
+import { movedSinceBase } from './moved-git.js';
+import { UNTRUSTED_GIT } from './git.js';
 
 export const MARKER = '<!-- docviz-pr-diagrams -->';
 const DOCVIZ_REPO = 'https://github.com/DerekHertz/docviz';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-// The reviewed checkout's .git/config is untrusted: switch off the settings that run commands.
-export const UNTRUSTED_GIT = ['-c', 'core.fsmonitor=', '-c', 'core.hooksPath=/dev/null'];
+export { UNTRUSTED_GIT };
 
 /** The text from `from` up to `to` (exclusive; empty means the end) and its 1-based line range. */
 export function cut(text, from, to) {
@@ -118,13 +119,27 @@ function docvizVersion() {
   return JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
 }
 
-/** Returns { body, missing, usage }; throws with `usage` when the diagram can't be used. */
-export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: requested, model, check = true, ask, log = () => {} }) {
+// Modules moved is code only. A bad --base fails here, before any model call; with no base to
+// default to (a repo's first commit) the comment says it wasn't compared.
+function movedFor(base, cwd, head, log) {
+  try {
+    return movedSinceBase(base, head, { cwd });
+  } catch (e) {
+    if (base) throw e;
+    log(`modules moved: ${e.message}`);
+    return { moved: null, markdown: `Modules moved: not compared (${e.message}).\n` };
+  }
+}
+
+/** Returns { body, missing, usage, moved }; throws with `usage` when the diagram can't be used. */
+export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: requested, model, check = true, ask, base, log = () => {} }) {
   const git = (...a) => execFileSync('git', [...UNTRUSTED_GIT, ...a], { encoding: 'utf8' }).trim();
   const root = git('rev-parse', '--show-toplevel');
   const sha = git('rev-parse', 'HEAD');
   const repoUrl = repoWebUrl(git('remote', 'get-url', 'origin'));
   if (git('status', '--porcelain', '--untracked-files=no')) log('warning: uncommitted changes; links point at HEAD as committed');
+
+  const movedPart = movedFor(base, root, sha, log);
 
   const doc = JSON.parse(readFileSync(resolve(stepsFile), 'utf8'));
   let parsed = false;
@@ -193,6 +208,6 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
   for (const c of checks || []) if (c.error) log(`step ${c.id} not checked: ${c.error}`);
   const costs = checks && !doc.card ? { diagram: sumUsage(spent), checks: sumUsage(checks.map((c) => c.usage)) } : null;
   const usage = sumUsage([...spent, ...(checks || []).map((c) => c.usage)]);
-  const body = prComment({ card, steps, sha, repoUrl, usage, checked, version: docvizVersion(), checks, costs, drawnBy });
-  return { body, missing: missingSteps(steps, card.mermaid), usage, checks };
+  const body = prComment({ card, steps, sha, repoUrl, usage, checked, version: docvizVersion(), checks, costs, drawnBy }) + '\n' + movedPart.markdown;
+  return { body, missing: missingSteps(steps, card.mermaid), usage, checks, moved: movedPart.moved };
 }
