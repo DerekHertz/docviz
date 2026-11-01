@@ -44,8 +44,13 @@ export function sumUsage(list) {
   return { usd: list.reduce((n, u) => n + (u?.usd || 0), 0), estimated: list.some((u) => u?.estimated) };
 }
 
-// Same format as the extension's card costs (extension/settings.js money()).
-export const money = (u) => `${u.estimated ? '~' : ''}$${u.usd < 0.01 ? u.usd.toFixed(3) : u.usd.toFixed(2)}`;
+// The extension's card-cost format (extension/settings.js money()), plus a real figure below a tenth
+// of a cent: a Jev check costs ~$0.00004, and "$0.000" would read as if the call cost nothing.
+export const money = (u) => {
+  const usd = u.usd || 0;
+  const figure = usd === 0 ? '$0' : usd < 0.0001 ? '<$0.0001' : `$${usd.toFixed(usd < 0.001 ? 4 : usd < 0.01 ? 3 : 2)}`;
+  return `${u.estimated ? '~' : ''}${figure}`;
+};
 
 export const codeLink = (repoUrl, sha) => (c) => `[\`${c.path}:${c.start}-${c.end}\`](${repoUrl}/blob/${sha}/${c.path}#L${c.start}-L${c.end})`;
 

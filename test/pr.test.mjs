@@ -6,7 +6,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, readFileSync, chmodSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { cut, missingSteps, repoWebUrl, prComment, sumUsage, MARKER } from '../helper/pr.js';
+import { cut, missingSteps, repoWebUrl, prComment, sumUsage, money, MARKER } from '../helper/pr.js';
 import { prCardPrompt } from '../helper/prompts.js';
 import { fakeStatechart, fakeSpec, fakeChart } from './fake-statechart.mjs';
 
@@ -48,6 +48,18 @@ test('usage adds up, and an estimate stays an estimate', () => {
   assert.deepEqual(sumUsage([{ usd: 0.03, estimated: false }, { usd: 0.01, estimated: true }]), { usd: 0.04, estimated: true });
 });
 
+test('money shows a real figure below a tenth of a cent, so every call shows up in the cost', () => {
+  const m = (usd, estimated = false) => money({ usd, estimated });
+  assert.equal(m(0), '$0');
+  assert.equal(m(0.00004), '<$0.0001');
+  assert.equal(m(0.0002), '$0.0002');
+  assert.equal(m(0.00012), '$0.0001');
+  assert.equal(m(0.004), '$0.004');
+  assert.equal(m(0.004, true), '~$0.004');
+  assert.equal(m(0.031), '$0.03');
+  assert.equal(m(1.5), '$1.50');
+});
+
 test('the comment links each step to its lines and shows the cost', () => {
   const body = prComment({
     card: { caption: 'CAP', mermaid: 'flowchart TD\n  pick:::changed\n' },
@@ -79,7 +91,7 @@ test('step checks add a column and a footer line, with their cost broken out', (
   assert.match(body, /\| Rank them \|  \| .* \| ⚠ review \|/);
   assert.match(body, /\| Post it \|  \| .* \| ✗ doesn’t match \|/);
   assert.match(body, /steps checked by Jev: 1 ✓, 1 ⚠, 1 ✗/);
-  assert.match(body, /cost \$0\.04 \(diagram \$0\.04, step checks \$0\.000\)/);
+  assert.match(body, /cost \$0\.04 \(diagram \$0\.04, step checks <\$0\.0001\)/);
 });
 
 test('without checks the comment says the steps were not checked', () => {
@@ -221,7 +233,7 @@ test('a steps.json with a card makes no provider call and says the agent drew it
   assert.match(res.stdout, /pick\["Pick forums"\]:::changed/);
   assert.match(res.stdout, /### Where in the code/);
   assert.match(res.stdout, /Diagram by the calling agent/);
-  assert.match(res.stdout, /cost \$0\.000/);
+  assert.match(res.stdout, /cost \$0\.<\/sub>/);
   assert.doesNotMatch(res.stdout, /diagram \$/);
 });
 
@@ -245,7 +257,7 @@ test('the footer names the calling agent only for an agent-drawn card, and costs
   const body = prComment({ ...args, drawnBy: 'agent' });
   assert.match(body, /Diagram by the calling agent/);
   assert.match(body, /checked against Mermaid 11/);
-  assert.match(body, /steps checked by Jev: 1 ✓, cost \$0\.000 \(step checks\)/);
+  assert.match(body, /steps checked by Jev: 1 ✓, cost \$0\.0002 \(step checks\)/);
 });
 
 // The PR adds a `lib` module that `src` imports, on top of the repo's first commit.
