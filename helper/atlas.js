@@ -60,15 +60,21 @@ export function parseRules(md) {
 export function stripTla(text) {
   let out = '';
   let depth = 0;
+  let leading = false;
   for (let i = 0; i < text.length; i++) {
     const two = text.slice(i, i + 2);
     if (depth) {
       if (two === '(*') { depth++; i++; } else if (two === '*)') {
         depth--; i++;
-        // A comment that opens its line leaves no indent, so `(* x *) B == 2` still starts a definition.
-        if (!depth && /(^|\n)\s*$/.test(out)) { out = out.replace(/[ \t]*$/, ''); while (text[i + 1] === ' ' || text[i + 1] === '\t') i++; }
+        // A comment where code would start its line stands in for nothing, not even the spaces after
+        // it, so `(* x *) B == 2` still starts at column 0 and `  (* x *) p ==` keeps its indent.
+        if (!depth && leading) while (text[i + 1] === ' ' || text[i + 1] === '\t') i++;
       } else if (text[i] === '\n') out += '\n';
-    } else if (two === '(*') { depth = 1; i++; out += ' '; } else if (two === '\\*') {
+    } else if (two === '(*') {
+      depth = 1; i++;
+      leading = /(^|\n)[ \t]*$/.test(out);
+      if (!leading) out += ' ';
+    } else if (two === '\\*') {
       while (i < text.length && text[i] !== '\n') i++;
       i--;
     } else if (text[i] === '"') {

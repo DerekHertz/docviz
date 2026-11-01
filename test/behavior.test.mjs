@@ -345,6 +345,8 @@ test('atlasChanges: a rule weakened between a (* in a line comment and a later *
 test('atlasChanges: a comment that opens a definition line changes nothing', () => {
   const lead = (c) => atlasOf({ spec: SPEC.replace('ShipsPaid == state', `${c}ShipsPaid == state`) });
   assert.deepEqual(atlasChanges({ before: lead(''), head: lead('(* x *) '), changed: ['.atlas/models/order/Order.tla'] }), []);
+  const local = (c) => atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', `ShipsPaid ==\n  LET\n    ${c}p == charged\n  IN state = "shipped" => p`) });
+  assert.deepEqual(atlasChanges({ before: local(''), head: local('(* note *) '), changed: ['.atlas/models/order/Order.tla'] }), [], 'a comment before an indented LET local');
 });
 
 test('atlasChanges: a removed model, and a removed .atlas/, are named', () => {
