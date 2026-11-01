@@ -173,4 +173,8 @@ test('the atlas reads the same from a directory and from git at a ref', () => {
   assert.equal(readAtlasDir(repo).rules[0].name, 'Other');
   assert.equal(readAtlasAt(git, sha).rules[0].name, 'ShipsPaid');
   assert.equal(readAtlasDir(mkdtempSync(join(tmpdir(), 'no-atlas-'))), null);
+  // A ref that isn't a commit: docviz's own words, not git's.
+  for (const ref of ['no-such-ref', '--output=x']) {
+    assert.throws(() => readAtlasAt(git, ref), (e) => e.message === `can’t read .atlas/ at \`${ref}\`: not a commit in this repo`, ref);
+  }
 });

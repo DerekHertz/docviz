@@ -149,6 +149,15 @@ export function readAtlasDir(root) {
 
 /** The atlas at a git ref; `git(...args)` returns git's raw stdout. Nothing is checked out. */
 export function readAtlasAt(git, ref) {
-  const paths = git('ls-tree', '-r', '--name-only', ref, '--', ATLAS).split('\n').filter(Boolean);
-  return atlasFrom(Object.fromEntries(paths.map((p) => [p, git('show', `${ref}:${p}`)])));
+  const notCommit = new Error(`can’t read .atlas/ at \`${ref}\`: not a commit in this repo`);
+  if (!ref || String(ref).startsWith('-')) throw notCommit;
+  try { git('rev-parse', '--verify', '--quiet', `${ref}^{commit}`); } catch { throw notCommit; }
+  const read = (...args) => {
+    try { return git(...args); } catch (e) {
+      const why = String(e.stderr || e.message).split('\n').find(Boolean)?.replace(/^(fatal|error): /, '');
+      throw new Error(`can’t read .atlas/ at \`${ref}\`: ${args[0]} failed (${why})`);
+    }
+  };
+  const paths = read('ls-tree', '-r', '--name-only', ref, '--', ATLAS).split('\n').filter(Boolean);
+  return atlasFrom(Object.fromEntries(paths.map((p) => [p, read('show', `${ref}:${p}`)])));
 }
