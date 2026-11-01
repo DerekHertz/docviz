@@ -142,6 +142,28 @@ returns one PR comment.
   through, 1 of 9 held-out can't-tell passed. Adding the definitions a step calls (one hop,
   `helper/context.js`) didn't help overall and let a wrong link pass on its helper's code, so it is
   not used.
+- The comment, top to bottom: marker, verdict and its reasons, diagram and step table, Behavior,
+  Modules moved, and last the footer with every model call's cost. Below a tenth of a cent the
+  cost keeps its figure (`$0.0002`, `<$0.0001`), so a Jev check never reads as `$0.000`.
+- Base: one commit for both Behavior and Modules moved (`helper/moved-git.js` `resolveBase`):
+  `--base REF`, else the merge base with `origin/main`, else `HEAD~1`; the comment says which. A bad
+  `--base` fails before any model call.
+- Verdict (`helper/verdict.js`, the MVP; flow in `docs/flows/mvp-verification.md`): the comment
+  opens with **Needs you**, **Look when you can** or **Nothing for you** and its reasons, worst
+  first. The verdict table is an ordered list of rows; each finding takes the first row it matches.
+  A finding no row knows, an unchecked step (no key, `--no-check`, Jev error), code no model covers,
+  or a model that didn't run is "look" or worse, never "nothing". A rule that broke at base and
+  holds at head is "look" too ("ShipsPaid now holds; it broke before"): the PR changed it.
+- Behavior (`helper/behavior.js`): the reviewed repo's `.atlas/` (`helper/atlas.js`) holds
+  `rules.md` (one `## Name` per rule, the user's sentence under it; agents never write it) and
+  `models/<name>/` (TLA+ spec, cfg, view, `model.json` linking each action to its lines). Each
+  model whose code or folder the PR touched runs through pstack's statechart (TLC) at the base
+  (read with `git show`) and at head. The section draws the head chart with new states and steps marked, lists each rule as
+  holding or breaking (quoted word for word, with the shortest path), and checks each model step
+  against its code with Jev. Running a model imports its `view.mjs`, code from the checkout, so
+  models run only with `--trust-atlas`; TLC needs `TLA2TOOLS` and `JAVA`, statechart is found in
+  pstack's plugin cache or `DOCVIZ_STATECHART`. TLC is local and free; model-step checks are in the
+  footer as "model checks".
 
 ## Lab (`docviz lab`)
 
