@@ -44,6 +44,9 @@ export const TABLE = [
   { kind: 'rule-redefined', level: 'look', // a rule's TLA+ definition changed: the change is the reason, whatever it became
     when: (f) => f.kind === 'rule-redefined',
     text: (f) => `${f.name}’s definition in the model changed (${f.model})`, ref: (f) => f.model },
+  { kind: 'model-edited', level: 'look', // the spec changed and neither the chart nor a rule's definition shows how
+    when: (f) => f.kind === 'model-edited',
+    text: (f) => `${f.model}’s model changed, though its chart and your rules’ definitions read the same`, ref: (f) => f.model },
   { kind: 'model-removed', level: 'look', // a model, or all of .atlas/, removed
     when: (f) => f.kind === 'model-removed' || (f.kind === 'atlas' && f.status === 'removed'),
     text: (f) => (f.kind === 'atlas' ? '`.atlas/` removed: no model checks this repo any more' : `Model ${f.model} removed`),

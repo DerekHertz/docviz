@@ -28,6 +28,7 @@ const run$ = promisify(execFile);
 //   { kind: 'extra-rule', model, name, status, path? }          a model's invariant not in rules.md (all of them, with no rules.md)
 //   { kind: 'rules-changed', added, removed, reworded }          rules.md changed (names of the user's rules)
 //   { kind: 'rule-redefined', model, name }                     a checked rule's TLA+ definition changed
+//   { kind: 'model-edited', model }                             the spec or config changed in a way neither the chart nor a rule's definition shows
 //   { kind: 'model-removed', model }                            (and { kind: 'atlas', status: 'removed' })
 //   { kind: 'delta', model, changed, added, removed }
 //   { kind: 'step', source: 'pr'|'model', model?, id, label, verdict, error? }
@@ -232,7 +233,7 @@ export function ruleFindings({ rules, runs, models, touched }) {
 
 const stripComments = (text) => text.replace(/\(\*[\s\S]*?\*\)/g, ' ').replace(/\\\*.*$/gm, '');
 // A new top-level unit: a definition at column 0, a keyword, or the module's end.
-const TOP = /^\s*(?:(?:LOCAL\s+)?[A-Za-z_]\w*\s*(?:\([^)]*\))?\s*==|(?:VARIABLES?|CONSTANTS?|ASSUME|THEOREM|LEMMA|INSTANCE|LOCAL|RECURSIVE|EXTENDS)\b|====|----)/;
+const TOP = /^(?:(?:LOCAL\s+)?[A-Za-z_]\w*\s*(?:\([^)]*\))?\s*==|(?:VARIABLES?|CONSTANTS?|ASSUME|THEOREM|LEMMA|INSTANCE|LOCAL|RECURSIVE|EXTENDS)\b|====|----)/;
 
 /** A TLA+ operator's definition, `Name == …` up to the next top-level unit, without comments or spacing. Null when it isn't defined. */
 export function tlaDefinition(spec, name) {
@@ -269,6 +270,9 @@ const meaningIn = (model, name) => {
   return seen.get(name) && [...seen].filter(([, d]) => d).sort(([a], [b]) => byText(a, b)).map(([, d]) => d).join('\n');
 };
 
+const specText = (model) => Object.keys(model.files).filter((f) => /\.(tla|cfg)$/.test(f)).sort(byText)
+  .map((f) => `${f}\n${stripComments(model.files[f]).replace(/\s+/g, ' ').trim()}`).join('\n');
+
 /**
  * Pure: what the PR did to `.atlas/` itself, base (`before`) against head. rules.md changed: the
  * user's rules added, removed or reworded (rule 2 says no agent edits it; docviz can't know who
@@ -294,6 +298,9 @@ export function atlasChanges({ before, head, changed }) {
       const [was, now] = [meaningIn(b, name), meaningIn(h, name)];
       if (was && now && was !== now) out.push({ kind: 'rule-redefined', model: b.name, name });
     }
+    // The regexes above read common TLA+ shapes, not all of it. Any other edit to the spec or its
+    // config is still a reason to look; runPr drops it when the chart already shows a change.
+    if (!out.some((f) => f.kind === 'rule-redefined' && f.model === b.name) && specText(b) !== specText(h)) out.push({ kind: 'model-edited', model: b.name });
   }
   return out;
 }
@@ -439,10 +446,11 @@ export async function runBehavior({ root, git, base, trust = false, ask, check =
     const h = runs.find((r) => r.model === n && r.side === 'head');
     const b = runs.find((r) => r.model === n && r.side === 'base');
     const headError = bad?.side === 'head' ? bad.error : h?.error;
-    if (headError) { models.push({ name: n, side: 'head', error: headError }); continue; }
+    if (headError) { findings.splice(0, findings.length, ...findings.filter((f) => !(f.kind === 'model-edited' && f.model === n))); models.push({ name: n, side: 'head', error: headError }); continue; }
     if ((!h && !b) || bad || b?.error) continue;
     const d = delta(n, b || null, h || null);
     findings.push({ kind: 'delta', ...d });
+    if (d.changed) findings.splice(0, findings.length, ...findings.filter((f) => !(f.kind === 'model-edited' && f.model === n)));
     models.push({ name: n, delta: d, mermaid: h?.mermaid ? markChart(h.mermaid, d) : '' });
   }
 
@@ -479,6 +487,6 @@ export async function runBehavior({ root, git, base, trust = false, ask, check =
   };
 }
 
-const KINDS = ['atlas', 'rules-problem', 'rules-changed', 'rule-redefined', 'model-removed', 'not-run', 'run', 'rule', 'extra-rule', 'delta', 'step', 'uncovered'];
+const KINDS = ['atlas', 'rules-problem', 'rules-changed', 'rule-redefined', 'model-edited', 'model-removed', 'not-run', 'run', 'rule', 'extra-rule', 'delta', 'step', 'uncovered'];
 /** Findings in the comment's order; a kind this list doesn't know is kept, last, for verdict() to judge (rule 1). */
 export const order = (findings) => [...KINDS.flatMap((k) => findings.filter((f) => f.kind === k)), ...findings.filter((f) => !KINDS.includes(f.kind))];

@@ -16,6 +16,7 @@ test('the table has DESIGN.md’s rows in order, ending in "nothing"', () => {
     ['rule-fixed', 'look'],
     ['rules-changed', 'look'],
     ['rule-redefined', 'look'],
+    ['model-edited', 'look'],
     ['model-removed', 'look'],
     ['behavior-changed', 'look'],
     ['step-unconfirmed', 'look'],
