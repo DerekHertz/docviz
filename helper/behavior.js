@@ -21,6 +21,7 @@ const run$ = promisify(execFile);
 //           (changed is null when a side has no chart: statechart draws none above 500 states)
 // Finding = one fact helper/verdict.js reads, in this order:
 //   { kind: 'atlas', status: 'absent'|'no-rules'|'no-base' }
+//   { kind: 'rules-problem', text }                             rules.md text that isn't a rule (atlas.js)
 //   { kind: 'not-run', models: string[], why }
 //   { kind: 'run', model, side, error }                         a model failed to load or to run
 //   { kind: 'rule', name, text, status: 'holds'|'breaks'|'untouched'|'unchecked', model?, path?, atBase? }
@@ -279,6 +280,8 @@ export function behaviorSection({ base, findings, models = [], modelSteps = [], 
   const rules = findings.filter((f) => f.kind === 'rule');
   if (has('atlas', 'no-rules')) out.push('No `.atlas/rules.md`: none of these rules are yours yet. Write one `## Name` per rule, with your sentence under it.', '');
   else if (rules.length) out.push('**Your rules** (`.atlas/rules.md`)', '', ...rules.map(ruleLine), '');
+  const problems = findings.filter((f) => f.kind === 'rules-problem');
+  if (problems.length) out.push('**Text in `.atlas/rules.md` that isn’t a rule**', '', ...problems.map((f) => `- ⚠ ${f.text}`), '');
   const extra = findings.filter((f) => f.kind === 'extra-rule');
   const broke = extra.filter((f) => f.status === 'breaks');
   if (broke.length) {
@@ -322,6 +325,7 @@ export async function runBehavior({ root, git, base, trust = false, ask, check =
   }
   if (!base?.sha) findings.push({ kind: 'atlas', status: 'no-base' });
   if (head && !head.rules) findings.push({ kind: 'atlas', status: 'no-rules' });
+  for (const text of head?.problems || []) findings.push({ kind: 'rules-problem', text });
 
   const changed = base?.sha ? git('diff', '--name-only', '--no-renames', base.sha, '--').split('\n').filter(Boolean) : [];
   const headModels = head?.models || [];
@@ -391,5 +395,5 @@ export async function runBehavior({ root, git, base, trust = false, ask, check =
   };
 }
 
-const KINDS = ['atlas', 'not-run', 'run', 'rule', 'extra-rule', 'delta', 'step', 'uncovered'];
+const KINDS = ['atlas', 'rules-problem', 'not-run', 'run', 'rule', 'extra-rule', 'delta', 'step', 'uncovered'];
 const order = (findings) => KINDS.flatMap((k) => findings.filter((f) => f.kind === k));

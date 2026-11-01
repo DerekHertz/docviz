@@ -228,3 +228,12 @@ test('runBehavior: no rules.md still reports the broken invariant, with its path
   assert.match(md, /No `\.atlas\/rules\.md`/);
   assert.match(md, /- ✗ \*\*Shut\*\* breaks in door \(not one of your rules\)\n  1\. shut\n  2\. you kick it: open/);
 });
+
+test('runBehavior: rules.md text that isn’t a rule is a finding the section shows', async () => {
+  const { repo, git, put, base, tools } = fakeRepo();
+  put('.atlas/rules.md', '## Shut\nThe door shuts.\n\n## Stays Shut\nIt stays shut at night.\n');
+  const b = await runBehavior({ root: repo, git, base: { sha: base, how: 'test' }, trust: true, ask: asks({}), tools });
+  const p = b.findings.filter((f) => f.kind === 'rules-problem');
+  assert.deepEqual(p, [{ kind: 'rules-problem', text: 'rules.md: line 4 `## Stays Shut` is not a rule heading (## Name, one word)' }]);
+  assert.match(b.section(() => ''), /⚠ rules\.md: line 4 `## Stays Shut` is not a rule heading \(## Name, one word\)/);
+});
