@@ -114,9 +114,9 @@ export function moved(baseFiles, headFiles) {
 
 const tick = (s) => `\`${s}\``;
 
-/** The comment section. `base` (a sha) names what the PR was compared against. */
-export function movedSection({ modules, edges }, { base } = {}) {
-  const since = base ? ` since \`${base.slice(0, 7)}\`` : '';
+/** The comment section. `base` (a sha) and `how` it was chosen name what the PR was compared against. */
+export function movedSection({ modules, edges }, { base, how } = {}) {
+  const since = base ? ` since \`${base.slice(0, 7)}\`${how ? ` (${how})` : ''}` : '';
   if (!modules.length && !edges.length) return `### Modules moved\n\nNo modules moved${since}.\n`;
   const names = (change, show) => modules.filter((m) => m.change === change).map(show);
   const line = (label, items) => (items.length ? [`- ${label}: ${items.join(', ')}`] : []);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // docviz [serve] [--port N] [--host H] [--provider auto|claude|codex] [--model M] [--codex-rates in,cached,out,image] [--new-code]
 // docviz lab [--port 47830]   (repo checkout only: the lab needs Playwright)
-// docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M] [--codex-rates ...] [--no-check]
+// docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--base REF] [--provider P] [--model M] [--codex-rates ...] [--no-check]
 // docviz pr --rules [--glossary FILE]   |   docviz pr --lint <steps.json>
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { randomInt } from 'node:crypto';
@@ -52,7 +52,7 @@ if (opts.help || !['serve', 'code', 'pr', 'lab'].includes(opts.cmd) || (opts.cmd
   docviz serve [--port 47823] [--host 127.0.0.1] [--provider auto|claude|codex] [--model M] [--new-code]
                [--codex-rates in,cached,out,image]   USD per 1M tokens + per picture, for Codex cost estimates
   docviz code            print the pairing code
-  docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--provider P] [--model M] [--no-check]
+  docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--base REF] [--provider P] [--model M] [--no-check]
                          print a PR comment: one diagram of the PR's flow, code links, its cost.
                          With TYPESAFE_API_KEY set, Jev checks each step's label against its code.
                          A "card": { "caption", "mermaid" } in steps.json is used as is: no model call
@@ -60,6 +60,7 @@ if (opts.help || !['serve', 'code', 'pr', 'lab'].includes(opts.cmd) || (opts.cmd
                          print the rules for the diagram an agent writes itself
   docviz pr --lint <steps.json>
                          check that card: one failure per line, exit 1 if any
+                         --base REF: compare modules against REF (default: merge base with origin/main, else HEAD~1)
   docviz lab [--port 47830]
                          open the lab: try a check (Jev first) on known-good and known-broken cases`);
   process.exit(opts.help ? 0 : 1);
@@ -89,7 +90,7 @@ if (opts.cmd === 'pr') {
   try {
     const { body, missing, usage } = await runPr({
       stepsFile: opts.args[0], prUrl: opts.pr, title: opts.title, glossaryFile: opts.glossary,
-      provider: opts.provider, model: opts.model, check: !opts['no-check'], log,
+      provider: opts.provider, model: opts.model, check: !opts['no-check'], base: opts.base, log,
     });
     if (missing.length) log(`warning: steps not drawn as nodes: ${missing.join(', ')}`);
     log(`cost: ${money(usage)}`);

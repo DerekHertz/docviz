@@ -1,8 +1,8 @@
 // Reads the files `moved()` compares out of git, so nothing is checked out and no code from
 // the reviewed repo runs (see UNTRUSTED_GIT).
 import { execFileSync } from 'node:child_process';
-import { UNTRUSTED_GIT } from './pr.js';
-import { moved } from './moved.js';
+import { UNTRUSTED_GIT } from './git.js';
+import { moved, movedSection } from './moved.js';
 
 const SOURCE = /\.(?:js|mjs|cjs|ts|tsx|jsx)$/;
 
@@ -37,3 +37,10 @@ export function resolveBase(ref, { cwd = process.cwd() } = {}) {
 
 /** `moved()` between two refs of the repo at `cwd`. */
 export const movedBetween = (baseRef, headRef, opts) => moved(filesAt(baseRef, opts), filesAt(headRef, opts));
+
+/** The section for `docviz pr`: the repo at `head` against `base` (a ref, or the default). Throws on a bad `base`. */
+export function movedSinceBase(base, head, opts) {
+  const from = resolveBase(base, opts);
+  const result = movedBetween(from.sha, head, opts);
+  return { moved: result, base: from, markdown: movedSection(result, { base: from.sha, how: from.how }) };
+}

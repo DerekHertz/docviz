@@ -114,7 +114,7 @@ cat '${join(bin, 'out.json')}'
 
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
   delete env.TYPESAFE_API_KEY;
-  const run = () => spawnSync('node', [CLI, 'pr', 'steps.json', '--pr', 'https://github.com/o/r/pull/1', '--provider', 'claude'], {
+  const run = (...extra) => spawnSync('node', [CLI, 'pr', 'steps.json', '--pr', 'https://github.com/o/r/pull/1', '--provider', 'claude', ...extra], {
     cwd: repo, encoding: 'utf8', env,
   });
   return { repo, git, run, called: () => existsSync(join(bin, 'called')) };
@@ -200,4 +200,38 @@ test('the footer names the calling agent only for an agent-drawn card, and costs
   assert.match(body, /Diagram by the calling agent/);
   assert.match(body, /checked against Mermaid 11/);
   assert.match(body, /steps checked by Jev: 1 ✓, cost \$0\.000 \(step checks\)/);
+});
+
+// The PR adds a `lib` module that `src` imports, on top of the repo's first commit.
+const addLib = (repo) => {
+  mkdirSync(join(repo, 'lib'));
+  writeFileSync(join(repo, 'lib', 'u.js'), 'export {};\n');
+  writeFileSync(join(repo, 'src', 'a.js'), "import '../lib/u.js';\nfunction pick() {}\nfunction later() {}\n");
+  execFileSync('git', ['-C', repo, 'add', 'lib', 'src'], { encoding: 'utf8' });
+  execFileSync('git', ['-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'lib'], { encoding: 'utf8' });
+};
+
+test('docviz pr appends the modules the PR moved, naming the base commit', () => {
+  const { git, run } = prRepo(addLib);
+  const base = git('rev-parse', 'HEAD~1').slice(0, 7);
+  const res = run('--base', 'HEAD~1');
+  assert.equal(res.status, 0, res.stderr);
+  assert.ok(res.stdout.includes(`### Modules moved since \`${base}\` (--base HEAD~1)`));
+  assert.match(res.stdout, /- added: `lib`/);
+  assert.match(res.stdout, /- changed: `src`/);
+  assert.match(res.stdout, /- added: `src` → `lib`/);
+  assert.ok(run().stdout.includes(`since \`${base}\` (HEAD~1`), 'the default base is HEAD~1 without origin/main');
+});
+
+test('docviz pr says the modules were not compared when the repo has no base commit', () => {
+  const res = prRepo().run();
+  assert.equal(res.status, 0, res.stderr);
+  assert.match(res.stdout, /Modules moved: not compared \(no base commit: pass --base <ref>\)/);
+});
+
+test('docviz pr fails before spending when --base is not a commit', () => {
+  const res = prRepo().run('--base', 'no-such-ref');
+  assert.equal(res.status, 2);
+  assert.match(res.stderr, /--base no-such-ref: not a commit/);
+  assert.doesNotMatch(res.stderr, /cost:/);
 });
