@@ -156,9 +156,12 @@ function baseFor(ref, cwd, log) {
   }
 }
 
-/** Returns { body, missing, usage, moved, behavior }; throws with `usage` when the diagram can't be used. */
-export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: requested, model, check = true, ask, base: baseRef, trustAtlas = false, log = () => {} }) {
-  const git = (...a) => execFileSync('git', [...UNTRUSTED_GIT, ...a], { encoding: 'utf8' }).trim();
+/**
+ * Returns { body, missing, usage, moved, behavior }; throws with `usage` when the diagram can't be used.
+ * `cwd` is the reviewed checkout (default: the current directory), so one process can review several.
+ */
+export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: requested, model, check = true, ask, base: baseRef, trustAtlas = false, cwd = process.cwd(), log = () => {} }) {
+  const git = (...a) => execFileSync('git', [...UNTRUSTED_GIT, ...a], { encoding: 'utf8', cwd }).trim();
   const root = git('rev-parse', '--show-toplevel');
   const gitRaw = (...a) => execFileSync('git', [...UNTRUSTED_GIT, ...a], { encoding: 'utf8', cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
   const sha = git('rev-parse', 'HEAD');
@@ -168,7 +171,7 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
   const base = baseFor(baseRef, root, log);
   const movedPart = movedSinceBase(base, sha, { cwd: root });
 
-  const doc = JSON.parse(readFileSync(resolve(stepsFile), 'utf8'));
+  const doc = JSON.parse(readFileSync(resolve(cwd, stepsFile), 'utf8'));
   let parsed = false;
   if (doc.card) {
     const lint = await lintDoc(doc);
@@ -182,7 +185,7 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
       try { return { path: src.path, ...cut(readFileSync(resolve(root, src.path), 'utf8'), src.from, src.to) }; } catch (e) { throw new Error(`${src.path}: ${e.message}`); }
     }),
   }));
-  const glossary = glossaryFile ? readFileSync(resolve(glossaryFile), 'utf8') : '';
+  const glossary = glossaryFile ? readFileSync(resolve(cwd, glossaryFile), 'utf8') : '';
 
   const provider = doc.card ? null : pickProvider(requested || 'auto', detectProviders());
   const spent = [];

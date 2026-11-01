@@ -266,6 +266,13 @@ test('a card that fails lint stops the run before any call', () => {
   assert.equal(res.stdout, '');
 });
 
+test('runPr reviews the checkout at cwd, not the process’s own', async () => {
+  const { repo } = prRepo(withCard(agentCard));
+  const { body } = await runPr({ stepsFile: 'steps.json', prUrl: 'https://github.com/o/r/pull/1', check: false, cwd: repo });
+  assert.match(body, /CAP BY AGENT/);
+  assert.match(body, /\[`src\/a\.js:2-2`\]\(https:\/\/github\.com\/o\/r\/blob\//);
+});
+
 test('the footer names the calling agent only for an agent-drawn card, and costs only the step checks', () => {
   const args = {
     card: { caption: 'CAP', mermaid: 'flowchart TD\n  pick\n' },
