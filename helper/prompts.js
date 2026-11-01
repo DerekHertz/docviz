@@ -182,7 +182,7 @@ Then write "html": ONE self-contained HTML document.
 // `docviz pr`: the one diagram on a pull request, for a reader deciding whether to merge.
 const PR_PREFS = { depth: 'concept', style: 'strict', coverage: 'all', thinkFirst: false };
 const PR_RULES = `This card is the one diagram on a pull request. The reader decides whether to merge without reading the code, often in GitHub's dark theme.
-- Draw the whole flow as ONE flowchart TD (the first line is "flowchart TD") with one node per step, in order, using each step's id as the node id. Add at most one extra node, only for a fallback the reader must see. At most 6 nodes in total: with more steps, merge adjacent steps first.
+- Draw the whole flow as ONE flowchart TD (the first line is "flowchart TD") with one node per step, in order, using each step's id as the node id. Add no node that is not a step: only step labels are checked against the code. At most 6 nodes in total: with more steps, merge adjacent steps first.
 - Node labels: the step's label, word for word, e.g. A["Rank the results"]. A label claims only what its linked lines show, so step labels are at most 5 plain words, no code names, no parentheses (the table under the diagram links the code). This overrides the identifier rule: the code links carry the real names.
 - Edge labels: only on a branch, at most 3 words (e.g. "3+ likes", "fails"). No labels on straight edges.
 - Steps marked NEW (changed: true) must be drawn with :::changed, and no other node may carry it. The diagram must end with exactly: classDef changed stroke:#d29922,stroke-width:3px

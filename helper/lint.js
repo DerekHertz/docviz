@@ -36,7 +36,7 @@ export function lintCard(steps, card) {
     if (s.changed && !changed.has(s.id)) errors.push(`step ${s.id} is changed but has no :::changed`);
     if (!s.changed && changed.has(s.id)) errors.push(`step ${s.id} is not changed but carries :::changed`);
   }
-  for (const id of changed) if (!steps.some((s) => s.id === id)) errors.push(`node ${id} carries :::changed but is no step`);
+  for (const id of ids) if (!steps.some((s) => s.id === id)) errors.push(`node ${id} is no step; only step labels are checked against the code`);
   for (const l of card.mermaid.split('\n')) if (/^\s*classDef\b.*\bfill\b/.test(l)) errors.push(`classDef sets fill (breaks dark mode): ${l.trim()}`);
   return errors;
 }

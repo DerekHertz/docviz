@@ -41,7 +41,12 @@ test('the diagram must be flowchart TD', () => {
 
 test('at most 6 nodes', () => {
   const extra = mermaid.replace('classDef', 'post --> e1["One"] --> e2["Two"] --> e3["Three"] --> e4["Four"]\n  classDef');
-  assert.deepEqual(lintCard(steps, withMermaid(extra)), ['7 nodes; at most 6']);
+  assert.deepEqual(lintCard(steps, withMermaid(extra)).slice(0, 1), ['7 nodes; at most 6']);
+});
+
+test('a node that is no step is an error, since only step labels are checked', () => {
+  const extra = mermaid.replace('classDef', 'post --> refused["Refused, nothing spent"]\n  classDef');
+  assert.deepEqual(lintCard(steps, withMermaid(extra)), ['node refused is no step; only step labels are checked against the code']);
 });
 
 test('every step needs a node with its id', () => {
