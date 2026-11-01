@@ -300,16 +300,53 @@ test('atlasChanges: the user’s rules added, removed and reworded when rules.md
   assert.deepEqual(atlasChanges({ before: atlasOf(), head: atlasOf(), changed: ['src/order.js'] }), []);
 });
 
-test('atlasChanges: an invariant whose definition changed, even to TRUE; a new one is not a change', () => {
+test('atlasChanges: an invariant whose definition changed, even to TRUE; a new one is a model edit, not a redefinition', () => {
   const weak = atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', 'ShipsPaid == TRUE') });
   assert.deepEqual(atlasChanges({ before: atlasOf(), head: weak, changed: ['.atlas/models/order/Order.tla'] }),
     [{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }]);
   const added = atlasOf({ spec: SPEC.replace('Inv(x) == x', 'Inv(x) == x\nPaidHasMoney == state = "paid" => charged'), cfg: 'INIT Init\nNEXT Next\nINVARIANT ShipsPaid\nINVARIANT NoKeptMoney\nINVARIANT PaidHasMoney\n' });
-  assert.deepEqual(atlasChanges({ before: atlasOf(), head: added, changed: ['.atlas/models/order/Order.tla'] }), []);
+  assert.deepEqual(atlasChanges({ before: atlasOf(), head: added, changed: ['.atlas/models/order/Order.tla'] }), [{ kind: 'model-edited', model: 'order' }]);
   // A rule the user named is compared even when the config no longer checks it.
   const dropped = atlasOf({ spec: SPEC.replace('=> ~charged', '=> TRUE'), cfg: 'INIT Init\nNEXT Next\nINVARIANT ShipsPaid\n' });
   assert.deepEqual(atlasChanges({ before: atlasOf(), head: dropped, changed: ['.atlas/models/order/Order.tla'] }),
     [{ kind: 'rule-redefined', model: 'order', name: 'NoKeptMoney' }]);
+});
+
+test('atlasChanges: a rule weakened through an operator it calls is redefined; an unrelated operator is a model edit', () => {
+  const viaHelper = (paid, other = 'Other == 1') => atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', `Paid == ${paid}\n${other}\nShipsPaid == state = "shipped" => Paid`) });
+  assert.deepEqual(atlasChanges({ before: viaHelper('charged'), head: viaHelper('TRUE'), changed: ['.atlas/models/order/Order.tla'] }),
+    [{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }]);
+  for (const lead of ['  ', 'LOCAL ']) {
+    const shaped = (paid) => atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', `${lead}Paid == ${paid}\nShipsPaid == state = "shipped" => Paid`) });
+    assert.deepEqual(atlasChanges({ before: shaped('charged'), head: shaped('TRUE'), changed: ['.atlas/models/order/Order.tla'] }),
+      [{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }], `a helper written as "${lead}Paid =="`);
+  }
+  assert.deepEqual(atlasChanges({ before: viaHelper('charged'), head: viaHelper('charged', 'Other == 2'), changed: ['.atlas/models/order/Order.tla'] }), [{ kind: 'model-edited', model: 'order' }]);
+});
+
+test('atlasChanges: a LET local weakened on its own line is redefined; a comment-only edit is nothing', () => {
+  const withLet = (p, note = '') => atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', `ShipsPaid ==\n  LET\n    p == ${p}${note}\n  IN state = "shipped" => p`) });
+  assert.deepEqual(atlasChanges({ before: withLet('charged'), head: withLet('TRUE'), changed: ['.atlas/models/order/Order.tla'] }),
+    [{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }]);
+  assert.deepEqual(atlasChanges({ before: withLet('charged'), head: withLet('charged', ' \\* paid first'), changed: ['.atlas/models/order/Order.tla'] }), []);
+});
+
+test('atlasChanges: any other edit to a model reads as a model edit (a shape the definition reader misses)', () => {
+  const split = (v) => atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', `Paid\n  == ${v}\nShipsPaid == state = "shipped" => Paid`) });
+  assert.deepEqual(atlasChanges({ before: split('charged'), head: split('TRUE'), changed: ['.atlas/models/order/Order.tla'] }), [{ kind: 'model-edited', model: 'order' }]);
+});
+
+test('atlasChanges: a rule weakened between a (* in a line comment and a later *) is still seen', () => {
+  const tricky = (v) => atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', `\\* pay() (* the old way\nShipsPaid == ${v}\n(* later note *)`) });
+  assert.deepEqual(atlasChanges({ before: tricky('state = "shipped" => charged'), head: tricky('TRUE'), changed: ['.atlas/models/order/Order.tla'] }),
+    [{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }]);
+});
+
+test('atlasChanges: a comment that opens a definition line changes nothing', () => {
+  const lead = (c) => atlasOf({ spec: SPEC.replace('ShipsPaid == state', `${c}ShipsPaid == state`) });
+  assert.deepEqual(atlasChanges({ before: lead(''), head: lead('(* x *) '), changed: ['.atlas/models/order/Order.tla'] }), []);
+  const local = (c) => atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', `ShipsPaid ==\n  LET\n    ${c}p == charged\n  IN state = "shipped" => p`) });
+  assert.deepEqual(atlasChanges({ before: local(''), head: local('(* note *) '), changed: ['.atlas/models/order/Order.tla'] }), [], 'a comment before an indented LET local');
 });
 
 test('atlasChanges: a removed model, and a removed .atlas/, are named', () => {

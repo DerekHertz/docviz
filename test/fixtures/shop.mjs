@@ -181,7 +181,7 @@ export const CASES = [
     answers: { [LABELS.refund]: 'flag' }, steps: [step('refund', LABELS.refundKeeps, 'function refund(', true)] },
   { name: 'model-fails', branch: 'broken-model', expect: 'needs', reasons: ['model-failed', 'not-run', 'not-run'], trust: true, tlc: true, why: 'the head model doesn\'t parse',
     steps: [step('cancel', LABELS.cancel, 'function cancel(', true)] },
-  { name: 'invariant-not-a-rule', branch: 'new-invariant', expect: 'look', reasons: ['rules-gap'], trust: true, tlc: true, why: 'PaidHasMoney is checked but isn\'t in rules.md',
+  { name: 'invariant-not-a-rule', branch: 'new-invariant', expect: 'look', reasons: ['model-edited', 'rules-gap'], trust: true, tlc: true, why: 'PaidHasMoney is checked but isn\'t in rules.md',
     steps: [step('pay', LABELS.pay, 'function pay(')] },
   { name: 'uncovered-file', branch: 'report-change', expect: 'look', reasons: ['uncovered'], trust: true, tlc: false, why: 'src/report.js changed and no model covers it',
     steps: [{ id: 'summary', label: LABELS.summary, changed: true, sources: [{ path: 'src/report.js', from: 'export const summary', to: '' }] }] },

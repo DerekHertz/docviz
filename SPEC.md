@@ -159,7 +159,10 @@ returns one PR comment.
   Changes to `.atlas/` itself are "look" (2026-10-31): a PR that edits `rules.md` ("Your rules
   changed: added …; removed …; reworded …"; agents never edit it, and docviz can't tell who did);
   a rule whose TLA+ definition changed between base and head, comments and spacing aside ("ShipsPaid's
-  definition in the model changed (order)"; weakening it to `TRUE` is caught by the change itself);
+  definition in the model changed (order)"; the definition includes every operator it calls, so
+  weakening it to `TRUE` directly or through a helper is caught by the change itself); any other
+  edit to a model's `.tla` or `.cfg` that its chart doesn't show ("order's model changed, though its
+  chart and your rules' definitions read the same"), since docviz reads common TLA+ shapes, not all;
   a model, or all of `.atlas/`, removed ("Model order removed"), with the other findings still
   applying. A model invariant that breaks is "needs you" whether or not it is in `rules.md`, and
   with no `rules.md` at all: a break is a break, shown with its path.
