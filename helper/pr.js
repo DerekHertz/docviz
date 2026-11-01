@@ -12,6 +12,7 @@ import { checkSteps } from './checks.js';
 import { lintCard } from './lint.js';
 import { movedSinceBase, resolveBase } from './moved-git.js';
 import { runBehavior } from './behavior.js';
+import { verdict, verdictLines } from './verdict.js';
 import { UNTRUSTED_GIT } from './git.js';
 
 export const MARKER = '<!-- docviz-pr-diagrams -->';
@@ -43,8 +44,15 @@ export function sumUsage(list) {
   return { usd: list.reduce((n, u) => n + (u?.usd || 0), 0), estimated: list.some((u) => u?.estimated) };
 }
 
-// Same format as the extension's card costs (extension/settings.js money()).
-export const money = (u) => `${u.estimated ? '~' : ''}$${u.usd < 0.01 ? u.usd.toFixed(3) : u.usd.toFixed(2)}`;
+// The extension's card-cost format (extension/settings.js money()) from a cent up; below a cent, two
+// significant digits. A Jev check costs ~$0.00004, and "$0.000" would read as if it cost nothing.
+// One rule for every figure, so a total and its parts agree: each is within 5% of what was spent.
+export const money = (u) => {
+  const usd = u.usd || 0;
+  const places = usd >= 0.01 ? 2 : 1 - Math.floor(Math.log10(usd));
+  const figure = usd === 0 ? '$0' : `$${usd >= 0.01 ? usd.toFixed(2) : usd.toFixed(places).replace(/\.?0+$/, '')}`;
+  return `${u.estimated ? '~' : ''}${figure}`;
+};
 
 export const codeLink = (repoUrl, sha) => (c) => `[\`${c.path}:${c.start}-${c.end}\`](${repoUrl}/blob/${sha}/${c.path}#L${c.start}-L${c.end})`;
 
@@ -62,9 +70,9 @@ function checkSummary(checks) {
  * the steps weren't checked. `costs` breaks the total into what spent it: diagram, step checks,
  * model checks (a single part is named without its figure, which is the total). `sections`
  * (markdown: Behavior, Modules moved) go after the step table, before the footer; `tlc` says TLC
- * ran, at no cost.
+ * ran, at no cost. `verdict` (helper/verdict.js verdictLines) opens the comment.
  */
-export function prComment({ card, steps, sha, repoUrl, usage, checked, version, checks, costs, drawnBy, sections = [], tlc = false }) {
+export function prComment({ card, steps, sha, repoUrl, usage, checked, version, checks, costs, drawnBy, sections = [], tlc = false, verdict }) {
   const link = codeLink(repoUrl, sha);
   const agent = drawnBy === 'agent';
   const parts = costs ? [['diagram', costs.diagram], ['step checks', costs.checks], ['model checks', costs.models]].filter(([, u]) => u)
@@ -74,6 +82,7 @@ export function prComment({ card, steps, sha, repoUrl, usage, checked, version, 
     + (tlc ? '; TLC runs locally, free' : '');
   return [
     MARKER,
+    ...(verdict ? [verdict.trimEnd(), ''] : []),
     '## How this PR works',
     '',
     card.caption,
@@ -233,9 +242,17 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
     ...(!doc.card && { diagram: sumUsage(spent) }), ...(checks && { checks: sumUsage(checks.map((c) => c.usage)) }), ...(models && { models }),
   } : null;
   const usage = sumUsage([...spent, ...(await otherSpend())]);
+  // The PR's own steps are findings too: one unchecked (no key, --no-check, Jev error) is never "nothing".
+  const notChecked = check ? 'TYPESAFE_API_KEY not set' : 'step checks off';
+  const prSteps = steps.map((s, i) => {
+    const error = checks ? checks[i]?.error : notChecked;
+    return { kind: 'step', source: 'pr', id: s.id, label: s.label, verdict: checks?.[i]?.verdict || 'unchecked', ...(error && { error }) };
+  });
+  const v = verdict([...prSteps, ...behavior.findings]);
+  log(`verdict: ${v.level}`);
   const body = prComment({
     card, steps, sha, repoUrl, usage, checked, version: docvizVersion(), checks, costs, drawnBy,
-    sections: [behavior.section(codeLink(repoUrl, sha)), movedPart.markdown], tlc: behavior.runs.length > 0,
+    sections: [behavior.section(codeLink(repoUrl, sha)), movedPart.markdown], tlc: behavior.runs.length > 0, verdict: verdictLines(v),
   });
-  return { body, missing: missingSteps(steps, card.mermaid), usage, checks, moved: movedPart.moved, behavior };
+  return { body, missing: missingSteps(steps, card.mermaid), usage, checks, moved: movedPart.moved, behavior, verdict: v };
 }

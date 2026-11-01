@@ -7,7 +7,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseChart, parseReport, delta, markChart, ruleFindings, behaviorSection, runBehavior, isSource, statechartError, order } from '../helper/behavior.js';
+import { parseChart, parseReport, delta, markChart, ruleFindings, behaviorSection, runBehavior, isSource, statechartError, order, atlasChanges, tlaDefinition } from '../helper/behavior.js';
+import { atlasFrom } from '../helper/atlas.js';
 import { fakeRepo } from './fake-statechart.mjs';
 
 const BASE_CHART = readFileSync('prototype/pr1-pipeline/model/out-base/chart.mmd', 'utf8');
@@ -222,8 +223,8 @@ test('runBehavior: no rules.md still reports the broken invariant, with its path
     chart: chart('  s0 --> s1: you kick it\n') }));
   const b = await runBehavior({ root: repo, git, base: { sha: base, how: 'test' }, trust: true, ask: asks({}), tools });
   assert.deepEqual(b.findings.map((f) => `${f.kind}:${f.status ?? f.changed ?? f.verdict}:${f.name || ''}`),
-    ['atlas:no-rules:', 'extra-rule:breaks:Shut', 'delta:true:', 'step:pass:']);
-  assert.deepEqual(b.findings[1].path, ['shut', 'you kick it: open']);
+    ['atlas:no-rules:', 'rules-changed:undefined:', 'extra-rule:breaks:Shut', 'delta:true:', 'step:pass:']);
+  assert.deepEqual(b.findings[2].path, ['shut', 'you kick it: open']);
   const md = b.section((c) => c.path);
   assert.match(md, /No `\.atlas\/rules\.md`/);
   assert.match(md, /- ✗ \*\*Shut\*\* breaks in door \(not one of your rules\)\n  1\. shut\n  2\. you kick it: open/);
@@ -258,4 +259,74 @@ test('runBehavior: a malformed model.json is an error naming the model and the f
 test('order keeps finding kinds it doesn’t know, after the ones it does', () => {
   const f = [{ kind: 'something-new', x: 1 }, { kind: 'uncovered', path: 'a.js' }, { kind: 'atlas', status: 'no-rules' }, { kind: 'later' }];
   assert.deepEqual(order(f).map((x) => x.kind), ['atlas', 'uncovered', 'something-new', 'later']);
+});
+
+const SPEC = `---- MODULE Order ----
+VARIABLES state, charged
+Init == state = "cart" /\\ charged = FALSE
+
+\\* The user's rules.
+ShipsPaid == state = "shipped" => charged   \\* only once paid
+NoKeptMoney ==
+  state \\in {"refunded", "cancelled"}
+    => ~charged
+Inv(x) == x
+====
+`;
+
+test('a TLA+ definition is its text up to the next definition, without comments or spacing', () => {
+  assert.equal(tlaDefinition(SPEC, 'ShipsPaid'), 'ShipsPaid == state = "shipped" => charged');
+  assert.equal(tlaDefinition(SPEC, 'NoKeptMoney'), 'NoKeptMoney == state \\in {"refunded", "cancelled"} => ~charged');
+  assert.equal(tlaDefinition(SPEC, 'Inv'), 'Inv(x) == x');
+  assert.equal(tlaDefinition(SPEC, 'Ships'), null);
+  assert.equal(tlaDefinition(SPEC.replace('charged   \\* only once paid', 'charged (* same *)'), 'ShipsPaid'), tlaDefinition(SPEC, 'ShipsPaid'));
+});
+
+const atlasOf = ({ rules = '## ShipsPaid\nShips only once paid.\n\n## NoKeptMoney\nKeeps no money.\n', spec = SPEC, cfg = 'INIT Init\nNEXT Next\nINVARIANT ShipsPaid\nINVARIANT NoKeptMoney\n', models = ['order'] } = {}) => atlasFrom({
+  ...(rules != null && { '.atlas/rules.md': rules }),
+  ...Object.fromEntries(models.flatMap((m) => [
+    [`.atlas/models/${m}/model.json`, JSON.stringify({ spec: 'Order.tla', config: 'Order.cfg', code: [`src/${m}.js`], steps: [] })],
+    [`.atlas/models/${m}/Order.tla`, spec], [`.atlas/models/${m}/Order.cfg`, cfg],
+  ])),
+  'src/x.js': '',
+});
+
+test('atlasChanges: the user’s rules added, removed and reworded when rules.md changed', () => {
+  const head = atlasOf({ rules: '## ShipsPaid\nShips only once paid, always.\n\n## Fast\nShips fast.\n' });
+  assert.deepEqual(atlasChanges({ before: atlasOf(), head, changed: ['.atlas/rules.md'] }),
+    [{ kind: 'rules-changed', added: ['Fast'], removed: ['NoKeptMoney'], reworded: ['ShipsPaid'] }]);
+  assert.deepEqual(atlasChanges({ before: atlasOf(), head: atlasOf({ rules: '# Mine\n\n## ShipsPaid\nShips only once paid.\n\n## NoKeptMoney\nKeeps no money.\n' }), changed: ['.atlas/rules.md'] }),
+    [{ kind: 'rules-changed', added: [], removed: [], reworded: [] }]);
+  assert.deepEqual(atlasChanges({ before: atlasOf(), head: atlasOf(), changed: ['src/order.js'] }), []);
+});
+
+test('atlasChanges: an invariant whose definition changed, even to TRUE; a new one is not a change', () => {
+  const weak = atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', 'ShipsPaid == TRUE') });
+  assert.deepEqual(atlasChanges({ before: atlasOf(), head: weak, changed: ['.atlas/models/order/Order.tla'] }),
+    [{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }]);
+  const added = atlasOf({ spec: SPEC.replace('Inv(x) == x', 'Inv(x) == x\nPaidHasMoney == state = "paid" => charged'), cfg: 'INIT Init\nNEXT Next\nINVARIANT ShipsPaid\nINVARIANT NoKeptMoney\nINVARIANT PaidHasMoney\n' });
+  assert.deepEqual(atlasChanges({ before: atlasOf(), head: added, changed: ['.atlas/models/order/Order.tla'] }), []);
+  // A rule the user named is compared even when the config no longer checks it.
+  const dropped = atlasOf({ spec: SPEC.replace('=> ~charged', '=> TRUE'), cfg: 'INIT Init\nNEXT Next\nINVARIANT ShipsPaid\n' });
+  assert.deepEqual(atlasChanges({ before: atlasOf(), head: dropped, changed: ['.atlas/models/order/Order.tla'] }),
+    [{ kind: 'rule-redefined', model: 'order', name: 'NoKeptMoney' }]);
+});
+
+test('atlasChanges: a removed model, and a removed .atlas/, are named', () => {
+  assert.deepEqual(atlasChanges({ before: atlasOf({ models: ['order', 'cart'] }), head: atlasOf(), changed: ['.atlas/models/cart/model.json'] }),
+    [{ kind: 'model-removed', model: 'cart' }]);
+  assert.deepEqual(atlasChanges({ before: atlasOf(), head: null, changed: ['.atlas/rules.md', '.atlas/models/order/model.json'] }), [
+    { kind: 'atlas', status: 'removed' },
+    { kind: 'rules-changed', added: [], removed: ['ShipsPaid', 'NoKeptMoney'], reworded: [] },
+    { kind: 'model-removed', model: 'order' },
+  ]);
+});
+
+test('runBehavior: a removed model is named, never run or charted, and the rules only it checked go unchecked', async () => {
+  const { repo, git, base, tools } = fakeRepo();
+  rmSync(join(repo, '.atlas/models/door'), { recursive: true });
+  const b = await runBehavior({ root: repo, git, base: { sha: base, how: 'test' }, trust: true, ask: asks({}), tools });
+  assert.deepEqual(b.runs, []);
+  assert.deepEqual(b.findings.map((f) => `${f.kind}:${f.model ?? ''}:${f.status ?? ''}`), ['model-removed:door:', 'rule::unchecked']);
+  assert.doesNotMatch(b.section(() => ''), /#### door/);
 });

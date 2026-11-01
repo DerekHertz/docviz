@@ -26,6 +26,9 @@ const run$ = promisify(execFile);
 //   { kind: 'run', model, side, error }                         a model failed to load or to run
 //   { kind: 'rule', name, text, status: 'holds'|'breaks'|'untouched'|'unchecked', model?, path?, atBase? }
 //   { kind: 'extra-rule', model, name, status, path? }          a model's invariant not in rules.md (all of them, with no rules.md)
+//   { kind: 'rules-changed', added, removed, reworded }          rules.md changed (names of the user's rules)
+//   { kind: 'rule-redefined', model, name }                     a checked rule's TLA+ definition changed
+//   { kind: 'model-removed', model }                            (and { kind: 'atlas', status: 'removed' })
 //   { kind: 'delta', model, changed, added, removed }
 //   { kind: 'step', source: 'pr'|'model', model?, id, label, verdict, error? }
 //   { kind: 'uncovered', path }                                 a changed source file no model covers
@@ -225,6 +228,62 @@ export function ruleFindings({ rules, runs, models, touched }) {
   return out;
 }
 
+// ---------- what the PR did to the atlas itself ----------
+
+const stripComments = (text) => text.replace(/\(\*[\s\S]*?\*\)/g, ' ').replace(/\\\*.*$/gm, '');
+// A new top-level unit: a definition at column 0, a keyword, or the module's end.
+const TOP = /^(?:[A-Za-z_]\w*\s*(?:\([^)]*\))?\s*==|(?:VARIABLES?|CONSTANTS?|ASSUME|THEOREM|LEMMA|INSTANCE|LOCAL|RECURSIVE|EXTENDS)\b|====|----)/;
+
+/** A TLA+ operator's definition, `Name == …` up to the next top-level unit, without comments or spacing. Null when it isn't defined. */
+export function tlaDefinition(spec, name) {
+  const lines = stripComments(spec).split('\n');
+  const head = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\([^)]*\\))?\\s*==`);
+  const start = lines.findIndex((l) => head.test(l));
+  if (start < 0) return null;
+  let end = start + 1;
+  while (end < lines.length && !TOP.test(lines[end])) end++;
+  return lines.slice(start, end).join(' ').replace(/\s+/g, ' ').trim();
+}
+
+// A name's definition in any of a model's .tla files, its spec first.
+const definitionIn = (model, name) => {
+  const files = Object.keys(model.files).filter((f) => f.endsWith('.tla')).sort((a, b) => (a === model.spec ? -1 : b === model.spec ? 1 : byText(a, b)));
+  for (const f of files) {
+    const d = tlaDefinition(model.files[f], name);
+    if (d) return d;
+  }
+  return null;
+};
+
+/**
+ * Pure: what the PR did to `.atlas/` itself, base (`before`) against head. rules.md changed: the
+ * user's rules added, removed or reworded (rule 2 says no agent edits it; docviz can't know who
+ * did). A rule's TLA+ definition changed, in a model at both sides: the change itself is the reason,
+ * whatever it became. A model, or all of `.atlas/`, removed.
+ */
+export function atlasChanges({ before, head, changed }) {
+  const out = [];
+  if (!before) return out;
+  if (!head) out.push({ kind: 'atlas', status: 'removed' });
+  if (changed.includes('.atlas/rules.md')) {
+    const was = new Map((before.rules || []).map((r) => [r.name, r.text]));
+    const now = new Map((head?.rules || []).map((r) => [r.name, r.text]));
+    out.push({ kind: 'rules-changed', added: [...now.keys()].filter((n) => !was.has(n)), removed: [...was.keys()].filter((n) => !now.has(n)),
+      reworded: [...now.keys()].filter((n) => was.has(n) && was.get(n) !== now.get(n)) });
+  }
+  const mine = (head?.rules || before.rules || []).map((r) => r.name);
+  for (const b of before.models) {
+    const h = head?.models.find((m) => m.name === b.name);
+    if (!h) { out.push({ kind: 'model-removed', model: b.name }); continue; }
+    if (b.error || h.error) continue;
+    for (const name of [...new Set([...b.rules, ...h.rules, ...mine])]) {
+      const [was, now] = [definitionIn(b, name), definitionIn(h, name)];
+      if (was && now && was !== now) out.push({ kind: 'rule-redefined', model: b.name, name });
+    }
+  }
+  return out;
+}
+
 // ---------- the comment's Behavior section ----------
 
 const quote = (text) => `“${text.replace(/\s*\n\s*/g, ' ')}”`;
@@ -333,14 +392,16 @@ export async function runBehavior({ root, git, base, trust = false, ask, check =
   const names = [...new Set([...headModels, ...baseModels].map((m) => m.name))].sort(byText);
   const touched = names.filter((n) => [...headModels, ...baseModels].some((m) => m.name === n && changed.some((p) => covers(m, p))));
   const pair = (n) => ({ head: headModels.find((m) => m.name === n), base: baseModels.find((m) => m.name === n) });
+  findings.push(...atlasChanges({ before, head, changed }));
 
   // A malformed model (atlas.js names its folder and field) is reported as it is, trusted or not:
   // nothing runs on it. Malformed at head, neither side runs; at base only, the head still runs.
+  // A removed model (no head) isn't run either: "Model <name> removed" says what happened to it.
   const malformed = touched.flatMap((n) => {
     const { head: h, base: b } = pair(n);
-    return h?.error ? [{ model: n, side: 'head', error: h.error }] : b?.error ? [{ model: n, side: 'base', error: b.error }] : [];
+    return h?.error ? [{ model: n, side: 'head', error: h.error }] : h && b?.error ? [{ model: n, side: 'base', error: b.error }] : [];
   });
-  const runnable = touched.filter((n) => !pair(n).head?.error);
+  const runnable = touched.filter((n) => pair(n).head && !pair(n).head.error);
 
   // Run each runnable model at base and head (in parallel), when trusted and the tools are there.
   let runs = [];
@@ -404,6 +465,6 @@ export async function runBehavior({ root, git, base, trust = false, ask, check =
   };
 }
 
-const KINDS = ['atlas', 'rules-problem', 'not-run', 'run', 'rule', 'extra-rule', 'delta', 'step', 'uncovered'];
+const KINDS = ['atlas', 'rules-problem', 'rules-changed', 'rule-redefined', 'model-removed', 'not-run', 'run', 'rule', 'extra-rule', 'delta', 'step', 'uncovered'];
 /** Findings in the comment's order; a kind this list doesn't know is kept, last, for verdict() to judge (rule 1). */
 export const order = (findings) => [...KINDS.flatMap((k) => findings.filter((f) => f.kind === k)), ...findings.filter((f) => !KINDS.includes(f.kind))];
