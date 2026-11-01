@@ -34,11 +34,44 @@ const files = () => ({
 });
 
 test('rules.md: one rule per ## heading, its text word for word', () => {
-  assert.deepEqual(parseRules(RULES), [
+  assert.deepEqual(parseRules(RULES), { rules: [
     { name: 'ShipsPaid', text: 'An order ships only after it is paid.' },
     { name: 'NoKeptMoney', text: 'A refunded or cancelled order keeps none of the customer\'s money.\nIt is returned the same day.' },
+  ], problems: [] });
+  assert.deepEqual(parseRules(''), { rules: [], problems: [] });
+});
+
+// The user's sentences are never dropped silently: text docviz can't read as a rule is a problem the comment shows.
+test('rules.md: prose with no rule heading is a problem, not an empty list', () => {
+  assert.deepEqual(parseRules('just prose, no headings\n'), { rules: [],
+    problems: ['rules.md: no rule headings, so none of its text is a rule (write `## Name`, one word, above each sentence)'] });
+});
+
+test('rules.md: a heading that is not `## Name` (Name one TLA+ word) is a problem naming its line', () => {
+  const md = '# Rules\n\n## Spend Shows\nEvery call shows its cost.\n\n### A\nsub\n\n## Budget-First\nx\n\n## OK_1\nfine\n\n# Later\nmore\n';
+  const { rules, problems } = parseRules(md);
+  assert.deepEqual(rules, [{ name: 'OK_1', text: 'fine' }]);
+  assert.deepEqual(problems, [
+    'rules.md: line 3 `## Spend Shows` is not a rule heading (## Name, one word)',
+    'rules.md: line 6 `### A` is not a rule heading (## Name, one word)',
+    'rules.md: line 9 `## Budget-First` is not a rule heading (## Name, one word)',
+    'rules.md: line 15 `# Later` is not a rule heading (## Name, one word)',
   ]);
-  assert.deepEqual(parseRules('just prose, no headings\n'), []);
+});
+
+test('rules.md: a rule with no sentence, or a name used twice, is a problem', () => {
+  const { rules, problems } = parseRules('## A\n\n## B\nfirst\n## B\nsecond\n');
+  assert.deepEqual(rules.map((r) => r.name), ['B']);
+  assert.deepEqual(problems, ['rules.md: line 1 `## A` has no sentence under it', 'rules.md: line 5 `## B` repeats a rule name; only the first counts']);
+});
+
+test('an atlas carries the problems in its rules.md', () => {
+  const f = files();
+  f['.atlas/rules.md'] = 'Ships only when paid.\n';
+  const atlas = atlasFrom(f);
+  assert.deepEqual(atlas.rules, []);
+  assert.match(atlas.problems[0], /^rules\.md: no rule headings/);
+  assert.deepEqual(atlasFrom(files()).problems, []);
 });
 
 test('a TLC config names the rules it checks', () => {

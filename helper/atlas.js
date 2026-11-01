@@ -9,22 +9,48 @@ import { join, relative, sep } from 'node:path';
 export const ATLAS = '.atlas';
 const MODELS = `${ATLAS}/models/`;
 
-// Atlas = { rules: Rule[] | null, models: Model[] }       rules is null when rules.md is missing
+// Atlas = { rules: Rule[] | null, problems: string[], models: Model[] }
+//          rules is null when rules.md is missing; problems are rules.md text that isn't a rule
 // Rule  = { name, text }                                  text is the user's, word for word
 // Model = { name, dir, spec, config, view, code: string[], steps: ModelStep[],
 //           rules: string[], files: { [name]: text }, error? }
 // ModelStep = { action, label, sources: { path, from, to }[] }
 
-/** `## Name` headings, each with the text under it (up to the next heading), trimmed. */
+// A rule's name is the TLA+ invariant or property that checks it: one word of letters, digits and _.
+const RULE_HEADING = /^##[ \t]+(\w*[A-Za-z]\w*)[ \t]*$/;
+const notRule = (n, line) => `rules.md: line ${n} \`${line.trim()}\` is not a rule heading (## Name, one word)`;
+
+/**
+ * rules.md → its rules (`## Name` headings, each with the text under it, trimmed) and its problems:
+ * every heading that isn't a rule (one `# Title` above the rules is fine), a rule with no sentence,
+ * a repeated name, or prose with no rule heading at all. The user's sentences are never dropped silently.
+ */
 export function parseRules(md) {
-  const rules = [];
-  for (const line of md.split('\n')) {
-    const h = line.match(/^##\s+(\S+)\s*$/);
-    if (h) rules.push({ name: h[1], lines: [] });
-    else if (/^#/.test(line)) rules.push({ name: null, lines: [] });
-    else rules.at(-1)?.lines.push(line);
+  const sections = [];
+  const problems = [];
+  let title = true;
+  md.split('\n').forEach((line, i) => {
+    const h = line.match(RULE_HEADING);
+    if (h) { title = false; sections.push({ name: h[1], line: i + 1, lines: [] }); return; }
+    if (/^#/.test(line)) {
+      if (!(title && /^#[ \t]/.test(line))) problems.push({ line: i + 1, text: notRule(i + 1, line) });
+      title = false;
+      sections.push({ name: null, line: i + 1, lines: [] });
+      return;
+    }
+    sections.at(-1)?.lines.push(line);
+  });
+  if (!sections.some((x) => x.name) && md.trim()) {
+    return { rules: [], problems: ['rules.md: no rule headings, so none of its text is a rule (write `## Name`, one word, above each sentence)'] };
   }
-  return rules.filter((r) => r.name).map((r) => ({ name: r.name, text: r.lines.join('\n').trim() }));
+  const rules = [];
+  for (const s of sections.filter((x) => x.name)) {
+    const text = s.lines.join('\n').trim();
+    if (!text) problems.push({ line: s.line, text: `rules.md: line ${s.line} \`## ${s.name}\` has no sentence under it` });
+    else if (rules.some((r) => r.name === s.name)) problems.push({ line: s.line, text: `rules.md: line ${s.line} \`## ${s.name}\` repeats a rule name; only the first counts` });
+    else rules.push({ name: s.name, text });
+  }
+  return { rules, problems: problems.sort((a, b) => a.line - b.line).map((p) => p.text) };
 }
 
 const CFG_KEYWORD = /^(CONSTANTS?|INIT|NEXT|SPECIFICATION|INVARIANTS?|PROPERTY|PROPERTIES|CONSTRAINTS?|ACTION_CONSTRAINTS?|SYMMETRY|VIEW|CHECK_DEADLOCK|POSTCONDITION|ALIAS)$/;
@@ -69,7 +95,8 @@ export function atlasFrom(files) {
     if (missing.length) return { ...model, error: `missing ${missing.join(', ')}` };
     return { ...model, rules: cfgRules(own[model.config]) };
   });
-  return { rules: rulesMd == null ? null : parseRules(rulesMd), models };
+  const parsed = rulesMd == null ? { rules: null, problems: [] } : parseRules(rulesMd);
+  return { rules: parsed.rules, problems: parsed.problems, models };
 }
 
 /** The atlas in a checkout as it is on disk (uncommitted edits included). */
