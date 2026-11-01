@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseChart, parseReport, delta, markChart, ruleFindings, behaviorSection, runBehavior, isSource, statechartError } from '../helper/behavior.js';
+import { parseChart, parseReport, delta, markChart, ruleFindings, behaviorSection, runBehavior, isSource, statechartError, order } from '../helper/behavior.js';
 import { fakeRepo } from './fake-statechart.mjs';
 
 const BASE_CHART = readFileSync('prototype/pr1-pipeline/model/out-base/chart.mmd', 'utf8');
@@ -253,4 +253,9 @@ test('runBehavior: a malformed model.json is an error naming the model and the f
     assert.match(b.section(() => ''), /#### door\n\nDidn’t run at head: \.atlas\/models\/door\/model\.json: `code` must be an array/);
   }
   assert.ok(!existsSync(join(marks, 'ran')), 'statechart ran on a malformed model');
+});
+
+test('order keeps finding kinds it doesn’t know, after the ones it does', () => {
+  const f = [{ kind: 'something-new', x: 1 }, { kind: 'uncovered', path: 'a.js' }, { kind: 'atlas', status: 'no-rules' }, { kind: 'later' }];
+  assert.deepEqual(order(f).map((x) => x.kind), ['atlas', 'uncovered', 'something-new', 'later']);
 });

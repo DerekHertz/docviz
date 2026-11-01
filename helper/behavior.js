@@ -405,4 +405,5 @@ export async function runBehavior({ root, git, base, trust = false, ask, check =
 }
 
 const KINDS = ['atlas', 'rules-problem', 'not-run', 'run', 'rule', 'extra-rule', 'delta', 'step', 'uncovered'];
-const order = (findings) => KINDS.flatMap((k) => findings.filter((f) => f.kind === k));
+/** Findings in the comment's order; a kind this list doesn't know is kept, last, for verdict() to judge (rule 1). */
+export const order = (findings) => [...KINDS.flatMap((k) => findings.filter((f) => f.kind === k)), ...findings.filter((f) => !KINDS.includes(f.kind))];
