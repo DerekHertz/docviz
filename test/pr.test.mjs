@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, chmodSync, mkdirSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, chmodSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { cut, missingSteps, repoWebUrl, prComment, sumUsage, MARKER } from '../helper/pr.js';
@@ -94,6 +94,7 @@ function prRepo(prepare = () => {}) {
   writeFileSync(join(bin, 'out.json'), JSON.stringify({ structured_output: card, total_cost_usd: 0.031, usage: { input_tokens: 10, output_tokens: 5 } }));
   writeFileSync(join(bin, 'claude'), `#!/bin/sh
 cat >/dev/null
+touch '${join(bin, 'called')}'
 cat '${join(bin, 'out.json')}'
 `);
   chmodSync(join(bin, 'claude'), 0o755);
@@ -116,7 +117,7 @@ cat '${join(bin, 'out.json')}'
   const run = () => spawnSync('node', [CLI, 'pr', 'steps.json', '--pr', 'https://github.com/o/r/pull/1', '--provider', 'claude'], {
     cwd: repo, encoding: 'utf8', env,
   });
-  return { repo, git, run };
+  return { repo, git, run, called: () => existsSync(join(bin, 'called')) };
 }
 
 test('docviz pr runs the CLI once and prints the comment with its cost', () => {
@@ -153,4 +154,50 @@ test('docviz pr runs no code from the reviewed checkout: its playwright, fsmonit
   assert.equal(res.status, 0, res.stderr);
   assert.ok(res.stdout.startsWith(MARKER));
   for (const m of ['playwright', 'fsmonitor', 'hook']) assert.ok(!existsSync(join(marks, m)), `reviewed checkout ran its ${m}`);
+});
+
+const agentCard = {
+  caption: 'CAP BY AGENT',
+  mermaid: 'flowchart TD\n  pick["Pick forums"]:::changed\n  classDef changed stroke:#d29922,stroke-width:3px',
+};
+const withCard = (card) => (repo) => {
+  const doc = JSON.parse(readFileSync(join(repo, 'steps.json'), 'utf8'));
+  writeFileSync(join(repo, 'steps.json'), JSON.stringify({ ...doc, card }));
+};
+
+test('a steps.json with a card makes no provider call and says the agent drew it', () => {
+  const { run, called } = prRepo(withCard(agentCard));
+  const res = run();
+  assert.equal(res.status, 0, res.stderr);
+  assert.equal(called(), false, 'the fake claude was called');
+  assert.ok(res.stdout.startsWith(MARKER));
+  assert.match(res.stdout, /CAP BY AGENT/);
+  assert.match(res.stdout, /pick\["Pick forums"\]:::changed/);
+  assert.match(res.stdout, /### Where in the code/);
+  assert.match(res.stdout, /Diagram by the calling agent/);
+  assert.match(res.stdout, /cost \$0\.000/);
+  assert.doesNotMatch(res.stdout, /diagram \$/);
+});
+
+test('a card that fails lint stops the run before any call', () => {
+  const { run, called } = prRepo(withCard({ ...agentCard, mermaid: agentCard.mermaid.replace('Pick forums', 'Choose') }));
+  const res = run();
+  assert.equal(res.status, 2);
+  assert.equal(called(), false);
+  assert.match(res.stderr, /node pick says "Choose"; step label is "Pick forums"/);
+  assert.equal(res.stdout, '');
+});
+
+test('the footer names the calling agent only for an agent-drawn card, and costs only the step checks', () => {
+  const args = {
+    card: { caption: 'CAP', mermaid: 'flowchart TD\n  pick\n' },
+    steps: [{ label: 'Pick forums', cuts: [{ path: 'src/a.js', start: 3, end: 9 }] }],
+    checks: [{ verdict: 'pass' }],
+    sha: 'abcdef1234567', repoUrl: 'https://github.com/o/r', usage: { usd: 0.0002, estimated: false }, checked: true, version: 'v1',
+  };
+  assert.doesNotMatch(prComment(args), /calling agent/);
+  const body = prComment({ ...args, drawnBy: 'agent' });
+  assert.match(body, /Diagram by the calling agent/);
+  assert.match(body, /checked against Mermaid 11/);
+  assert.match(body, /steps checked by Jev: 1 ✓, cost \$0\.000 \(step checks\)/);
 });
