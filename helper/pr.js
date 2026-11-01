@@ -10,7 +10,8 @@ import { complete, detectProviders, pickProvider } from './providers.js';
 import { prCardPrompt, repairPrompt } from './prompts.js';
 import { checkSteps } from './checks.js';
 import { lintCard } from './lint.js';
-import { movedSinceBase } from './moved-git.js';
+import { movedSinceBase, resolveBase } from './moved-git.js';
+import { runBehavior } from './behavior.js';
 import { UNTRUSTED_GIT } from './git.js';
 
 export const MARKER = '<!-- docviz-pr-diagrams -->';
@@ -18,12 +19,18 @@ const DOCVIZ_REPO = 'https://github.com/DerekHertz/docviz';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 export { UNTRUSTED_GIT };
 
-/** The text from `from` up to `to` (exclusive; empty means the end) and its 1-based line range. */
+// A marker as the reader sees it: newlines and tabs written out, so it fits on one line.
+const shown = (marker) => `“${JSON.stringify(marker).slice(1, -1)}”`;
+
+/**
+ * The text from `from` up to `to` (exclusive; empty means the end) and its 1-based line range.
+ * A marker that isn't there throws: a missing `to` never widens the cut to the end of the file.
+ */
 export function cut(text, from, to) {
   const a = from ? text.indexOf(from) : 0;
-  if (a < 0) throw new Error(`marker not found: ${from}`);
-  let b = to ? text.indexOf(to, a + 1) : -1;
-  if (b < 0) b = text.length;
+  if (a < 0) throw new Error(`\`from\` marker ${shown(from)} not found`);
+  const b = to ? text.indexOf(to, a + 1) : text.length;
+  if (b < 0) throw new Error(`\`to\` marker ${shown(to)} not found after \`from\``);
   const lineOf = (i) => text.slice(0, i).split('\n').length;
   return { text: text.slice(a, b), start: lineOf(a), end: lineOf(Math.max(a, b - 1)) };
 }
@@ -39,6 +46,8 @@ export function sumUsage(list) {
 // Same format as the extension's card costs (extension/settings.js money()).
 export const money = (u) => `${u.estimated ? '~' : ''}$${u.usd < 0.01 ? u.usd.toFixed(3) : u.usd.toFixed(2)}`;
 
+export const codeLink = (repoUrl, sha) => (c) => `[\`${c.path}:${c.start}-${c.end}\`](${repoUrl}/blob/${sha}/${c.path}#L${c.start}-L${c.end})`;
+
 const CHECK = { pass: '✓', review: '⚠ review', flag: '✗ doesn’t match', unchecked: '—' };
 
 // "1 ✓, 1 ⚠, 1 ✗": only the outcomes that happened.
@@ -50,13 +59,19 @@ function checkSummary(checks) {
 
 /**
  * `checks` (one per step, from helper/checks.js) adds a Check column; without it the footer says
- * the steps weren't checked. `costs` breaks the total into diagram and step checks.
+ * the steps weren't checked. `costs` breaks the total into what spent it: diagram, step checks,
+ * model checks (a single part is named without its figure, which is the total). `sections`
+ * (markdown: Behavior, Modules moved) go after the step table, before the footer; `tlc` says TLC
+ * ran, at no cost.
  */
-export function prComment({ card, steps, sha, repoUrl, usage, checked, version, checks, costs, drawnBy }) {
-  const link = (c) => `[\`${c.path}:${c.start}-${c.end}\`](${repoUrl}/blob/${sha}/${c.path}#L${c.start}-L${c.end})`;
+export function prComment({ card, steps, sha, repoUrl, usage, checked, version, checks, costs, drawnBy, sections = [], tlc = false }) {
+  const link = codeLink(repoUrl, sha);
   const agent = drawnBy === 'agent';
-  const cost = costs ? `${money(usage)} (diagram ${money(costs.diagram)}, step checks ${money(costs.checks)})`
-    : `${money(usage)}${agent && checks ? ' (step checks)' : ''}`;
+  const parts = costs ? [['diagram', costs.diagram], ['step checks', costs.checks], ['model checks', costs.models]].filter(([, u]) => u)
+    : agent && checks ? [['step checks', usage]] : [];
+  const cost = money(usage)
+    + (parts.length > 1 ? ` (${parts.map(([k, u]) => `${k} ${money(u)}`).join(', ')})` : parts.length ? ` (${parts[0][0]})` : '')
+    + (tlc ? '; TLC runs locally, free' : '');
   return [
     MARKER,
     '## How this PR works',
@@ -76,6 +91,7 @@ export function prComment({ card, steps, sha, repoUrl, usage, checked, version, 
     checks?.some((c) => c.verdict === 'review' || c.verdict === 'flag')
       ? '\n⚠ the label claims something these lines don’t show (a person should look); ✗ the lines contradict the label.' : '',
     '',
+    ...sections.flatMap((s) => [s.trimEnd(), '']),
     `<sub>Diagram by ${agent ? 'the calling agent, formatted by ' : ''}[docviz](${DOCVIZ_REPO}) \`${version}\`, ${checked ? 'checked against Mermaid 11' : 'not syntax-checked'}, ${checks ? checkSummary(checks) : 'steps not checked'}, cost ${cost}.</sub>`,
   ].join('\n') + '\n';
 }
@@ -119,27 +135,29 @@ function docvizVersion() {
   return JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
 }
 
-// Modules moved is code only. A bad --base fails here, before any model call; with no base to
-// default to (a repo's first commit) the comment says it wasn't compared.
-function movedFor(base, cwd, head, log) {
+// One base for Modules moved and Behavior. A bad --base fails here, before any model call; with no
+// base to default to (a repo's first commit) both sections say they weren't compared.
+function baseFor(ref, cwd, log) {
   try {
-    return movedSinceBase(base, head, { cwd });
+    return resolveBase(ref, { cwd });
   } catch (e) {
-    if (base) throw e;
-    log(`modules moved: ${e.message}`);
-    return { moved: null, markdown: `Modules moved: not compared (${e.message}).\n` };
+    if (ref) throw e;
+    log(`base: ${e.message}`);
+    return { sha: null, how: e.message };
   }
 }
 
-/** Returns { body, missing, usage, moved }; throws with `usage` when the diagram can't be used. */
-export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: requested, model, check = true, ask, base, log = () => {} }) {
+/** Returns { body, missing, usage, moved, behavior }; throws with `usage` when the diagram can't be used. */
+export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: requested, model, check = true, ask, base: baseRef, trustAtlas = false, log = () => {} }) {
   const git = (...a) => execFileSync('git', [...UNTRUSTED_GIT, ...a], { encoding: 'utf8' }).trim();
   const root = git('rev-parse', '--show-toplevel');
+  const gitRaw = (...a) => execFileSync('git', [...UNTRUSTED_GIT, ...a], { encoding: 'utf8', cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
   const sha = git('rev-parse', 'HEAD');
   const repoUrl = repoWebUrl(git('remote', 'get-url', 'origin'));
   if (git('status', '--porcelain', '--untracked-files=no')) log('warning: uncommitted changes; links point at HEAD as committed');
 
-  const movedPart = movedFor(base, root, sha, log);
+  const base = baseFor(baseRef, root, log);
+  const movedPart = movedSinceBase(base, sha, { cwd: root });
 
   const doc = JSON.parse(readFileSync(resolve(stepsFile), 'utf8'));
   let parsed = false;
@@ -174,6 +192,11 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
   const canCheck = check && (ask || process.env.TYPESAFE_API_KEY);
   if (check && !canCheck) log('TYPESAFE_API_KEY not set: steps not checked');
   const checking = canCheck ? checkSteps(steps, ask ? { ask } : {}) : null;
+  // Behavior (helper/behavior.js) runs alongside too: models at base and head, rules, model steps.
+  const behaving = runBehavior({ root, git: gitRaw, base, trust: trustAtlas, ask, check, log }).catch((e) => ({
+    findings: [{ kind: 'run', model: '.atlas', side: 'head', error: e.message }], runs: [], usage: null, section: () => `### Behavior\n\nNot checked: ${e.message}`,
+  }));
+  const otherSpend = async () => [...((await checking) || []).map((c) => c.usage), (await behaving).usage];
 
   // The fallback for a person at a terminal: a model draws the diagram, and a second call repairs it.
   const draw = async () => {
@@ -181,8 +204,7 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
     try {
       card = await call(prCardPrompt({ page: { title: title || 'Pull request', url: prUrl }, steps, glossary }), 300_000);
     } catch (e) {
-      const checks = await checking;
-      throw Object.assign(e, { usage: sumUsage([...spent, ...(checks || []).map((c) => c.usage)]) });
+      throw Object.assign(e, { usage: sumUsage([...spent, ...(await otherSpend())]) });
     }
     const checker = await mermaidChecker();
     if (!checker) log('playwright not found: the diagram is not syntax-checked');
@@ -193,8 +215,7 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
         error = await checker.check(card.mermaid);
       }
       if (error) {
-        const checks = await checking;
-        throw Object.assign(new Error(`diagram doesn't parse: ${error.split('\n')[0]}`), { usage: sumUsage([...spent, ...(checks || []).map((c) => c.usage)]) });
+        throw Object.assign(new Error(`diagram doesn't parse: ${error.split('\n')[0]}`), { usage: sumUsage([...spent, ...(await otherSpend())]) });
       }
     } finally {
       await checker?.close();
@@ -206,8 +227,15 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
 
   const checks = await checking;
   for (const c of checks || []) if (c.error) log(`step ${c.id} not checked: ${c.error}`);
-  const costs = checks && !doc.card ? { diagram: sumUsage(spent), checks: sumUsage(checks.map((c) => c.usage)) } : null;
-  const usage = sumUsage([...spent, ...(checks || []).map((c) => c.usage)]);
-  const body = prComment({ card, steps, sha, repoUrl, usage, checked, version: docvizVersion(), checks, costs, drawnBy }) + '\n' + movedPart.markdown;
-  return { body, missing: missingSteps(steps, card.mermaid), usage, checks, moved: movedPart.moved };
+  const behavior = await behaving;
+  const models = behavior.modelSteps?.length ? behavior.usage : null;
+  const costs = checks || models ? {
+    ...(!doc.card && { diagram: sumUsage(spent) }), ...(checks && { checks: sumUsage(checks.map((c) => c.usage)) }), ...(models && { models }),
+  } : null;
+  const usage = sumUsage([...spent, ...(await otherSpend())]);
+  const body = prComment({
+    card, steps, sha, repoUrl, usage, checked, version: docvizVersion(), checks, costs, drawnBy,
+    sections: [behavior.section(codeLink(repoUrl, sha)), movedPart.markdown], tlc: behavior.runs.length > 0,
+  });
+  return { body, missing: missingSteps(steps, card.mermaid), usage, checks, moved: movedPart.moved, behavior };
 }
