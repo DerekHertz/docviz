@@ -39,7 +39,8 @@ An order ships only after it is paid.
 A refunded or cancelled order keeps none of the customer's money.
 `;
 
-const tla = ({ ship = 'state = "paid"', extraActions = '', extraNext = '', done = '"shipped", "refunded", "cancelled"', extraRules = '', cancel = 'UNCHANGED charged' } = {}) => `---- MODULE Order ----
+const tla = ({ ship = 'state = "paid"', extraActions = '', extraNext = '', done = '"shipped", "refunded", "cancelled"', extraRules = '', cancel = 'UNCHANGED charged',
+  shipsPaid = 'state = "shipped" => charged' } = {}) => `---- MODULE Order ----
 \\* One order and the customer's money (src/order.js).
 VARIABLES state, charged
 vars == <<state, charged>>
@@ -59,7 +60,7 @@ ${extraActions}Done == state \\in {${done}} /\\ UNCHANGED vars
 Next == Pay \\/ Ship \\/ Refund \\/ Cancel${extraNext} \\/ Done
 
 \\* The user's rules (.atlas/rules.md).
-ShipsPaid == state = "shipped" => charged
+ShipsPaid == ${shipsPaid}
 NoKeptMoney == state \\in {"refunded", "cancelled"} => ~charged
 ${extraRules}====
 `;
@@ -110,14 +111,16 @@ const BASE = {
 
 // ---------- the planted PRs ----------
 
-// Each branch is one commit on the base: the files it changes.
+// The agent lets pickup orders ship from the cart, and updates the model to match: ShipsPaid breaks.
+const SHIP_FROM_CART = {
+  'src/order.js': order({ ship: "// Pickup orders ship straight from the cart and pay at the counter.\nif (order.state !== 'paid' && order.state !== 'cart') throw new Error('only a cart or a paid order ships');" }),
+  [`${M}/Order.tla`]: tla({ ship: 'state \\in {"cart", "paid"}' }),
+  [`${M}/model.json`]: modelJson({ ship: LABELS.shipFromCart }),
+};
+
+// Each branch is one commit on the base: the files it changes (null removes a file or folder).
 const BRANCHES = {
-  // The agent lets pickup orders ship from the cart, and updates the model to match: ShipsPaid breaks.
-  'rule-break': {
-    'src/order.js': order({ ship: "// Pickup orders ship straight from the cart and pay at the counter.\nif (order.state !== 'paid' && order.state !== 'cart') throw new Error('only a cart or a paid order ships');" }),
-    [`${M}/Order.tla`]: tla({ ship: 'state \\in {"cart", "paid"}' }),
-    [`${M}/model.json`]: modelJson({ ship: LABELS.shipFromCart }),
-  },
+  'rule-break': SHIP_FROM_CART,
   // Renames a parameter: same behavior, same model.
   'noop-refactor': { 'src/order.js': order({ o: 'o' }) },
   // Adds returns, with the model: a new state and step, both rules still hold.
@@ -144,6 +147,14 @@ const BRANCHES = {
   'report-change': { 'src/report.js': 'export const summary = (orders) => orders.map((o, i) => `${i + 1}. ${o.state}`).join(\'\\n\');\n' },
   // Docs only.
   'docs-only': { 'README.md': '# Shop\n\nOne order and the customer\'s money. Run the tests with `node --test`.\n' },
+  // Rewords one of the user's rules in rules.md, which no agent edits (rule 2).
+  'rules-edit': { '.atlas/rules.md': RULES.replace('An order ships only after it is paid.', 'An order ships once it is paid or picked up.') },
+  // Weakens ShipsPaid's definition to TRUE: it still "holds", and nothing else changes.
+  'weaken-rule': { [`${M}/Order.tla`]: tla({ shipsPaid: 'TRUE' }) },
+  // Removes .atlas/: the rules and the model with it.
+  'remove-atlas': { '.atlas': null },
+  // Ships from the cart, as rule-break, and removes rules.md: ShipsPaid still breaks in the model.
+  'no-rules-break': { ...SHIP_FROM_CART, '.atlas/rules.md': null },
 };
 
 const step = (id, label, from, changed = false, path = 'src/order.js') => ({ id, label, changed, sources: [{ path, from: `export ${from}`, to: '\n}\n' }] });
@@ -181,6 +192,15 @@ export const CASES = [
   // main against rule-break: the PR that undoes the break, so ShipsPaid broke at base and holds at head.
   { name: 'rule-fixed', branch: 'main', base: 'rule-break', expect: 'look', reasons: ['rule-fixed', 'behavior-changed'], trust: true, tlc: true, why: 'ShipsPaid holds again: an order ships only once paid',
     steps: [step('ship', LABELS.ship, 'function ship(', true), step('pay', LABELS.pay, 'function pay(')] },
+  { name: 'rules-edited', branch: 'rules-edit', expect: 'look', reasons: ['rules-changed'], trust: true, tlc: false, why: 'ShipsPaid is reworded in rules.md, which agents never edit',
+    steps: [step('ship', LABELS.ship, 'function ship(')] },
+  { name: 'rule-weakened', branch: 'weaken-rule', expect: 'look', reasons: ['rule-redefined'], trust: true, tlc: true, why: 'ShipsPaid is defined as TRUE: it holds, and means nothing',
+    steps: [step('ship', LABELS.ship, 'function ship(')] },
+  { name: 'atlas-removed', branch: 'remove-atlas', expect: 'look', reasons: ['rules-changed', 'model-removed', 'model-removed'], trust: true, tlc: false, why: '.atlas/ is deleted: the rules and the order model with it',
+    steps: [step('ship', LABELS.ship, 'function ship(')] },
+  { name: 'no-rules-break', branch: 'no-rules-break', expect: 'needs', reasons: ['rule-breaks', 'rules-changed', 'behavior-changed', 'rules-gap', 'rules-gap'], trust: true, tlc: true,
+    why: 'rules.md is gone and ShipsPaid still breaks in the model: a break is a break',
+    steps: [step('ship', LABELS.shipFromCart, 'function ship(', true), step('pay', LABELS.pay, 'function pay(')] },
   { name: 'untrusted', branch: 'noop-refactor', expect: 'look', reasons: ['not-run', 'not-run', 'not-run'], trust: false, tlc: false, why: 'without --trust-atlas the touched model doesn\'t run',
     steps: [step('pay', LABELS.pay, 'function pay(', true), step('ship', LABELS.ship, 'function ship(', true)] },
 ];
@@ -205,6 +225,7 @@ export function makeShop(dir = mkdtempSync(join(tmpdir(), 'docviz-shop-'))) {
   const git = (...a) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8', env: { ...process.env, ...GIT_ENV } }).trim();
   const write = (files) => {
     for (const [p, text] of Object.entries(files)) {
+      if (text === null) { rmSync(join(repo, p), { recursive: true, force: true }); continue; }
       mkdirSync(dirname(join(repo, p)), { recursive: true });
       writeFileSync(join(repo, p), text);
     }

@@ -24,9 +24,11 @@ function checkout(branch) {
 const run = (c) => runPr({ stepsFile: c.stepsFile, prUrl: PR_URL, cwd: checkout(c.branch), ask: recorded(c.answers), trustAtlas: c.trust, base: c.base });
 const why = (r) => `${r.verdict.level}: ${r.verdict.reasons.map((x) => x.text).join(' | ')}`;
 
-test('the fixture plants 6–8 PRs on one base, with every verdict at least once', () => {
+// The flow asked for 6–8; the fix round added rules.md edits, a weakened rule, a removed .atlas/
+// and a break with no rules.md.
+test('the fixture plants at least 6 PRs on one base, with every verdict at least once', () => {
   const branches = new Set(shop.cases.map((c) => c.branch).filter((b) => b !== 'main'));
-  assert.ok(branches.size >= 6 && branches.size <= 8, `${branches.size} branches`);
+  assert.ok(branches.size >= 6, `${branches.size} branches`);
   for (const level of ['needs', 'look', 'nothing']) assert.ok(shop.cases.some((c) => c.expect === level), level);
   assert.ok(shop.cases.some((c) => c.expect === 'look' && c.answers && Object.values(c.answers).includes('error')), 'a case with an unchecked step');
 });
@@ -65,3 +67,28 @@ for (const name of ['uncovered-file', 'rule-break']) {
     assert.equal(a.verdict.level, c.expect);
   });
 }
+
+const caseNamed = (name) => shop.cases.find((c) => c.name === name);
+
+test('rules-edited: the user sees which of their rules changed', { skip: skipFor(caseNamed('rules-edited')) }, async () => {
+  const r = await run(caseNamed('rules-edited'));
+  assert.match(r.body, /\*\*Look when you can\*\*\n\n- ⚠ Your rules changed: reworded ShipsPaid\n/);
+});
+
+test('rule-weakened: a rule defined as TRUE still holds, and its changed definition is the reason', { skip: skipFor(caseNamed('rule-weakened')) }, async () => {
+  const r = await run(caseNamed('rule-weakened'));
+  assert.match(r.body, /\*\*Look when you can\*\*\n\n- ⚠ ShipsPaid’s definition in the model changed \(order\)\n/);
+  assert.match(r.body, /✓ \*\*ShipsPaid\*\* holds/);
+});
+
+test('atlas-removed: .atlas/, its rules and its model are each named', { skip: skipFor(caseNamed('atlas-removed')) }, async () => {
+  const r = await run(caseNamed('atlas-removed'));
+  assert.match(r.body, /\*\*Look when you can\*\*\n\n- ⚠ Your rules changed: removed ShipsPaid, NoKeptMoney\n- ⚠ `\.atlas\/` removed: no model checks this repo any more\n- ⚠ Model order removed\n/);
+});
+
+test('no-rules-break: with no rules.md, the break is "needs you", with its path', { skip: skipFor(caseNamed('no-rules-break')) }, async () => {
+  const r = await run(caseNamed('no-rules-break'));
+  assert.match(r.body, /^.*\n\*\*Needs you\*\*\n\n- ✗ ShipsPaid breaks in order, ending “we ship it: shipped” \(the model checks it; it isn’t in your rules\.md\)\n/);
+  assert.match(r.body, /- ⚠ No `\.atlas\/rules\.md`: the models check no rule of yours/);
+  assert.match(r.body, /- ✗ \*\*ShipsPaid\*\* breaks in order \(not one of your rules\)\n  1\. in the cart\n  2\. we ship it: shipped/);
+});
