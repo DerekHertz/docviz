@@ -316,6 +316,11 @@ test('atlasChanges: a rule weakened through an operator it calls is redefined; a
   const viaHelper = (paid, other = 'Other == 1') => atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', `Paid == ${paid}\n${other}\nShipsPaid == state = "shipped" => Paid`) });
   assert.deepEqual(atlasChanges({ before: viaHelper('charged'), head: viaHelper('TRUE'), changed: ['.atlas/models/order/Order.tla'] }),
     [{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }]);
+  for (const lead of ['  ', 'LOCAL ']) {
+    const shaped = (paid) => atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', `${lead}Paid == ${paid}\nShipsPaid == state = "shipped" => Paid`) });
+    assert.deepEqual(atlasChanges({ before: shaped('charged'), head: shaped('TRUE'), changed: ['.atlas/models/order/Order.tla'] }),
+      [{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }], `a helper written as "${lead}Paid =="`);
+  }
   assert.deepEqual(atlasChanges({ before: viaHelper('charged'), head: viaHelper('charged', 'Other == 2'), changed: ['.atlas/models/order/Order.tla'] }), []);
 });
 

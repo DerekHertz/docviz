@@ -232,12 +232,12 @@ export function ruleFindings({ rules, runs, models, touched }) {
 
 const stripComments = (text) => text.replace(/\(\*[\s\S]*?\*\)/g, ' ').replace(/\\\*.*$/gm, '');
 // A new top-level unit: a definition at column 0, a keyword, or the module's end.
-const TOP = /^(?:[A-Za-z_]\w*\s*(?:\([^)]*\))?\s*==|(?:VARIABLES?|CONSTANTS?|ASSUME|THEOREM|LEMMA|INSTANCE|LOCAL|RECURSIVE|EXTENDS)\b|====|----)/;
+const TOP = /^\s*(?:(?:LOCAL\s+)?[A-Za-z_]\w*\s*(?:\([^)]*\))?\s*==|(?:VARIABLES?|CONSTANTS?|ASSUME|THEOREM|LEMMA|INSTANCE|LOCAL|RECURSIVE|EXTENDS)\b|====|----)/;
 
 /** A TLA+ operator's definition, `Name == …` up to the next top-level unit, without comments or spacing. Null when it isn't defined. */
 export function tlaDefinition(spec, name) {
   const lines = stripComments(spec).split('\n');
-  const head = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\([^)]*\\))?\\s*==`);
+  const head = new RegExp(`^\\s*(?:LOCAL\\s+)?${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\([^)]*\\))?\\s*==`);
   const start = lines.findIndex((l) => head.test(l));
   if (start < 0) return null;
   let end = start + 1;
