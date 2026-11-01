@@ -336,6 +336,12 @@ test('atlasChanges: any other edit to a model reads as a model edit (a shape the
   assert.deepEqual(atlasChanges({ before: split('charged'), head: split('TRUE'), changed: ['.atlas/models/order/Order.tla'] }), [{ kind: 'model-edited', model: 'order' }]);
 });
 
+test('atlasChanges: a rule weakened between a (* in a line comment and a later *) is still seen', () => {
+  const tricky = (v) => atlasOf({ spec: SPEC.replace('ShipsPaid == state = "shipped" => charged', `\\* pay() (* the old way\nShipsPaid == ${v}\n(* later note *)`) });
+  assert.deepEqual(atlasChanges({ before: tricky('state = "shipped" => charged'), head: tricky('TRUE'), changed: ['.atlas/models/order/Order.tla'] }),
+    [{ kind: 'rule-redefined', model: 'order', name: 'ShipsPaid' }]);
+});
+
 test('atlasChanges: a removed model, and a removed .atlas/, are named', () => {
   assert.deepEqual(atlasChanges({ before: atlasOf({ models: ['order', 'cart'] }), head: atlasOf(), changed: ['.atlas/models/cart/model.json'] }),
     [{ kind: 'model-removed', model: 'cart' }]);

@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { readAtlasAt, readAtlasDir, covers } from './atlas.js';
+import { readAtlasAt, readAtlasDir, covers, stripTla, squeezeTla } from './atlas.js';
 import { checkSteps } from './checks.js';
 import { cut } from './pr.js';
 
@@ -231,19 +231,18 @@ export function ruleFindings({ rules, runs, models, touched }) {
 
 // ---------- what the PR did to the atlas itself ----------
 
-const stripComments = (text) => text.replace(/\(\*[\s\S]*?\*\)/g, ' ').replace(/\\\*.*$/gm, '');
 // A new top-level unit: a definition at column 0, a keyword, or the module's end.
 const TOP = /^(?:(?:LOCAL\s+)?[A-Za-z_]\w*\s*(?:\([^)]*\))?\s*==|(?:VARIABLES?|CONSTANTS?|ASSUME|THEOREM|LEMMA|INSTANCE|LOCAL|RECURSIVE|EXTENDS)\b|====|----)/;
 
 /** A TLA+ operator's definition, `Name == …` up to the next top-level unit, without comments or spacing. Null when it isn't defined. */
 export function tlaDefinition(spec, name) {
-  const lines = stripComments(spec).split('\n');
+  const lines = stripTla(spec).split('\n');
   const head = new RegExp(`^\\s*(?:LOCAL\\s+)?${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\([^)]*\\))?\\s*==`);
   const start = lines.findIndex((l) => head.test(l));
   if (start < 0) return null;
   let end = start + 1;
   while (end < lines.length && !TOP.test(lines[end])) end++;
-  return lines.slice(start, end).join(' ').replace(/\s+/g, ' ').trim();
+  return squeezeTla(lines.slice(start, end).join(' '));
 }
 
 // A name's definition in any of a model's .tla files, its spec first.
@@ -271,7 +270,7 @@ const meaningIn = (model, name) => {
 };
 
 const specText = (model) => Object.keys(model.files).filter((f) => /\.(tla|cfg)$/.test(f)).sort(byText)
-  .map((f) => `${f}\n${stripComments(model.files[f]).replace(/\s+/g, ' ').trim()}`).join('\n');
+  .map((f) => `${f}\n${squeezeTla(stripTla(model.files[f]))}`).join('\n');
 
 /**
  * Pure: what the PR did to `.atlas/` itself, base (`before`) against head. rules.md changed: the

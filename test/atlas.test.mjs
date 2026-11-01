@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { parseRules, cfgRules, atlasFrom, readAtlasDir, readAtlasAt, covers, ATLAS } from '../helper/atlas.js';
+import { parseRules, cfgRules, atlasFrom, readAtlasDir, readAtlasAt, covers, ATLAS, stripTla, squeezeTla } from '../helper/atlas.js';
 
 const RULES = `# Rules
 
@@ -177,4 +177,16 @@ test('the atlas reads the same from a directory and from git at a ref', () => {
   for (const ref of ['no-such-ref', '--output=x']) {
     assert.throws(() => readAtlasAt(git, ref), (e) => e.message === `can’t read .atlas/ at \`${ref}\`: not a commit in this repo`, ref);
   }
+});
+
+test('stripTla: one pass, so a (* in a line comment or a string opens no block', () => {
+  assert.equal(stripTla('A == 1 \\* pay() (* the old way\nB == TRUE\nC == 2 (* later *)'), 'A == 1 \nB == TRUE\nC == 2  ');
+  assert.equal(stripTla('S == "a (* b"\nT == 1'), 'S == "a (* b"\nT == 1');
+  assert.equal(stripTla('X (* a (* nested *) b *) Y'), 'X   Y');
+  assert.equal(stripTla('(* one\ntwo *)Z'), ' \nZ');
+  assert.equal(squeezeTla('S  ==\n "a    b"'), 'S == "a    b"');
+});
+
+test('cfgRules: a block comment in the config names no rule', () => {
+  assert.deepEqual(cfgRules('INVARIANT ShipsPaid (* done *)\n(* INVARIANT Old *)\nINVARIANT NoKeptMoney'), ['ShipsPaid', 'NoKeptMoney']);
 });

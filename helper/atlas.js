@@ -53,14 +53,41 @@ export function parseRules(md) {
   return { rules, problems: problems.sort((a, b) => a.line - b.line).map((p) => p.text) };
 }
 
+/**
+ * TLA+ text without its comments, in one pass: strings stay as written, a `\*` comment runs to the
+ * end of its line, and `(* *)` comments nest. Newlines inside comments are kept, so lines stay put.
+ */
+export function stripTla(text) {
+  let out = '';
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const two = text.slice(i, i + 2);
+    if (depth) {
+      if (two === '(*') { depth++; i++; } else if (two === '*)') { depth--; i++; } else if (text[i] === '\n') out += '\n';
+    } else if (two === '(*') { depth = 1; i++; out += ' '; } else if (two === '\\*') {
+      while (i < text.length && text[i] !== '\n') i++;
+      i--;
+    } else if (text[i] === '"') {
+      let j = i + 1;
+      while (j < text.length && text[j] !== '"' && text[j] !== '\n') j += text[j] === '\\' ? 2 : 1;
+      out += text.slice(i, j + 1);
+      i = j;
+    } else out += text[i];
+  }
+  return out;
+}
+
+/** Whitespace runs as one space, except inside strings. */
+export const squeezeTla = (text) => text.replace(/("(?:[^"\\\n]|\\.)*")|\s+/g, (m, str) => str || ' ').trim();
+
 const CFG_KEYWORD = /^(CONSTANTS?|INIT|NEXT|SPECIFICATION|INVARIANTS?|PROPERTY|PROPERTIES|CONSTRAINTS?|ACTION_CONSTRAINTS?|SYMMETRY|VIEW|CHECK_DEADLOCK|POSTCONDITION|ALIAS)$/;
 
 /** The invariants and properties a TLC config checks, in order. */
 export function cfgRules(cfg) {
   const names = [];
   let collecting = false;
-  for (const raw of cfg.split('\n')) {
-    const line = raw.replace(/\\\*.*$/, '').trim();
+  for (const raw of stripTla(cfg).split('\n')) {
+    const line = raw.trim();
     if (!line) continue;
     const [word, ...rest] = line.split(/\s+/);
     if (CFG_KEYWORD.test(word)) {
