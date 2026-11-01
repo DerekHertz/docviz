@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { cut, missingSteps, repoWebUrl, prComment, sumUsage, MARKER } from '../helper/pr.js';
 import { prCardPrompt } from '../helper/prompts.js';
+import { fakeStatechart, fakeSpec, fakeChart } from './fake-statechart.mjs';
 
 const CLI = resolve('helper/cli.js');
 
@@ -114,11 +115,48 @@ cat '${join(bin, 'out.json')}'
 
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
   delete env.TYPESAFE_API_KEY;
-  const run = (...extra) => spawnSync('node', [CLI, 'pr', 'steps.json', '--pr', 'https://github.com/o/r/pull/1', '--provider', 'claude', ...extra], {
-    cwd: repo, encoding: 'utf8', env,
+  const runEnv = (extraEnv, ...extra) => spawnSync('node', [CLI, 'pr', 'steps.json', '--pr', 'https://github.com/o/r/pull/1', '--provider', 'claude', ...extra], {
+    cwd: repo, encoding: 'utf8', env: { ...env, ...extraEnv },
   });
-  return { repo, git, run, called: () => existsSync(join(bin, 'called')) };
+  const run = (...extra) => runEnv({}, ...extra);
+  return { repo, git, run, runEnv, called: () => existsSync(join(bin, 'called')) };
 }
+
+test('docviz pr --trust-atlas runs the touched model at base and head and adds the Behavior section', () => {
+  const statechart = fakeStatechart();
+  const { runEnv } = prRepo((repo) => {
+    const put = (p, text) => { mkdirSync(join(repo, p, '..'), { recursive: true }); writeFileSync(join(repo, p), text); };
+    const commit = (m) => { execFileSync('git', ['-C', repo, 'add', '.atlas', 'src']); execFileSync('git', ['-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', m]); };
+    put('.atlas/rules.md', '## Shut\nThe door shuts.\n');
+    put('.atlas/models/door/model.json', JSON.stringify({ spec: 'Door.tla', config: 'Door.cfg', code: ['src/a.js'],
+      steps: [{ action: 'Pick', label: 'Pick forums', sources: [{ path: 'src/a.js', from: 'function pick', to: 'function later' }] }] }));
+    put('.atlas/models/door/Door.cfg', 'INIT Init\nNEXT Next\nINVARIANT Shut\n');
+    put('.atlas/models/door/Door.tla', fakeSpec({ exit: 0, report: '## Rules that hold\nShut\n', chart: fakeChart() }));
+    commit('atlas');
+    put('.atlas/models/door/Door.tla', fakeSpec({ exit: 0, report: '## Rules that hold\nShut\n', chart: fakeChart('  s1 --> s1: you wait\n') }));
+    put('src/a.js', 'x\nfunction pick() { return 1; }\nfunction later() {}\n');
+    commit('head');
+  });
+  const env = { DOCVIZ_STATECHART: statechart, TLA2TOOLS: statechart };
+  const trusted = runEnv(env, '--trust-atlas');
+  assert.equal(trusted.status, 0, trusted.stderr);
+  assert.match(trusted.stdout, /### Behavior\n\nCompared with `\w{7}` \(HEAD~1 \(no origin\/main\)\)/);
+  // One base for both sections, and the footer with every cost comes last.
+  const at = (s) => trusted.stdout.indexOf(s);
+  assert.ok(at('### Behavior') < at('### Modules moved since') && at('### Modules moved since') < at('<sub>Diagram by'), trusted.stdout);
+  assert.match(trusted.stdout, /<sub>Diagram by[^\n]*<\/sub>\n$/);
+  const bases = [...trusted.stdout.matchAll(/`(\w{7})` \(HEAD~1/g)].map((m) => m[1]);
+  assert.equal(bases.length, 2);
+  assert.equal(bases[0], bases[1]);
+  assert.match(trusted.stdout, /s1 --> s1: you wait \(new\)/);
+  assert.match(trusted.stdout, /✓ \*\*Shut\*\* holds: “The door shuts\.”/);
+  assert.match(trusted.stdout, /\| Pick forums \| \[`src\/a\.js:2-2`\]/);
+  assert.match(trusted.stdout, /TLC runs locally, free/);
+  const untrusted = runEnv(env);
+  assert.equal(untrusted.status, 0, untrusted.stderr);
+  assert.match(untrusted.stdout, /door: models not run: pass --trust-atlas on your own repo/);
+  assert.doesNotMatch(untrusted.stdout, /TLC runs locally/);
+});
 
 test('docviz pr runs the CLI once and prints the comment with its cost', () => {
   const { git, run } = prRepo();

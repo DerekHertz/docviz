@@ -38,9 +38,12 @@ export function resolveBase(ref, { cwd = process.cwd() } = {}) {
 /** `moved()` between two refs of the repo at `cwd`. */
 export const movedBetween = (baseRef, headRef, opts) => moved(filesAt(baseRef, opts), filesAt(headRef, opts));
 
-/** The section for `docviz pr`: the repo at `head` against `base` (a ref, or the default). Throws on a bad `base`. */
+/**
+ * The section for `docviz pr`: the repo at `head` against `base`, the `{ sha, how }` from
+ * resolveBase that Behavior compares against too. With no base (sha null) it says so.
+ */
 export function movedSinceBase(base, head, opts) {
-  const from = resolveBase(base, opts);
-  const result = movedBetween(from.sha, head, opts);
-  return { moved: result, base: from, markdown: movedSection(result, { base: from.sha, how: from.how }) };
+  if (!base.sha) return { moved: null, markdown: `Modules moved: not compared (${base.how}).\n` };
+  const result = movedBetween(base.sha, head, opts);
+  return { moved: result, markdown: movedSection(result, { base: base.sha, how: base.how }) };
 }
