@@ -22,9 +22,10 @@ const changes = (f) => [
  * the verdict is the worst level among them. `text(f)` is the reason in the reader's words.
  */
 export const TABLE = [
-  { kind: 'rule-breaks', level: 'needs', // a rule breaks at head
-    when: (f) => f.kind === 'rule' && f.status === 'breaks',
-    text: (f) => `${f.name} breaks in ${f.model}${last(f.path)}`, ref: (f) => f.model },
+  { kind: 'rule-breaks', level: 'needs', // a rule breaks at head; a model invariant not in rules.md (or with no rules.md) too
+    when: (f) => (f.kind === 'rule' || f.kind === 'extra-rule') && f.status === 'breaks',
+    text: (f) => `${f.name} breaks in ${f.model}${last(f.path)}${f.kind === 'extra-rule' ? ' (the model checks it; it isn’t in your rules.md)' : ''}`,
+    ref: (f) => f.model },
   { kind: 'contradicted', level: 'needs', // a PR step or model step contradicted by its code (Jev ✗)
     when: (f) => f.kind === 'step' && f.verdict === 'flag',
     text: (f) => `${stepName(f)} is contradicted by its code`, ref: (f) => f.id },
@@ -56,9 +57,10 @@ export const TABLE = [
     })[f.kind](),
     ref: (f) => f.model || f.name, group: (f) => f.kind === 'rule' && `Rules not checked (${f.model} didn’t run)` },
   { kind: 'rules-gap', level: 'look', // rules.md missing or a model invariant not in it
-    when: (f) => (f.kind === 'atlas' && f.status === 'no-rules') || f.kind === 'extra-rule' || (f.kind === 'rule' && f.status === 'unchecked' && !f.model),
+    when: (f) => (f.kind === 'atlas' && f.status === 'no-rules') || f.kind === 'extra-rule' || f.kind === 'rules-problem' || (f.kind === 'rule' && f.status === 'unchecked' && !f.model),
     text: (f) => ({
       atlas: () => 'No `.atlas/rules.md`: the models check no rule of yours',
+      'rules-problem': () => f.text,
       'extra-rule': () => `${f.name} (${f.model}) ${f.status === 'breaks' ? 'breaks' : 'is checked'}, and it isn’t one of your rules`,
       rule: () => `${f.name} is checked by no model`,
     })[f.kind](),

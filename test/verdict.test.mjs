@@ -98,3 +98,20 @@ test('the verdict opens the comment: its line, then the reasons, worst first', (
   assert.ok(body.startsWith(`${MARKER}\n**Needs you**\n`));
   assert.ok(body.indexOf('**Needs you**') < body.indexOf('## How this PR works'));
 });
+
+// With no rules.md (or for an invariant not in it), a break TLC finds is still a break.
+test('a model invariant that breaks is "needs you", with its path, rules.md or not', () => {
+  const f = { kind: 'extra-rule', model: 'order', name: 'PaidHasMoney', status: 'breaks', path: ['in the cart', 'you pay: paid'] };
+  const v = verdict([f, { kind: 'atlas', status: 'no-rules' }]);
+  assert.equal(v.level, 'needs');
+  assert.deepEqual(v.reasons.map((r) => [r.level, r.kind, r.text]), [
+    ['needs', 'rule-breaks', 'PaidHasMoney breaks in order, ending “you pay: paid” (the model checks it; it isn’t in your rules.md)'],
+    ['look', 'rules-gap', 'No `.atlas/rules.md`: the models check no rule of yours'],
+  ]);
+  assert.equal(verdict([{ ...f, status: 'holds' }]).level, 'look');
+});
+
+test('rules.md text that isn’t a rule is a reason to look, in its own words', () => {
+  const v = verdict([{ kind: 'rules-problem', text: 'rules.md: line 3 `## Spend Shows` is not a rule heading (## Name, one word)' }]);
+  assert.deepEqual(v.reasons.map((r) => [r.level, r.kind, r.text]), [['look', 'rules-gap', 'rules.md: line 3 `## Spend Shows` is not a rule heading (## Name, one word)']]);
+});
