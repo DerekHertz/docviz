@@ -21,11 +21,11 @@ function checkout(branch) {
   return dir;
 }
 
-const run = (c) => runPr({ stepsFile: c.stepsFile, prUrl: PR_URL, cwd: checkout(c.branch), ask: recorded(c.answers), trustAtlas: c.trust });
+const run = (c) => runPr({ stepsFile: c.stepsFile, prUrl: PR_URL, cwd: checkout(c.branch), ask: recorded(c.answers), trustAtlas: c.trust, base: c.base });
 const why = (r) => `${r.verdict.level}: ${r.verdict.reasons.map((x) => x.text).join(' | ')}`;
 
 test('the fixture plants 6–8 PRs on one base, with every verdict at least once', () => {
-  const branches = new Set(shop.cases.map((c) => c.branch));
+  const branches = new Set(shop.cases.map((c) => c.branch).filter((b) => b !== 'main'));
   assert.ok(branches.size >= 6 && branches.size <= 8, `${branches.size} branches`);
   for (const level of ['needs', 'look', 'nothing']) assert.ok(shop.cases.some((c) => c.expect === level), level);
   assert.ok(shop.cases.some((c) => c.expect === 'look' && c.answers && Object.values(c.answers).includes('error')), 'a case with an unchecked step');
@@ -47,6 +47,13 @@ test('the rule-break case names the rule, quotes it, and gives its path', { skip
   assert.match(r.body, /✗ \*\*ShipsPaid\*\* breaks in order: “An order ships only after it is paid\.”\n  1\. in the cart\n  2\. we ship it: shipped/);
   assert.match(r.body, /✓ \*\*NoKeptMoney\*\* holds/);
   assert.match(r.body, /in the cart --> s\d+: we ship it \(new\)|s\d+ --> s\d+: we ship it \(new\)/);
+});
+
+test('the rule-fixed case says the rule holds now and broke before', { skip: skipFor(shop.cases.find((c) => c.name === 'rule-fixed')) }, async () => {
+  const r = await run(shop.cases.find((c) => c.name === 'rule-fixed'));
+  assert.match(r.body, /\*\*Look when you can\*\*\n\n- ⚠ ShipsPaid now holds; it broke before\n/);
+  assert.match(r.body, /✓ \*\*ShipsPaid\*\* holds \(it broke at base\): “An order ships only after it is paid\.”/);
+  assert.match(r.body, /Compared with `\w{7}` \(--base rule-break\)/);
 });
 
 // The rerun rule: the same PR at the same commit gives the same verdict.

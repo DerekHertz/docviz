@@ -154,7 +154,8 @@ const card = (steps, caption) => ({
 });
 
 /**
- * Case = { name, branch, expect: 'needs'|'look'|'nothing', reasons: Reason kinds in order, trust, tlc, answers, why, steps }.
+ * Case = { name, branch, base?, expect: 'needs'|'look'|'nothing', reasons: Reason kinds in order, trust, tlc, answers, why, steps }.
+ * `base` (a branch) is passed as --base; without it the base is main, the merge base with origin/main.
  * `answers` maps a step label to its recorded Jev answer ('review' | 'flag' | 'error'); any other
  * label passes. `tlc` cases run a model, so they need TLC and statechart.
  */
@@ -177,6 +178,9 @@ export const CASES = [
     answers: { [LABELS.ship]: 'error' }, steps: [step('ship', LABELS.ship, 'function ship(')] },
   { name: 'docs-only', branch: 'docs-only', expect: 'nothing', reasons: [], trust: true, tlc: false, why: 'docs only, every step confirmed',
     steps: [step('ship', LABELS.ship, 'function ship(')] },
+  // main against rule-break: the PR that undoes the break, so ShipsPaid broke at base and holds at head.
+  { name: 'rule-fixed', branch: 'main', base: 'rule-break', expect: 'look', reasons: ['rule-fixed', 'behavior-changed'], trust: true, tlc: true, why: 'ShipsPaid holds again: an order ships only once paid',
+    steps: [step('ship', LABELS.ship, 'function ship(', true), step('pay', LABELS.pay, 'function pay(')] },
   { name: 'untrusted', branch: 'noop-refactor', expect: 'look', reasons: ['not-run', 'not-run', 'not-run'], trust: false, tlc: false, why: 'without --trust-atlas the touched model doesn\'t run',
     steps: [step('pay', LABELS.pay, 'function pay(', true), step('ship', LABELS.ship, 'function ship(', true)] },
 ];
@@ -232,6 +236,6 @@ if (resolve(process.argv[1] || '') === fileURLToPath(import.meta.url)) {
   const { dir, repo, cases } = makeShop(process.argv[2] && resolve(process.argv[2]));
   console.log(`fixture in ${dir}\n`);
   for (const c of cases) {
-    console.log(`${c.name.padEnd(24)} ${c.expect.padEnd(8)} git -C ${repo} checkout -q ${c.branch} && docviz pr ${c.stepsFile} --pr ${PR_URL}${c.trust ? ' --trust-atlas' : ''}`);
+    console.log(`${c.name.padEnd(24)} ${c.expect.padEnd(8)} git -C ${repo} checkout -q ${c.branch} && docviz pr ${c.stepsFile} --pr ${PR_URL}${c.base ? ` --base ${c.base}` : ''}${c.trust ? ' --trust-atlas' : ''}`);
   }
 }
