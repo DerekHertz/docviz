@@ -2,10 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { contractFindings, digest, harnessDigest, isExecuted, judge, parseProfile, runHarness } from '../helper/contracts.js';
+import { contractFindings, digest, harnessDigest, isExecuted, judge, loadProfile, parseProfile, runHarness } from '../helper/contracts.js';
 import { verdict } from '../helper/verdict.js';
 
 const [contract] = parseProfile(readFileSync('test/fixtures/contracts/card-spend.json', 'utf8'));
@@ -105,4 +105,47 @@ test('a profile can’t grant authority, results, or a command', () => {
   for (const patch of [{ authority: 'human-confirmed' }, { status: 'supported-in-scope' }, { evidence: [] }, { check: { harness: 'card-spend', path: '/bin/sh' } }]) {
     assert.throws(() => parseProfile(JSON.stringify({ ...p, contracts: [{ ...p.contracts[0], ...patch }] })), /contract profile/, JSON.stringify(patch));
   }
+});
+
+test('a profile anywhere inside the reviewed checkout is refused, whatever its name or link; outside siblings load', () => {
+  const box = mkdtempSync(join(tmpdir(), 'docviz-boundary-'));
+  const root = join(box, 'repo');
+  const text = readFileSync('test/fixtures/contracts/card-spend.json', 'utf8');
+  const put = (p) => { mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); return p; };
+  mkdirSync(root);
+  const inside = /inside the reviewed checkout/;
+  assert.throws(() => loadProfile(put(join(root, 'profile.json')), root), inside, 'plain file inside');
+  assert.throws(() => loadProfile(put(join(root, '..profile.json')), root), inside, 'a name starting with .. is still inside');
+  assert.throws(() => loadProfile(put(join(root, '..contracts', 'p.json')), root), inside, 'a folder starting with .. is still inside');
+  symlinkSync(join(root, 'profile.json'), join(box, 'outside-link.json'));
+  assert.throws(() => loadProfile(join(box, 'outside-link.json'), root), inside, 'an outside link to an inside file');
+  const outside = put(join(box, 'repo-profiles', 'p.json'));
+  symlinkSync(outside, join(root, 'inside-link.json'));
+  assert.throws(() => loadProfile(join(root, 'inside-link.json'), root), inside, 'an inside link the author controls, even to an outside file');
+  symlinkSync(root, join(box, 'repo-alias'));
+  assert.throws(() => loadProfile(join(box, 'repo-alias', 'profile.json'), root), inside, 'the checkout reached through a linked path');
+  assert.throws(() => loadProfile(join(root, 'profile.json'), join(box, 'repo-alias')), inside, 'a linked root');
+  assert.equal(loadProfile(outside, root).contracts[0].id, 'card-spend-accounting', 'a sibling folder whose name starts with the checkout’s name is outside');
+  assert.equal(loadProfile(put(join(box, '..profile.json')), root).contracts[0].id, 'card-spend-accounting', 'a ..-named file beside the checkout is outside');
+});
+
+test('the harness records the ledger, card and page total it observed at each action', () => {
+  const frames = executed.observed.frames;
+  assert.ok(Array.isArray(frames), 'observed.frames is recorded');
+  assert.deepEqual(frames.map((f) => f.id), ['before-first-reply', 'after-failed-draw', 'after-retry-request', 'after-dismiss', 'after-late-return']);
+  assert.deepEqual(frames.map((f) => f.ledgerPaid), [0, 1, 1, 1, 2]);
+  assert.deepEqual(frames.map((f) => f.card.present), [true, true, true, false, false]);
+  assert.deepEqual(frames.map((f) => f.card.cost), [null, 1, 1, null, null]);
+  assert.deepEqual(frames.map((f) => f.pageTotal), [0, 1, 1, 0, 0]);
+  assert.equal(frames[1].card.status, 'error');
+  for (const f of frames) assert.ok(typeof f.action === 'string' && f.action, `${f.id} names its action`);
+  const last = frames.at(-1);
+  assert.deepEqual([executed.observed.ledgerPaid, executed.observed.pageTotalAfter], [last.ledgerPaid, last.pageTotal], 'final fields agree with the last frame');
+});
+
+test('recording frames changed the harness identity, so records from the earlier harness read stale', () => {
+  const earlier = '7b798249a12a5959c932e0f2f09b70bdc5f66362eb59e237626657d96d899031'; // card-spend.mjs before frames
+  assert.notEqual(earlier, harnessDigest('card-spend'));
+  assert.equal(executed.harness.digest, harnessDigest('card-spend'));
+  assert.deepEqual(status(judge(contract, facts({ currentHarness: earlier }))), ['stale', 'harness-changed']);
 });

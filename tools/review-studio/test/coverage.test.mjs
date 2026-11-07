@@ -47,6 +47,16 @@ test('an edited stored result is rejected: by fingerprint, or as a claim with no
  assert.throws(()=>validateCoverage({...p2,id:digest(p2)}),/operator-selected/);
 });
 
+test('the view carries only the frames the harness captured, and says so when there are none',t=>{
+ const real=realCoverage(t),[row]=coverageView(real).rows,recorded=real.obligations[0].evidence.observed.frames;
+ assert.ok(Array.isArray(recorded)&&recorded.length>=5,'the CLI result records frames');
+ assert.deepEqual(row.evidence.frames,recorded);
+ const reseal=edit=>{const copy=structuredClone(real);edit(copy);const {id,...payload}=copy;return{...payload,id:digest(payload)};};
+ assert.equal(coverageView(reseal(c=>{delete c.obligations[0].evidence.observed.frames;})).rows[0].evidence.frames,null);
+ assert.throws(()=>validateCoverage(reseal(c=>{c.obligations[0].evidence.observed.frames=[{action:'made up'}];})),/frames/);
+ assert.throws(()=>validateCoverage(reseal(c=>{c.obligations[0].evidence.observed.frames='after-late-return';})),/frames/);
+});
+
 test('a stack serves declared coverage through the same fingerprinted artifacts as evidence',async t=>{
  const real=realCoverage(t),root=mkdtempSync(join(tmpdir(),'docviz-stack-coverage-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
  const dir=join(root,'stacks','example');mkdirSync(join(dir,'artifacts'),{recursive:true});
