@@ -77,3 +77,19 @@ test('schema validation preserves empty graphs and inclusive single-line sources
  assert.equal(saved.map.id,again.map.id);assert.deepEqual(await maps.read(saved.map.id),saved.map);
  assert.deepEqual(saved.map.nodes[0].sources,[f.nodes[0].sources[0]]);
 });
+
+test('source ranges beyond their anchored blob cannot be stored or reused',async t=>{
+ const f=await fixture(t),maps=createSystemMapCache(f.data),badNode={...f.nodes[0],sources:[{...f.nodes[0].sources[0],from:999,to:999}]};
+ await assert.rejects(()=>maps.ensure(f.repository,f.a,[badNode],[]),/source range.*exceeds/i);
+ assert.equal((await maps.at(f.repository.id,f.a)).status,'missing');
+});
+
+test('a previously indexed out-of-file anchor is rejected before a cache hit is reused',async t=>{
+ const f=await fixture(t),maps=createSystemMapCache(f.data),saved=await maps.ensure(f.repository,f.a,[f.nodes[0]],[]),{id,...payload}=saved.map;
+ payload.nodes[0].sources[0].from=999;payload.nodes[0].sources[0].to=999;
+ payload.definitionHash=digest(canonicalForFixture({schema:1,nodes:payload.nodes,edges:payload.edges}));
+ const oldId=digest(canonicalForFixture(payload));
+ await writeFile(resolve(f.data,'system-maps','snapshots',oldId+'.json'),JSON.stringify({...payload,id:oldId}));
+ await writeFile(resolve(f.data,'system-maps','revisions',f.repository.id,f.a,payload.definitionHash+'.json'),JSON.stringify({id:oldId}));
+ await assert.rejects(()=>maps.ensure(f.repository,f.a,payload.nodes,payload.edges),/source range.*exceeds/i);
+});

@@ -36,7 +36,7 @@ Docviz #16 reuses five descriptions and updates one. Its controlled replay selec
 
 ## Reuse the stored system map
 
-Cached graph values are validated before storage and on read. Description fields must be strings, ports must be string arrays, and source ranges and graph endpoints must be valid. Extra sibling fields remain excluded. Valid version-1 maps retain their IDs; malformed cached records fail explicitly.
+Cached graph values are validated before storage and on read. Description fields must be strings, ports must be string arrays, and source ranges and graph endpoints must be valid. Extra sibling fields remain excluded. Source ranges are checked against their anchored Git blobs before a map is stored or reused. Valid version-1 maps retain their IDs; malformed cached records fail explicitly. Replay frames are loaded from fingerprint-verified immutable artifacts, so an altered inline copy cannot change a recorded output.
 
 Immutable snapshots live under `dataRoot/system-maps`. **Inspect stored copy** shows the revision, model ID and source fingerprints. New comparisons reference an exact baseline in the registered repository and overlay changed descriptions and connections. Competing models require an explicit map ID. There is no global latest-map fallback.
 

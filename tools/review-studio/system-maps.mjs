@@ -64,15 +64,18 @@ export function createSystemMapCache(dataRoot){
  }
  async function ensure(repository,commit,nodes,edges){
   const repositoryId=validRepo(repository.id);validCommit(commit);const graph=graphOf(nodes,edges),definitionHash=hash({schema:SCHEMA,...graph}),index=resolve(revisionPath(repositoryId,commit),definitionHash+'.json'),existing=await maybe(index);
-  if(existing){const map=await read(existing.id);if(map.repositoryId!==repositoryId||map.commit!==commit||map.definitionHash!==definitionHash)throw new Error('Stored map index does not match its snapshot.');return{map,status:'loaded'};}
+  const stored=existing?await read(existing.id):null;
+  if(stored&&(stored.repositoryId!==repositoryId||stored.commit!==commit||stored.definitionHash!==definitionHash))throw new Error('Stored map index does not match its snapshot.');
   if((await git(repository.path,['rev-parse','--verify',commit+'^{commit}'])).trim()!==commit)throw new Error('The mapped revision is not available in this repository.');
-  const refs=graph.nodes.flatMap(sourceRefs),files=new Map();
+  const refs=graph.nodes.flatMap(sourceRefs),files=new Map(),lineCounts=new Map();
   const blob=async(rev,path)=>{const key=rev+':'+path;if(!files.has(key)){const entry=await git(repository.path,['ls-tree','-z',rev,'--',path]);const match=entry.match(/^100\d+ blob ([a-f0-9]{40,64})\t/);files.set(key,match?match[1]:null);}return files.get(key);};
   const sourceFiles=[];for(const path of [...new Set(refs.map(s=>s.path))].sort())sourceFiles.push({path,blob:await blob(commit,path)});
   const current=new Map(sourceFiles.map(f=>[f.path,f.blob])),outdatedNodes=[];
-  for(const node of graph.nodes){let stale=false;for(const s of sourceRefs(node)){const origin=await blob(s.commit,s.path);if(!origin||origin!==current.get(s.path))stale=true;}if(stale)outdatedNodes.push(node.id);}
+  for(const node of graph.nodes){let stale=false;for(const s of sourceRefs(node)){const origin=await blob(s.commit,s.path);if(origin){if(!lineCounts.has(origin)){const bytes=await git(repository.path,['cat-file','blob',origin],{encoding:'buffer'});if(bytes.includes(0))throw new Error('Map source anchor refers to binary content: '+s.path);lineCounts.set(origin,bytes.toString('utf8').split('\n').length);}if(s.to>lineCounts.get(origin))throw new Error(`Map source range ${s.path}:${s.from}–${s.to} exceeds the anchored source at ${s.commit}.`);}if(!origin||origin!==current.get(s.path))stale=true;}if(stale)outdatedNodes.push(node.id);}
   const payload={schema:SCHEMA,repositoryId,commit,definitionHash,...graph,sourceFiles,outdatedNodes,coverage:{mappedPaths:sourceFiles.map(s=>s.path),basis:'Declared source anchors only; not exhaustive repository or dependency coverage.'},authority:'source-interpretation'};
-  const map={...payload,id:hash(payload)};await atomic(mapPath(map.id),map);await atomic(index,{id:map.id});return{map,status:'stored'};
+  const map={...payload,id:hash(payload)};
+  if(stored){if(stored.id!==map.id)throw new Error('Stored map metadata does not match its source context.');return{map:stored,status:'loaded'};}
+  await atomic(mapPath(map.id),map);await atomic(index,{id:map.id});return{map,status:'stored'};
  }
  async function assessment(repository,base,head){const match=await at(repository.id,base);if(!match.map)return{status:match.status,mapId:null};const candidate=await ensure(repository,head,match.map.nodes,match.map.edges),changedPaths=(await git(repository.path,['diff','--name-only','--no-renames',base,head])).trim().split('\n').filter(Boolean);return{status:'exact-base',mapId:match.map.id,base,head,overlay:compareMaps(match.map,candidate.map,changedPaths)};}
  async function forStack(stack){
