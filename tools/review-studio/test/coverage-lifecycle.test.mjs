@@ -197,6 +197,17 @@ test('clicking the omitted path opens the contract, its applicability, source an
  f.view.dispose();
 });
 
+test('Enter or Space on an SVG lifecycle event opens its contract through the shared action handler',async()=>{
+ for(const key of['Enter',' ']){
+  const f=mountView(world());let prevented=0;
+  const svgGroup={matches(){return true;},closest(){return{dataset:{behaviorAction:'obligation',id:'dismiss'}};}};
+  await f.host.onkeydown({key,preventDefault(){prevented++;},target:svgGroup});
+  assert.equal(prevented,1);assert.equal(f.dialog.open,true,`${JSON.stringify(key)} opens the drawer`);
+  assert.match(f.dialog.innerHTML,/card:dismiss/);
+  f.view.dispose();
+ }
+});
+
 test('missing coverage opens as uncertainty with no observed assertion',async()=>{
  const f=mountView(world({rows:[row({status:'unverified',tone:'pending',label:'Unverified',reason:'not-trusted',detail:'The pinned head was not trusted, so no harness ran.',evidence:null})]}));
  assert.doesNotMatch(f.host.innerHTML,/lifecycle-mark violation/);
