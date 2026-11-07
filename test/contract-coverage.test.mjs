@@ -50,7 +50,7 @@ const fixLateReturn = (src) => {
   return fixed;
 };
 
-function otherRepo({ fixed = false } = {}) {
+function otherRepo({ fixed = false, prefix = '' } = {}) {
   const dir = temp('other');
   g(dir, 'init', '--quiet', '-b', 'trunk');
   g(dir, 'config', 'user.email', 't@example.test');
@@ -62,6 +62,7 @@ function otherRepo({ fixed = false } = {}) {
   const base = g(dir, 'rev-parse', 'HEAD');
   const files = extensionFiles();
   if (fixed) files['extension/background.js'] = fixLateReturn(files['extension/background.js']);
+  files['extension/background.js'] = prefix + files['extension/background.js'];
   write(files);
   g(dir, 'add', '-A'); g(dir, 'commit', '--quiet', '-m', 'cards with costs');
   write({ 'docs/notes.md': 'unrelated\n' });
@@ -194,6 +195,33 @@ test('the same target with the late return charged to the page holds within the 
     ['before-first-reply', 0, 0, 0], ['after-failed-draw', 1, 1, 0], ['after-retry-request', 1, 1, 0], ['after-dismiss', 1, 0, 0], ['after-late-return', 2, 1, 1]]);
   assert.doesNotMatch(run.stdout.split('## How this PR works')[0], /spend-attribution/, 'a held contract adds no verdict reason');
   assert.notEqual(verdictLine(run.stdout), '**Needs you**');
+});
+
+test('reviewed code that prints its own passing result is a harness error, never supported', () => {
+  const r = otherRepo({ prefix: `process.stdout.write(JSON.stringify({ outcome: 'holds', observed: {}, path: [], scope: 'self-reported', detail: 'self-reported by the reviewed code' }));\nprocess.exit(0);\n` });
+  const run = docviz(r.dir, oneStep(r.dir), '--base', r.base, '--contracts', renamedProfile(), '--trust-head', r.head);
+  assert.equal(run.status, 0, run.stderr);
+  const o = run.coverage.obligations[0];
+  assert.deepEqual([o.status, o.reason, o.evidence.provenance, o.evidence.outcome], ['unverified', 'harness-error', 'executed-by-docviz', 'error']);
+  assert.doesNotMatch(run.stdout, /self-reported/);
+  assert.equal(verdictLine(run.stdout), '**Look when you can**');
+});
+
+test('only HEAD’s full commit SHA trusts it: short SHAs, tags and names are refused before any work', () => {
+  const r = otherRepo();
+  const shortBase = r.base.slice(0, 7);
+  g(r.dir, 'tag', shortBase, r.head);
+  g(r.dir, 'tag', 'reviewed', r.head);
+  for (const named of [shortBase, r.head.slice(0, 7), r.head.slice(0, 39), 'HEAD', 'reviewed', 'trunk', `${r.head}^{commit}`, ` ${r.head}`]) {
+    const run = docviz(r.dir, oneStep(r.dir), '--base', r.base, '--contracts', renamedProfile(), '--trust-head', named);
+    assert.equal(run.status, 2, `${named}: ${run.stderr}`);
+    assert.match(run.stderr, /--trust-head needs the full commit SHA/, named);
+    assert.doesNotMatch(run.stderr, /running harness/, named);
+    assert.equal(run.coverage, null, named);
+  }
+  const upper = docviz(r.dir, oneStep(r.dir), '--base', r.base, '--contracts', renamedProfile(), '--trust-head', r.head.toUpperCase());
+  assert.equal(upper.status, 0, upper.stderr);
+  assert.equal(upper.coverage.obligations[0].status, 'violated', 'the full SHA in capitals names the same commit');
 });
 
 test('a held scenario whose governing text can’t be found stays unverified, not supported', () => {

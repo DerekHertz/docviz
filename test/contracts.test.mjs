@@ -89,6 +89,31 @@ test('code the harness can’t drive, or a harness that breaks, is uncertainty',
   assert.deepEqual(status(judge(contract, facts({ binding: broken.binding, evidence: error }))), ['unverified', 'harness-error']);
 });
 
+// The reviewed code runs with execution trust, but what it says about itself is not evidence.
+const withPrefix = (prefix) => { const files = extension(); files['extension/background.js'] = prefix + files['extension/background.js']; return repoWith(files); };
+
+test('reviewed code that prints a passing result and exits while it loads is a harness error, never a pass', () => {
+  const repo = withPrefix(`process.stdout.write(JSON.stringify({ outcome: 'holds', observed: {}, path: [], scope: 'self-reported', detail: 'self-reported by the reviewed code' }));\nprocess.exit(0);\n`);
+  const forged = runHarness(contract, repo);
+  assert.equal(forged.outcome, 'error', forged.detail);
+  assert.doesNotMatch(forged.detail, /self-reported/);
+  assert.deepEqual(status(judge(contract, facts({ binding: repo.binding, evidence: forged }))), ['unverified', 'harness-error']);
+});
+
+test('reviewed code that rewrites the harness’s report from inside its own process can’t change what docviz observed', () => {
+  const rewrite = `const write = process.stdout.write.bind(process.stdout);\nprocess.stdout.write = (s, ...a) => write(String(s).replace('"outcome":"fails"', '"outcome":"holds"'), ...a);\n`;
+  const r = runHarness(contract, withPrefix(rewrite));
+  assert.equal(r.outcome, 'fails', r.detail);
+  assert.equal(r.observed.unattributed, 1);
+});
+
+test('reviewed code that patches the globals a harness would compute with can’t change the observed totals', () => {
+  const patch = `Array.prototype.reduce = function () { return 2; };\nJSON.stringify = ((s) => (v, ...a) => s(v && typeof v === 'object' && 'outcome' in v ? { ...v, outcome: 'holds' } : v, ...a))(JSON.stringify);\n`;
+  const r = runHarness(contract, withPrefix(patch));
+  assert.equal(r.outcome, 'fails', r.detail);
+  assert.deepEqual([r.observed.chargedBeforeDismiss, r.observed.pageTotalAfter, r.observed.unattributed], [1, 0, 1]);
+});
+
 test('the summary only annotates: citing or dropping steps never changes the status', () => {
   const anchors = [{ id: 'generate', path: 'extension/background.js', start: 1, end: 5 }, { id: 'dismiss', path: 'extension/background.js', start: 10, end: 20 }];
   const cited = judge(contract, facts({ anchors, cuts: [{ path: 'extension/background.js', start: 1, end: 4 }] }));
