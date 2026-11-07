@@ -137,3 +137,19 @@ npm test
 ```
 
 [Architecture](ARCHITECTURE.md) describes the source and persistence boundaries. The earlier historical prototype remains in the sibling `docviz-review` folder.
+
+## Play the behavior changes in PR #18
+
+The workspace opens a behavior diagram when exactly one prepared stack matches its repository, base and candidate. Select a module, play the recorded input → transformation → output, then click the output for its claim, visual assertion, implementation/test lines and raw capture. Other modules expose their inputs, outputs and source without borrowing a scenario from elsewhere.
+
+Prepare the Docviz example from the repository root:
+
+```sh
+node tools/review-studio/examples/stack/prepare-pr18.mjs \
+  "$PWD" .scratch/review-studio .scratch/pr18-captures "$(git rev-parse HEAD)"
+npm run review:studio
+```
+
+Open a comparison from `c31d97dd082d887bc108a22f91dcd36aa47ebe16` to the same candidate SHA. **Whole PR** shows the studio as an addition alongside the existing CLI. **Review fixes inside this PR** compares the initial PR checkpoint with the candidate. These are two checkpoints of PR #18, not two stacked PRs.
+
+The three rerunnable cases demonstrate malformed cache rejection, uncertainty for insufficient source context, and canonical evidence display. The latter two supply controlled provider scores/evidence records to real exported functions; they are not new live Jev judgments or an executed failing command. Captures bind their harness, exact Git blobs, inputs and outputs. The semantic map is curated source interpretation; it does not claim exhaustive dependency or runtime coverage. Missing captures, incompatible harnesses and historical source judgments remain explicit.

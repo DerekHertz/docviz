@@ -74,10 +74,10 @@ export async function startServer({dataRoot=resolve(process.env.DOCVIZ_REVIEW_DA
     if(req.method==='POST'&&path==='/api/open-github-comparison'){const body=await parseBody(req);response(res,202,await launchJob(null,'Open GitHub branch comparison',()=>openComparison(body.url),{githubUrl:body.url}));return;}
     if(req.method==='POST'&&path==='/api/open-pr'){const body=await parseBody(req);response(res,202,await launchJob(null,'Open GitHub PR',()=>openPR(body.url),{prUrl:body.url}));return;}
     const jobRoute=path.match(/^\/api\/jobs\/([\w-]+)$/);if(req.method==='GET'&&jobRoute){const job=jobs.get(jobRoute[1]);if(!job)throw new Error('Unknown job.');response(res,200,job);return;}
-    const route=path.match(/^\/api\/reviews\/([a-f0-9]+)(?:\/(source|diff|context|export|actions))?$/);
+    const route=path.match(/^\/api\/reviews\/([a-f0-9]+)(?:\/(source|diff|context|export|actions|behavior))?$/);
     if(route){const [,id,part]=route;
      if(req.method==='GET'){
-      const value=part==='source'?await workspace.source(id,url.searchParams.get('path'),url.searchParams.get('side')||'head'):part==='diff'?await workspace.diff(id,url.searchParams.get('path')):part==='context'?{context:await workspace.context(id),schema:contributionSchema}:part==='export'?await workspace.export(id):await workspace.read(id);response(res,200,value);return;
+      const value=part==='behavior'?await stacks.forReview(await workspace.read(id)):part==='source'?await workspace.source(id,url.searchParams.get('path'),url.searchParams.get('side')||'head'):part==='diff'?await workspace.diff(id,url.searchParams.get('path')):part==='context'?{context:await workspace.context(id),schema:contributionSchema}:part==='export'?await workspace.export(id):await workspace.read(id);response(res,200,value);return;
      }
      if(req.method==='POST'&&part==='actions'){
       const body=await parseBody(req);let value;

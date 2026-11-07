@@ -36,6 +36,12 @@ export function createStackStore(dataRoot){
   const mapped=await maps.forStack(stack);return{...stack,...mapped,claims:stack.claims||[],evidence,captures,jevConfigured:!!process.env.TYPESAFE_API_KEY};
  };
  return{
+  async forReview(doc){
+   let names;try{names=await readdir(resolve(dataRoot,'stacks'));}catch(e){if(e.code==='ENOENT')return{status:'missing'};throw e;}
+   const matches=[];for(const id of names){let candidate;try{candidate=await load(id);}catch{continue;}if(candidate.repository?.id===doc.repository.id&&candidate.target===doc.snapshot.base.commit&&candidate.tip===doc.snapshot.head.commit)matches.push(id);}
+   if(matches.length!==1)return{status:matches.length?'ambiguous':'missing',stackIds:matches};
+   return{status:'available',stack:await readStack(matches[0])};
+  },
   async list(){let names;try{names=await readdir(resolve(dataRoot,'stacks'));}catch(e){if(e.code==='ENOENT')return[];throw e;}const rows=[];for(const id of names)try{const s=await load(id);rows.push({id:s.id,title:s.title,repositoryName:s.repository?.name||s.repositoryName||'Repository',kind:s.kind,numbers:(s.layers||[]).map(l=>l.number)});}catch{}return rows;},
   read:readStack,
   map:id=>maps.read(id),

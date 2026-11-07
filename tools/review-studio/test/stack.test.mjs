@@ -84,3 +84,10 @@ test('command cards derive test counts from canonical output and reject corrupt 
  const card=(await f.store.read('fixture')).evidence[0];assert.equal(card.result,'pass');assert.equal(card.summary,'pass 66 · fail 0 · skipped 14');
  await f.saveRecord({...record,exitCode:1});await assert.rejects(()=>f.store.read('fixture'),/fingerprint/);
 });
+
+test('a workspace diagram binds to its exact repository, base and candidate',async t=>{
+ const f=await replayFixture(t),doc={repository:f.world.repository,snapshot:{base:{commit:f.world.target},head:{commit:f.world.tip}}};
+ assert.equal((await f.store.forReview(doc)).status,'available');
+ for(const changed of [{...doc,repository:{...doc.repository,id:'f'.repeat(24)}},{...doc,snapshot:{...doc.snapshot,base:{commit:'e'.repeat(40)}}},{...doc,snapshot:{...doc.snapshot,head:{commit:'d'.repeat(40)}}}])assert.equal((await f.store.forReview(changed)).status,'missing');
+ f.world.captures[0].frames[0].output.level='nothing';await f.saveWorld();assert.equal((await f.store.forReview(doc)).stack.captures[0].frames[0].output.level,'needs');
+});
