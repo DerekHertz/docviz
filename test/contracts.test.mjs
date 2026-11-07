@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -19,8 +20,9 @@ function repoWith(files) {
   const head = g('rev-parse', 'HEAD').trim();
   return { gitRaw: (...a) => g(...a), gitBuffer: (...a) => execFileSync('git', a, { cwd: dir }), binding: { repositoryRoot: head, base: 'b'.repeat(40), head } };
 }
+// Every top-level extension file, so the side panel's page, modules and manifest entry are the committed ones.
 const extension = () => ({ 'package.json': '{ "type": "module" }\n',
-  ...Object.fromEntries(readdirSync('extension').filter((f) => f.endsWith('.js')).map((f) => [`extension/${f}`, readFileSync(join('extension', f), 'utf8')])) });
+  ...Object.fromEntries(readdirSync('extension', { withFileTypes: true }).filter((d) => d.isFile()).map((d) => [`extension/${d.name}`, readFileSync(join('extension', d.name), 'utf8')])) });
 
 const target = repoWith(extension());
 const executed = runHarness(contract, target);
@@ -83,7 +85,7 @@ test('code the harness can’t drive, or a harness that breaks, is uncertainty',
   const inapplicable = runHarness(contract, bare);
   assert.equal(inapplicable.outcome, 'inapplicable');
   assert.deepEqual(status(judge(contract, facts({ binding: bare.binding, evidence: inapplicable }))), ['unverified', 'surface-missing']);
-  const broken = repoWith({ 'package.json': '{ "type": "module" }\n', 'extension/background.js': 'throw new Error("boom")\n', 'extension/sidepanel.js': 'const page = cards.reduce((t, c) => t + (c.cost?.usd || 0), 0);\n' });
+  const broken = repoWith({ ...extension(), 'extension/background.js': 'throw new Error("boom")\n' });
   const error = runHarness(contract, broken);
   assert.equal(error.outcome, 'error');
   assert.deepEqual(status(judge(contract, facts({ binding: broken.binding, evidence: error }))), ['unverified', 'harness-error']);
@@ -135,11 +137,112 @@ test('a page total with anything beyond the supported sum is uncertainty, never 
   ]) assert.equal(runHarness(contract, withPage(expr)).outcome, 'inapplicable', expr);
 });
 
-test('the supported page total is computed by docviz, whatever the reviewed code names its parameters', () => {
-  const renamed = runHarness(contract, withPage(`cards.reduce( (sum,card)=>sum + ( card.cost?.usd||0 ),state.unassigned||0 )`));
-  assert.deepEqual([renamed.outcome, renamed.observed.frames.map((f) => f.pageTotal)], ['fails', [0, 1, 1, 0, 0]]);
-  const noUnassigned = runHarness(contract, withPage(`cards.reduce((t, c) => t + (c.cost?.usd || 0), 0)`));
-  assert.equal(noUnassigned.outcome, 'fails', 'a page that leaves out unassigned spend is observed, not skipped');
+test('scope: only the known side panel is supported, so even a benign rewrite of its page total is uncertainty with no totals', () => {
+  // Until 2026-11-07 these read `fails` through a source recognizer. A recognizer can't tell which line runs
+  // (see the decoy tests), so any side panel other than the inspected one is surface-missing now.
+  for (const expr of [`cards.reduce( (sum,card)=>sum + ( card.cost?.usd||0 ),state.unassigned||0 )`, `cards.reduce((t, c) => t + (c.cost?.usd || 0), 0)`]) {
+    const r = runHarness(contract, withPage(expr));
+    assert.equal(r.outcome, 'inapplicable', `${expr}: ${r.outcome} ${r.detail}`);
+    assert.equal(r.observed.frames, undefined, `${expr}: no page totals for a side panel docviz doesn't know`);
+  }
+});
+
+// The independent final review's decoys (2026-11-07): the late return is charged to the page, but the side panel
+// shown in Chrome leaves unassigned spend out, or never receives it.
+const fixLateReturn = (src) => {
+  const fixed = src
+    .replace('    const cur = await getCard(key);\n    // A new diagram', '    const cur = await getCard(key);\n    if (!cur) return unassign(rec.tabId, usage);\n    // A new diagram')
+    .replace('    const cur = await getCard(key);\n    if (!cur) return;', '    const cur = await getCard(key);\n    if (!cur) return unassign(rec.tabId, e.usage);')
+    .replace('async function dismiss(key) {', 'async function unassign(tabId, usage) {\n  if (!usage) return;\n  const state = await getTab(tabId);\n  state.unassigned = (state.unassigned || 0) + usage.usd;\n  await putTab(tabId, state);\n}\n\nasync function dismiss(key) {');
+  assert.equal((fixed.match(/unassign\(/g) || []).length, 3, 'the late-return fix applies to this background.js');
+  return fixed;
+};
+const swap = (files, path, from, to) => {
+  assert.ok(files[path]?.includes(from), `${path} has ${from.slice(0, 60)}`);
+  files[path] = files[path].replace(from, to);
+};
+/** A target with the late return fixed in background.js, then `edit` applied to its files. */
+const fixedWith = (edit = () => {}) => { const files = extension(); files['extension/background.js'] = fixLateReturn(files['extension/background.js']); edit(files); return repoWith(files); };
+const REAL_PAGE = 'const page = cards.reduce((t, c) => t + (c.cost?.usd || 0), state.unassigned || 0);';
+const NO_UNASSIGNED = 'const page = cards.reduce((t, c) => t + (c.cost?.usd || 0), 0);';
+const totals = (r) => r.observed.frames?.map((f) => f.pageTotal);
+const PANEL_GET = '    return { state, cards };\n  },\n  \'panel:breakdown\'';
+
+test('control: the fixed late return, read through the known side panel, holds; the genuine gap fails', () => {
+  const fixed = runHarness(contract, fixedWith());
+  assert.deepEqual([fixed.outcome, totals(fixed), fixed.observed.unattributed], ['holds', [0, 1, 1, 0, 1], 0], fixed.detail);
+  assert.deepEqual([executed.outcome, totals(executed), executed.observed.unattributed], ['fails', [0, 1, 1, 0, 0], 1]);
+});
+
+test('a commented-out or unused copy of the known page total doesn’t make another side panel supported', () => {
+  const decoys = {
+    comment: (f) => { swap(f, 'extension/sidepanel.js', REAL_PAGE, NO_UNASSIGNED); swap(f, 'extension/sidepanel.js', "  $('empty').hidden = cards.length > 0;\n", `  $('empty').hidden = cards.length > 0;\n  // was: ${REAL_PAGE}\n`); },
+    'dead function': (f) => { swap(f, 'extension/sidepanel.js', REAL_PAGE, NO_UNASSIGNED); f['extension/sidepanel.js'] = `function legacyTotal(cards, state) {\n  ${REAL_PAGE}\n  return page;\n}\n${f['extension/sidepanel.js']}`; },
+  };
+  for (const [name, edit] of Object.entries(decoys)) {
+    const r = runHarness(contract, fixedWith(edit));
+    assert.equal(r.outcome, 'inapplicable', `${name}: ${r.outcome} ${r.detail}`);
+    assert.match(r.detail, /side panel/, name);
+    assert.equal(r.observed.frames, undefined, `${name}: no page totals`);
+  }
+});
+
+test('the page total is what the known side panel computes from panel:get’s reply, not from raw storage', () => {
+  const r = runHarness(contract, fixedWith((f) => swap(f, 'extension/background.js', PANEL_GET, "    return { state: { keys: state.keys, status: state.status }, cards };\n  },\n  'panel:breakdown'")));
+  assert.deepEqual([r.outcome, totals(r), r.observed.unattributed], ['fails', [0, 1, 1, 0, 0], 1], r.detail);
+  assert.equal(r.observed.frames.at(-1).unassigned, 0, 'the frame records what the side panel received');
+});
+
+test('a side panel whose page, modules or manifest entry differ from the known one is uncertainty, with no totals', () => {
+  const edits = {
+    'a module changes Array.prototype.reduce': (f) => { f['extension/prefs-form.js'] = `const __reduce = Array.prototype.reduce;\nArray.prototype.reduce = function (fn) { return __reduce.call(this, fn, 0); };\n${f['extension/prefs-form.js']}`; },
+    'settings.js changes': (f) => swap(f, 'extension/settings.js', "return `${estimated ? '~' : ''}$${v}`;", "return '$0.00';"),
+    'the page loads another script': (f) => swap(f, 'extension/sidepanel.html', '<script type="module" src="sidepanel.js"></script>', '<script src="extra.js"></script>\n  <script type="module" src="sidepanel.js"></script>'),
+    'the manifest names another page': (f) => swap(f, 'extension/manifest.json', '"default_path": "sidepanel.html"', '"default_path": "other.html"'),
+    'the stylesheet is missing': (f) => { delete f['extension/ui.css']; },
+  };
+  for (const [name, edit] of Object.entries(edits)) {
+    const r = runHarness(contract, fixedWith(edit));
+    assert.equal(r.outcome, 'inapplicable', `${name}: ${r.outcome} ${r.detail}`);
+    assert.equal(r.observed.frames, undefined, `${name}: no page totals`);
+  }
+});
+
+test('a panel:get reply the known side panel can’t read is a harness error, never a total', () => {
+  const replies = {
+    'no value': '    return undefined;\n',
+    'no cards': '    return { state };\n',
+    'no state': '    return { cards };\n',
+    'cards not a list': '    return { state, cards: Object.fromEntries(cards.map((c) => [c.key, c])) };\n',
+    'a card without a section': '    return { state, cards: cards.map((c) => ({ ...c, section: undefined, popover: false })) };\n',
+    'unassigned as text': '    return { state: { ...state, unassigned: String(state.unassigned || 0) }, cards };\n',
+    'a cost the panel can’t print': '    return { state, cards: cards.map((c) => ({ ...c, cost: c.cost && { ...c.cost, usd: String(c.cost.usd) } })) };\n',
+    'an error reply': "    throw new Error('panel unavailable');\n",
+  };
+  for (const [name, body] of Object.entries(replies)) {
+    const r = runHarness(contract, fixedWith((f) => swap(f, 'extension/background.js', PANEL_GET, `${body}  },\n  'panel:breakdown'`)));
+    assert.equal(r.outcome, 'error', `${name}: ${r.outcome} ${r.detail}`);
+    assert.match(r.detail, /side panel/, name);
+  }
+});
+
+test('reviewed code that answers panel:get over the harness channel itself is a harness error', () => {
+  const forge = `process.on('message', (m) => { if (m?.message?.type === 'panel:get') process.send({ type: 'sent', seq: m.seq, ok: true, response: { ok: true, value: { state: { keys: [], unassigned: 2 }, cards: [] } } }); });\n`;
+  const r = runHarness(contract, withPrefix(forge));
+  assert.equal(r.outcome, 'error', r.detail);
+});
+
+test('the known side panel is this repository’s committed one, by content hash and git blob, and part of the harness identity', async () => {
+  const { KNOWN_PANELS } = await import('../helper/contracts/card-spend-panel.mjs');
+  const { HARNESSES } = await import('../helper/contracts.js');
+  assert.ok(HARNESSES['card-spend'].parts.some((p) => p.endsWith('card-spend-panel.mjs')));
+  const blobOf = (b) => createHash('sha1').update(`blob ${b.length}\0`).update(b).digest('hex');
+  const here = KNOWN_PANELS.find((k) => Object.entries(k.files).every(([p, f]) => {
+    const b = readFileSync(p);
+    return createHash('sha256').update(b).digest('hex') === f.sha256 && blobOf(b) === f.blob;
+  }));
+  assert.ok(here, 'extension/ at this head is a registered side panel');
+  assert.deepEqual(Object.keys(here.files).sort(), ['extension/prefs-form.js', 'extension/settings.js', 'extension/sidepanel.html', 'extension/sidepanel.js', 'extension/ui.css']);
 });
 
 test('reviewed background code that sends a result-shaped message or exits mid-scenario is a harness error', () => {

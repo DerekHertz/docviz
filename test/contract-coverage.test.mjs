@@ -39,8 +39,9 @@ function pr1Checkout() {
 }
 
 // A different repository, origin, contract id and summary, built from this checkout's extension code.
-const extensionFiles = () => Object.fromEntries(readdirSync('extension').filter((f) => f.endsWith('.js'))
-  .map((f) => [`extension/${f}`, readFileSync(join('extension', f), 'utf8')]));
+// Every top-level extension file, so the side panel's page, modules and manifest entry are the committed ones.
+const extensionFiles = () => Object.fromEntries(readdirSync('extension', { withFileTypes: true }).filter((d) => d.isFile())
+  .map((d) => [`extension/${d.name}`, readFileSync(join('extension', d.name), 'utf8')]));
 const fixLateReturn = (src) => {
   const fixed = src
     .replace("    const cur = await getCard(key);\n    // A new diagram", "    const cur = await getCard(key);\n    if (!cur) return unassign(rec.tabId, usage);\n    // A new diagram")
@@ -50,7 +51,7 @@ const fixLateReturn = (src) => {
   return fixed;
 };
 
-function otherRepo({ fixed = false, prefix = '' } = {}) {
+function otherRepo({ fixed = false, prefix = '', edit = () => {} } = {}) {
   const dir = temp('other');
   g(dir, 'init', '--quiet', '-b', 'trunk');
   g(dir, 'config', 'user.email', 't@example.test');
@@ -63,6 +64,7 @@ function otherRepo({ fixed = false, prefix = '' } = {}) {
   const files = extensionFiles();
   if (fixed) files['extension/background.js'] = fixLateReturn(files['extension/background.js']);
   files['extension/background.js'] = prefix + files['extension/background.js'];
+  edit(files);
   write(files);
   g(dir, 'add', '-A'); g(dir, 'commit', '--quiet', '-m', 'cards with costs');
   write({ 'docs/notes.md': 'unrelated\n' });
@@ -195,6 +197,32 @@ test('the same target with the late return charged to the page holds within the 
     ['before-first-reply', 0, 0, 0], ['after-failed-draw', 1, 1, 0], ['after-retry-request', 1, 1, 0], ['after-dismiss', 1, 0, 0], ['after-late-return', 2, 1, 1]]);
   assert.doesNotMatch(run.stdout.split('## How this PR works')[0], /spend-attribution/, 'a held contract adds no verdict reason');
   assert.notEqual(verdictLine(run.stdout), '**Needs you**');
+});
+
+// The independent final review's false passes at e3366da, through the CLI.
+const REAL_PAGE = 'const page = cards.reduce((t, c) => t + (c.cost?.usd || 0), state.unassigned || 0);';
+const swapIn = (files, path, from, to) => { assert.ok(files[path].includes(from), `${path} has ${from.slice(0, 60)}`); files[path] = files[path].replace(from, to); };
+
+test('the fixed late return with a panel:get that drops unassigned spend reads Needs you: the side panel never shows it', () => {
+  const r = otherRepo({ fixed: true, edit: (f) => swapIn(f, 'extension/background.js', '    return { state, cards };', '    return { state: { keys: state.keys, status: state.status }, cards };') });
+  const run = docviz(r.dir, oneStep(r.dir), '--base', r.base, '--contracts', renamedProfile(), '--trust-head', r.head);
+  assert.equal(run.status, 0, run.stderr);
+  const o = run.coverage.obligations[0];
+  assert.deepEqual([o.status, o.reason, o.evidence.observed.frames.map((f) => f.pageTotal)], ['violated', 'executed-fails', [0, 1, 1, 0, 0]]);
+  assert.equal(verdictLine(run.stdout), '**Needs you**');
+});
+
+test('a commented canonical page total above a side panel that drops unassigned spend reads Look, never held', () => {
+  const r = otherRepo({ fixed: true, edit: (f) => {
+    swapIn(f, 'extension/sidepanel.js', REAL_PAGE, 'const page = cards.reduce((t, c) => t + (c.cost?.usd || 0), 0);');
+    swapIn(f, 'extension/sidepanel.js', "  $('empty').hidden = cards.length > 0;\n", `  $('empty').hidden = cards.length > 0;\n  // was: ${REAL_PAGE}\n`);
+  } });
+  const run = docviz(r.dir, oneStep(r.dir), '--base', r.base, '--contracts', renamedProfile(), '--trust-head', r.head);
+  assert.equal(run.status, 0, run.stderr);
+  const o = run.coverage.obligations[0];
+  assert.deepEqual([o.status, o.reason, o.evidence.outcome, o.evidence.observed.frames], ['unverified', 'surface-missing', 'inapplicable', undefined]);
+  assert.equal(verdictLine(run.stdout), '**Look when you can**');
+  assert.match(run.stdout, /Contracts not checked at this head: `spend-attribution`/);
 });
 
 test('reviewed code that prints its own passing result is a harness error, never supported', () => {
