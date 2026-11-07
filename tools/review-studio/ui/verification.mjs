@@ -4,6 +4,7 @@ export function sourceJudgmentPresentation(evidence){
   label:evidence.uncertaintyReason==='insufficient-source-context'?'Source context uncertain':'Source judgment uncertain',tone:'pending',
   detail:evidence.uncertaintyReason==='insufficient-source-context'?'The supplied source context is insufficient to establish or refute this claim. Add the relevant code and reassess.':'The supplied source did not yield a conclusive support or contradiction judgment. Inspect the claim and recorded scores.'
  };
+ if(evidence.result==='unknown'&&evidence.requestSent===false)return{label:'Source unavailable',tone:'pending',detail:'No Jev request was made because the source packet could not be read. Inspect the missing source and recorded limits.'};
  if(evidence.result==='unknown')return{label:'Source check incomplete',tone:'pending',detail:'The model response did not contain valid scores for every required question. No support or contradiction is established.'};
  if(evidence.result==='contradicts')return{label:'Source contradiction',tone:'bad',detail:'The recorded model judgment flags a conflict with the supplied source. Inspect its scope and evidence before treating it as a code finding.'};
  if(evidence.result==='supports')return{label:'Source support',tone:'neutral',detail:'The model supports this source-linked claim. Runtime behavior remains a separate question.'};

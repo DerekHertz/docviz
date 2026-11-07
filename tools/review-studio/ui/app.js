@@ -1,3 +1,4 @@
+import {sourceContextDetails} from './source-context.mjs';
 import {createBehaviorView} from './behavior.js';
 import {request,surfaceContext} from './transport.mjs';
 import {verificationFor,verificationSummary,sourceJudgmentPresentation} from './verification.mjs';
@@ -7,7 +8,7 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const short=sha=>sha?.slice(0,7)||'—';
 const badge=(label,kind='')=>`<span class="badge ${kind}">${esc(label)}</span>`;
 const evidenceBadge=e=>{const p=sourceJudgmentPresentation(e);return badge(p.label,p.tone);};
-function sourceJudgmentDetails(e){if(e.kind!=='source-judgment')return '';const p=sourceJudgmentPresentation(e),score=v=>v==null?'not returned':String(v);return `<div class="source-judgment-detail ${p.tone}"><p>${esc(p.detail)}</p><p>Source context sufficient: ${e.criteriaVersion?esc(score(e.contextSufficient)):'not assessed under the original criteria'} · support: ${esc(score(e.supported))} · contradiction: ${esc(score(e.contradicted))}.</p><small>Criteria: ${esc(e.criteriaVersion||'original two-question assessment')}. These are model judgments, not measured pass rates.</small></div>`;}
+function sourceJudgmentDetails(e){if(e.kind!=='source-judgment')return '';const p=sourceJudgmentPresentation(e),score=v=>v==null?'not returned':String(v);return `<div class="source-judgment-detail ${p.tone}"><p>${esc(p.detail)}</p><p>Source context sufficient: ${e.criteriaVersion?esc(score(e.contextSufficient)):'not assessed under the original criteria'} · support: ${esc(score(e.supported))} · contradiction: ${esc(score(e.contradicted))}.</p><small>Criteria: ${esc(e.criteriaVersion||'original two-question assessment')}. These are model judgments, not measured pass rates.</small>${sourceContextDetails(e)}</div>`;}
 const state={boot:null,doc:null,selected:null,mode:'world',level:'verify',inspector:'overview',lens:'change',search:'',file:null,fileMode:'diff',sourceCache:new Map(),modal:null,stack:[],reviewDraft:null,jobs:[],busy:false};
 let toastTimer,saveTimer,pendingPatch={},mutationQueue=Promise.resolve(),lastNodeClick={id:null,at:0};
 const behaviorView=createBehaviorView({api,onProperty:id=>modal('property',{id}),onAgents:()=>modal('agents'),onReview:()=>modal('review'),onFiles:()=>modal('snapshot'),onOpenComparison:async({base,head,intent})=>{const doc=await api('/api/open',{repositoryId:state.doc.repository.id,baseRef:base,headRef:head,intent});await bootstrap();await openReview(doc.id);}});

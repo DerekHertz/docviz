@@ -1,0 +1,9 @@
+// Inspect what the source judge actually received; this manifest does not establish completeness.
+const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export function sourceContextDetails(evidence){
+ if(evidence.kind!=='source-judgment')return '';
+ const context=evidence.sourceContext;
+ if(!context)return '<p class="source-note">This earlier judgment retained anchor references only. Its exact submitted source packet is unavailable.</p>';
+ const files=context.files||[],omissions=context.omissions||[];
+ return `<details class="source-context-packet"><summary>${evidence.requestSent===false?'Source unavailable · no Jev request':'Inspect the source supplied to Jev'} · ${files.length} files · ${omissions.length} omissions</summary><p>Selection: ${esc(context.version)} · ${esc(context.bytes)} bytes. Selected context is not a complete dependency or behavior proof.</p><p><code>${esc(context.digest)}</code> · fingerprint of the submitted source text, not an authenticated signature.</p><ul>${files.map(f=>`<li><code>${esc(f.path)}</code> · ${esc(f.side)} ${esc(f.commit?.slice(0,7)||'commit not supplied')} · lines ${esc(f.from)}–${esc(f.to)} · blob ${esc(f.blob||'not supplied')}<br><small>${esc(Array.isArray(f.includedBecause)?f.includedBecause.join('; '):f.includedBecause)}</small></li>`).join('')}</ul>${omissions.length?`<p>Context left out or unavailable:</p><ul>${omissions.map(o=>`<li><code>${esc(o.path||o.specifier||'source')}</code> · ${esc(o.reason)}</li>`).join('')}</ul>`:'<p>No omission was recorded by this bounded selector. Callers, runtime state and unsupported relationships may still be absent.</p>'}<details><summary>Exact submitted source packet</summary><pre class="source-block">${esc(context.code)}</pre></details></details>`;
+}

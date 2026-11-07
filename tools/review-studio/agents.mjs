@@ -3,6 +3,7 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { digest } from './git.mjs';
+import { buildSourceBundle } from './source-context.mjs';
 const object=properties=>({type:'object',additionalProperties:false,properties,required:Object.keys(properties)});
 const array=items=>({type:'array',items});
 const string={type:'string'};
@@ -72,11 +73,18 @@ export async function judgeClaims(doc,readSource,recordEvidence) {
  const targets=doc.properties.filter(p=>p.sources.length).slice(0,20);if(!targets.length)throw new Error('Add source-linked properties before asking Jev to check their claims.');
  const propertyDefinitions=Object.fromEntries(targets.map(property=>[property.id,digest(property)]));
  let latest;
- for(const property of targets){const cuts=[];for(const ref of property.sources.slice(0,4)){const src=await readSource(ref.path,ref.side);cuts.push(`${ref.path}:${ref.from}-${ref.to}\n${src.text.split('\n').slice(ref.from-1,ref.to).join('\n')}`);}
+ const availablePaths=doc.snapshot?.tree?Object.fromEntries(['base','head'].map(side=>[side,new Set(doc.snapshot.tree[side].filter(f=>f.type==='blob'&&/^100/.test(f.mode)).map(f=>f.path))])):undefined;
+ for(const property of targets){
+  const component=doc.components?.find(c=>c.id===property.componentId),sides=[...new Set(property.sources.map(ref=>ref.side))];
+  const supportSources=sides.flatMap(side=>(component?.files||[]).map(path=>({side,path,includedBecause:'component:'+component.id})));
+  const sourceContext=await buildSourceBundle(property,readSource,{supportSources,availablePaths,snapshotId:doc.snapshot?.id,repositoryId:doc.snapshot?.repositoryId,expectedCommits:doc.snapshot?Object.fromEntries(['base','head'].map(side=>[side,doc.snapshot[side]?.commit])):undefined});
   const label=`When ${property.condition}, ${property.expectation}`;
-  const response=await fetch('https://api.typesafe.ai/v1/systemone',{method:'POST',headers:{authorization:`Bearer ${key}`,'content-type':'application/json'},body:JSON.stringify(sourceJudgmentRequest(label,cuts.join('\n\n'))),signal:AbortSignal.timeout(30000)});
+  if(!sourceContext.readableSeeds){
+   latest=await recordEvidence({kind:'source-judgment',propertyIds:[property.id],propertyDefinitions:{[property.id]:propertyDefinitions[property.id]},result:'unknown',uncertaintyReason:'source-unavailable',supported:null,contradicted:null,contextSufficient:null,criteriaVersion:'source-context-v2',thresholds:{...sourceThresholds},label,sources:property.sources,sourceContext,sourceSnapshotId:doc.snapshot?.id??null,requestSent:false,scope:'Source packet could not retain readable claim anchors; Jev was not called.',usage:null,actor:{kind:'local-process',name:'Source context builder',role:'verifier'}});continue;
+  }
+  const response=await fetch('https://api.typesafe.ai/v1/systemone',{method:'POST',headers:{authorization:`Bearer ${key}`,'content-type':'application/json'},body:JSON.stringify(sourceJudgmentRequest(label,sourceContext.code)),signal:AbortSignal.timeout(30000)});
   const result=await response.json();if(!response.ok)throw new Error(`Jev request failed (${response.status}); completed judgments remain saved.`);
-  latest=await recordEvidence({kind:'source-judgment',propertyIds:[property.id],propertyDefinitions:{[property.id]:propertyDefinitions[property.id]},...assessSourceJudgment(result?.answers),label,sources:property.sources,scope:'Jev judgment of the exact source/claim pair with source-context assessment; not a runtime assertion or formal proof.',usage:result?.usage||null,actor:{kind:'model',name:result?.model||'jev-1.14.0',role:'reviewer'}});
+  latest=await recordEvidence({kind:'source-judgment',propertyIds:[property.id],propertyDefinitions:{[property.id]:propertyDefinitions[property.id]},...assessSourceJudgment(result?.answers),label,sources:property.sources,sourceContext,sourceSnapshotId:doc.snapshot?.id??null,requestSent:true,scope:'Jev judgment of the exact source/claim pair with source-context assessment; not a runtime assertion or formal proof.',usage:result?.usage||null,actor:{kind:'model',name:result?.model||'jev-1.14.0',role:'reviewer'}});
  }
  return latest;
 }
