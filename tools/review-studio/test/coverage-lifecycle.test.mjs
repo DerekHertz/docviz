@@ -93,7 +93,8 @@ test('lifecycle layout keeps state boxes and event labels apart',()=>{
  const boxes=[...layout.states.values(),...layout.labels.values()];
  for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){const a=boxes[i],b=boxes[j];assert.ok(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y,`overlap ${JSON.stringify(a)} ${JSON.stringify(b)}`);}
  for(const e of lc.events){assert.ok(layout.states.get(e.from).x<layout.states.get(e.to).x,'events run left to right');}
- assert.ok(layout.width>=layout.states.size*120);
+ for(const b of boxes)assert.ok(b.x>=0&&b.y>=0&&b.x+b.w<=layout.width&&b.y+b.h<=layout.height,'every box inside the drawing');
+ assert.ok(layout.width<=1100,`six states fit a laptop content column without panning (${layout.width}px)`);
 });
 
 function mountView(stack){
