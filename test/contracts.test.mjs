@@ -226,6 +226,26 @@ test('a panel:get reply the known side panel can’t read is a harness error, ne
   }
 });
 
+test('each paid call must move the page total by its usage when it lands, so a panel showing a constant can’t hold', () => {
+  // The background's reply is what Chrome's panel would show, so it can say anything. At b13e80a this
+  // genuine gap, behind a panel:get that always shows $1 unassigned and no cards, read `holds`.
+  const constant = extension();
+  swap(constant, 'extension/background.js', PANEL_GET, "    return { state: { keys: [], status: state.status, unassigned: 1 }, cards: [] };\n  },\n  'panel:breakdown'");
+  const r = runHarness(contract, repoWith(constant));
+  assert.deepEqual([r.outcome, totals(r), r.observed.unattributed], ['fails', [1, 1, 1, 1, 1], 2], r.detail);
+  // A page that rises by more than a call's usage shows spend that was never paid: no judgement either way.
+  const over = runHarness(contract, fixedWith((f) => swap(f, 'extension/background.js', PANEL_GET, "    return { state: { ...state, unassigned: (state.unassigned || 0) * 3 }, cards };\n  },\n  'panel:breakdown'")));
+  assert.equal(over.outcome, 'error', `${over.outcome} ${over.detail}`);
+  assert.match(over.detail, /more than/);
+});
+
+test('an honest design that keeps a dismissed card’s spend on the page holds; it is not lost', () => {
+  // Under the earlier arithmetic (reported − shown before Dismiss − page after) this read `fails`.
+  const keep = fixedWith((f) => swap(f, 'extension/background.js', "  state.keys = state.keys.filter((k) => k !== key);\n", "  state.keys = state.keys.filter((k) => k !== key);\n  state.unassigned = (state.unassigned || 0) + (rec.cost?.usd || 0);\n"));
+  const r = runHarness(contract, keep);
+  assert.deepEqual([r.outcome, totals(r), r.observed.unattributed], ['holds', [0, 1, 1, 1, 2], 0], r.detail);
+});
+
 test('reviewed code that answers panel:get over the harness channel itself is a harness error', () => {
   const forge = `process.on('message', (m) => { if (m?.message?.type === 'panel:get') process.send({ type: 'sent', seq: m.seq, ok: true, response: { ok: true, value: { state: { keys: [], unassigned: 2 }, cards: [] } } }); });\n`;
   const r = runHarness(contract, withPrefix(forge));
