@@ -1,13 +1,18 @@
+import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {mkdir,readFile,readdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
-const [root,scenarioId,scratch]=process.argv.slice(2);
-if(!root||!scratch||!['malformed-cache','missing-context','canonical-evidence'].includes(scenarioId))throw new Error('Usage: pr18-worker.mjs CHECKOUT SCENARIO SCRATCH');
+const [root,scenarioId,scratch,targetRoot,stepsFile,profileFile]=process.argv.slice(2);
+if(!root||!scratch||!['malformed-cache','missing-context','canonical-evidence','contract-review'].includes(scenarioId))throw new Error('Usage: pr18-worker.mjs CHECKOUT SCENARIO SCRATCH [TARGET_CHECKOUT STEPS PROFILE]');
 await mkdir(scratch,{recursive:true});
 const load=path=>import(pathToFileURL(resolve(root,'tools/review-studio',path)).href);
-const {repositoryAt,digest,git}=await load('git.mjs');
-const repository=await repositoryAt(root),commit=(await git(root,['rev-parse','HEAD'])).trim();
+const commit=spawnSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).stdout.trim();
+if(!/^[a-f0-9]{40}$/.test(commit))throw new Error('The capture checkout has no readable HEAD.');
+// The PR base has the CLI but no studio, so studio modules load only for the studio scenarios.
+const {repositoryAt,digest}=scenarioId==='contract-review'?{}:await load('git.mjs');
+const repository=scenarioId==='contract-review'?null:await repositoryAt(root);
 const frames=[];
 const frame=(id,title,nodeId,input,output,observed)=>frames.push({id,title,nodeId,input:structuredClone(input),output:structuredClone(output),observed});
 let output;
@@ -39,6 +44,31 @@ if(scenarioId==='malformed-cache'){
  output={status:evidence.result,supported:evidence.supported,contradicted:evidence.contradicted,contextSufficient:evidence.contextSufficient??null,uncertaintyReason:evidence.uncertaintyReason??null,criteriaVersion:evidence.criteriaVersion??'original-two-question',thresholds:evidence.thresholds??null};
  frame('transform','Run judgeClaims with the intercepted response','judgment',{scores:answers,requestedQuestions:Object.keys(request.questions)},output,true);
  frame('output','Read the actual recorded source judgment','judgment',{recordKind:evidence.kind},output,true);
+}else if(scenarioId==='contract-review'){
+ // This revision's own `docviz pr`, run as a process on the frozen PR1 target. The verdict and any
+ // coverage come only from what that process printed and wrote; nothing is read from the candidate.
+ if(!targetRoot||!stepsFile||!profileFile)throw new Error('contract-review needs TARGET_CHECKOUT STEPS PROFILE.');
+ const target={repository:'docviz',pr:1,base:'595f590ba2b69e90f73e14c0591be0ca3d8f97d7',head:'8967e5d3e193b84d62ae359f59ae37a0312014b3'};
+ const sha=async path=>createHash('sha256').update(await readFile(path)).digest('hex');
+ const input={tool:{commit},target,stepsSha256:await sha(stepsFile),profileSha256:await sha(profileFile)};
+ frame('input','The same frozen PR1 target, author steps and contract profile','cli',input,input,false);
+ const coverageOut=resolve(scratch,'coverage.json');
+ const argv=[process.execPath,resolve(root,'helper/cli.js'),'pr',stepsFile,'--pr','https://github.com/DerekHertz/docviz/pull/1','--no-check','--base',target.base,'--contracts',profileFile,'--coverage-out',coverageOut,'--trust-head',target.head];
+ const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>key!=='TYPESAFE_API_KEY'));
+ const started=Date.now(),run=spawnSync(argv[0],argv.slice(1),{cwd:targetRoot,encoding:'utf8',env,timeout:120000});
+ await writeFile(resolve(scratch,'stdout.md'),run.stdout??'');await writeFile(resolve(scratch,'stderr.txt'),run.stderr??'');
+ const headline=run.stdout?.match(/^\*\*(Needs you|Look when you can|Nothing for you)\*\*$/m)?.[1]??null;
+ const status={'Needs you':'needs','Look when you can':'look','Nothing for you':'nothing'}[headline]??'unknown';
+ let coverage=null;try{coverage=JSON.parse(await readFile(coverageOut,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
+ const obligation=coverage?.obligations?.find(o=>o.contractId==='card-spend-accounting')??null;
+ const process_={argv:argv.map(a=>a===process.execPath?'node':a),cwd:targetRoot,exitCode:run.status,signal:run.signal,durationMs:Date.now()-started,stdoutSha256:createHash('sha256').update(run.stdout??'').digest('hex'),stderr:run.stderr,rawFiles:{stdout:resolve(scratch,'stdout.md'),stderr:resolve(scratch,'stderr.txt'),coverage:coverage?coverageOut:null}};
+ frame('transform','Run this revision\'s docviz pr as a process','cli',{argv:process_.argv,cwd:'PR1 target checkout at '+target.head.slice(0,7)},{exitCode:run.status,stderrVerdict:run.stderr?.match(/^verdict: (\w+)$/m)?.[1]??null,cost:run.stderr?.match(/^cost: (.+)$/m)?.[1]??null,coverageWritten:!!coverage},true);
+ output={status,headline,exitCode:run.status,stderrVerdict:run.stderr?.match(/^verdict: (\w+)$/m)?.[1]??null,cost:run.stderr?.match(/^cost: (.+)$/m)?.[1]??null,
+  contract:obligation?{contractId:obligation.contractId,status:obligation.status,reason:obligation.reason,provenance:obligation.evidence?.provenance??null,outcome:obligation.evidence?.outcome??null,evidenceBase:obligation.evidence?.base??null,evidenceHead:obligation.evidence?.head??null}:null,
+  contractResult:obligation?'present':'absent: this revision wrote no contract coverage and printed no contract row',
+  targetCoverage:coverage?{id:coverage.id,base:coverage.base,head:coverage.head,role:'Regression evidence for the PR1 target. It is not coverage of this PR.'}:null};
+ frame('output','Read the review this revision printed','cli',{headline},output,true);
+ process.stdout.write(JSON.stringify({scenarioId,frames,output,process:process_,stdout:run.stdout})+'\n');process.exit(0);
 }else{
  const {createStackStore}=await load('stack.mjs');
  const folder=resolve(scratch,'data/stacks/capture-fixture');await mkdir(resolve(folder,'artifacts'),{recursive:true});
