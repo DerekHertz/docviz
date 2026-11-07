@@ -19,7 +19,9 @@ const pr1StepsSha='385578d34246f7f753bbd6ca691dbf0a22e3fac0d8aa6618c24021d83affb
 const repository=await repositoryAt(repoPath),dataRoot=resolve(dataPath),checkouts=resolve(checkoutPath),id='docviz-pr18',folder=resolve(dataRoot,'stacks',id);
 await mkdir(resolve(folder,'artifacts'),{recursive:true});await mkdir(checkouts,{recursive:true});
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
-for(const commit of[pr1.base,pr1.head])await git(repository.path,['cat-file','-e',commit+'^{commit}']).catch(()=>{throw new Error(`PR1 commit ${commit} is missing. Fetch PR #1 first: git fetch origin pull/1/head:refs/docviz/pr1/head`);});
+const pr1Ref=(await git(repository.path,['rev-parse','--verify','-q','refs/docviz/pr1/head']).catch(()=>'')).trim();
+if(pr1Ref!==pr1.head)throw new Error('refs/docviz/pr1/head must name PR #1\'s head '+pr1.head+'. Fetch it first: git fetch origin pull/1/head:refs/docviz/pr1/head');
+await git(repository.path,['merge-base','--is-ancestor',pr1.base,pr1.head]);
 const inputs=resolve(checkouts,'inputs');await mkdir(inputs,{recursive:true});
 const stepsBytes=await readFile(resolve(here,'pr1-steps.json'));assert.equal(sha256(stepsBytes),pr1StepsSha,'pr1-steps.json must be the unchanged historical five-step summary.');
 const stepsFile=resolve(inputs,'pr1-steps.json');await writeFile(stepsFile,stepsBytes);
@@ -59,7 +61,7 @@ const legacy={id:'cli',title:'Docviz PR review',purpose:'The CLI at the PR base 
 const edges=[['git','snapshot','source + diff'],['snapshot','cache','component model'],['snapshot','judgment','claim + code'],['snapshot','checks','check snapshot'],['cache','review','map context'],['judgment','review','assessment'],['checks','review','test outcomes'],['review','handoff','review record'],['cli','contracts','profile + changed paths + trusted head'],['contracts','verdict','contract statuses'],['contracts','checks','coverage record (fingerprinted)']].map(([from,to,label],index)=>({id:'flow-'+index,from,to,label,basis:'source-interpretation'}));
 const harness=await artifact({kind:'capture-harness',title:'PR18 paired capture harness',harnessDigest,source:harnessSource,scope:'Rerunnable Node harness. Only exported functions are observed; local fixture provider responses and evidence records are controlled inputs. No external request is made.'});
 const captures=[],evidence=[{id:harness.id}];
-const cloneAt=async(commit,root)=>{try{await stat(resolve(root,'.git'));}catch{await exec('git',['-c','core.hooksPath=/dev/null','clone','--no-checkout','--no-hardlinks','--template=','--',repository.path,root]);await git(root,['checkout','--detach',commit]);}
+const cloneAt=async(commit,root)=>{try{await stat(resolve(root,'.git'));}catch{await exec('git',['-c','core.hooksPath=/dev/null','clone','--no-checkout','--no-hardlinks','--template=','--',repository.path,root]);await git(root,['fetch','-q','origin','+refs/docviz/*:refs/docviz/*']);await git(root,['checkout','--detach',commit]);}
  assert.equal((await git(root,['rev-parse','HEAD'])).trim(),commit);assert.equal((await git(root,['status','--porcelain','--untracked-files=no'])).trim(),'','Capture source checkout must be clean.');return root;};
 const targetRoot=await cloneAt(pr1.head,resolve(checkouts,'pr1-target-'+pr1.head.slice(0,12)));
 const printed={[target]:'look',[initial]:'look',[tip]:'needs'};

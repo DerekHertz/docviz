@@ -145,11 +145,17 @@ The workspace opens a behavior diagram when exactly one prepared stack matches i
 Prepare the Docviz example from the repository root:
 
 ```sh
+git fetch origin pull/1/head:refs/docviz/pr1/head
 node tools/review-studio/examples/stack/prepare-pr18.mjs \
   "$PWD" .scratch/review-studio .scratch/pr18-captures "$(git rev-parse HEAD)"
-npm run review:studio
+node tools/review-studio/examples/stack/prepare-pr1.mjs \
+  "$PWD" .scratch/review-studio --coverage <pr1TargetCoverage printed above>
+node tools/review-studio/examples/stack/open-pr18.mjs \
+  "$PWD" .scratch/review-studio "$(git rev-parse HEAD)"
 ```
 
-Open a comparison from `c31d97dd082d887bc108a22f91dcd36aa47ebe16` to the same candidate SHA. **Whole PR** shows the studio as an addition alongside the existing CLI. **Review fixes inside this PR** compares the initial PR checkpoint with the candidate. These are two checkpoints of PR #18, not two stacked PRs.
+The candidate must include the contract route (`helper/contracts.js`). **Whole PR** shows the studio added and the CLI review changed: `Docviz PR review → Contract assessment → PR verdict`, with the coverage record read by the studio's execution evidence. **Review fixes inside this PR** compares the initial PR checkpoint with the candidate. These are two checkpoints of PR #18, not two stacked PRs.
 
-The three rerunnable cases demonstrate malformed cache rejection, uncertainty for insufficient source context, and canonical evidence display. The latter two supply controlled provider scores/evidence records to real exported functions; they are not new live Jev judgments or an executed failing command. Captures bind their harness, exact Git blobs, inputs and outputs. The semantic map is curated source interpretation; it does not claim exhaustive dependency or runtime coverage. Missing captures, incompatible harnesses and historical source judgments remain explicit.
+The reviewer comparison (`Docviz PR review` module) runs each PR18 revision's own `helper/cli.js` as a process on one frozen target: PR #1 `595f590 → 8967e5d`, the author's five unchanged steps (sha256 `385578d3…`), the candidate's `card-spend` profile, `--no-check`, and explicit `--trust-head` for that pinned head only. Lanes name the TOOL revision apart from the TARGET. The base and initial CLIs print **Look when you can** and write no coverage; that absence is recorded, never a fabricated violation. The candidate executes `card-spend-accounting` and prints **Needs you**. This changes the review of PR #1, not PR #1's behavior. PR #1's coverage record stays nested regression evidence and opens through the target link in its own review; it is never PR #18's coverage.
+
+The three rerunnable studio cases demonstrate malformed cache rejection, uncertainty for insufficient source context, and canonical evidence display. The latter two supply controlled provider scores/evidence records to real exported functions; they are not new live Jev judgments or an executed failing command. Captures bind their harness, exact Git blobs, inputs and outputs. The semantic map is curated source interpretation; it does not claim exhaustive dependency or runtime coverage. Missing captures, incompatible harnesses and historical source judgments remain explicit.
