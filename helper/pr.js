@@ -14,7 +14,7 @@ import { movedSinceBase, resolveBase } from './moved-git.js';
 import { runBehavior } from './behavior.js';
 import { verdict, verdictLines } from './verdict.js';
 import { UNTRUSTED_GIT } from './git.js';
-import { assessContracts, contractFindings, contractsSection, loadProfile } from './contracts.js';
+import { assessContracts, contractFindings, contractsSection, loadProfile, parseTrustHead } from './contracts.js';
 
 export const MARKER = '<!-- docviz-pr-diagrams -->';
 const DOCVIZ_REPO = 'https://github.com/DerekHertz/docviz';
@@ -169,6 +169,7 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
   const gitBuffer = (...a) => execFileSync('git', [...UNTRUSTED_GIT, ...a], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 << 20 });
   // The operator's contract profile is read before any model call, so a bad one costs nothing.
   const profile = profileFile ? loadProfile(resolve(cwd, profileFile), root) : null;
+  const trusted = trustHead === undefined ? undefined : parseTrustHead(trustHead);
   const sha = git('rev-parse', 'HEAD');
   const repoUrl = repoWebUrl(git('remote', 'get-url', 'origin'));
   if (git('status', '--porcelain', '--untracked-files=no')) log('warning: uncommitted changes; links point at HEAD as committed');
@@ -193,7 +194,7 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
   const glossary = glossaryFile ? readFileSync(resolve(cwd, glossaryFile), 'utf8') : '';
   // Contracts come from the operator's profile; the steps above only annotate what the summary left out.
   const coverage = profile && assessContracts({
-    profile, gitRaw, gitBuffer, steps, trustHead, log, origin: repoUrl,
+    profile, gitRaw, gitBuffer, steps, trustHead: trusted, log, origin: repoUrl,
     binding: { repositoryRoot: git('rev-list', '--max-parents=0', 'HEAD').split('\n').sort()[0], base: base.sha, head: sha },
   });
 

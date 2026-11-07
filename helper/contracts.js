@@ -66,6 +66,12 @@ export function parseProfile(text) {
 
 export const definitionDigest = (contract) => digest(contract);
 
+/** `--trust-head` → one commit, by its full SHA. Git resolves a short SHA, tag or branch through refs, which can name another commit. */
+export function parseTrustHead(value) {
+  if (typeof value === 'string' && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value)) return value.toLowerCase();
+  throw new Error(`--trust-head needs the full commit SHA of the reviewed HEAD (git rev-parse HEAD), not “${value}”: a short SHA, tag or branch can name another commit`);
+}
+
 /** Reads the profile the operator named; one inside the reviewed checkout is the author's text, so it's refused. */
 export function loadProfile(file, root) {
   // By path segments, not prefixes: `..profile.json` is inside, `repo-profiles/` beside `repo/` is not.
@@ -179,7 +185,7 @@ export function runHarness(contract, { gitRaw, gitBuffer, binding }) {
 
 /**
  * Gathers facts from the reviewed checkout (git objects only) and judges every contract.
- * `trustHead` is the commit the operator allowed docviz's harnesses to run against.
+ * `trustHead` is the full SHA (parseTrustHead) of the commit the operator allowed docviz's harnesses to run against.
  */
 export function assessContracts({ profile, gitRaw, gitBuffer, binding, origin, steps, trustHead, log = () => {} }) {
   const show = (commit, path) => { try { return commit && gitRaw('show', `${commit}:${path}`); } catch { return null; } };
@@ -194,7 +200,6 @@ export function assessContracts({ profile, gitRaw, gitBuffer, binding, origin, s
   };
   const changedPaths = binding.base ? gitRaw('diff', '--name-only', '-z', binding.base, binding.head).split('\0').filter(Boolean) : [];
   const cuts = steps.flatMap((s) => s.cuts.map((c) => ({ path: c.path, start: c.start, end: c.end })));
-  const trusted = trustHead && (() => { try { return gitRaw('rev-parse', '--verify', `${trustHead}^{commit}`).trim(); } catch { return null; } })();
   const obligations = profile.contracts.map((contract) => {
     const anchors = contract.code.map((a) => {
       const text = show(binding.head, a.path);
@@ -213,7 +218,7 @@ export function assessContracts({ profile, gitRaw, gitBuffer, binding, origin, s
     const applicable = judge(contract, facts).status !== 'not-applicable';
     if (applicable && contract.check) {
       if (!trustHead) facts.noRun = 'not-trusted';
-      else if (trusted !== binding.head) facts.noRun = 'trust-other-head';
+      else if (trustHead !== binding.head) facts.noRun = 'trust-other-head';
       else {
         log(`contract ${contract.id}: running harness ${contract.check.harness} at ${binding.head.slice(0, 7)}`);
         facts.evidence = runHarness(contract, { gitRaw, gitBuffer, binding });

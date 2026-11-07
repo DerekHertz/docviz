@@ -203,7 +203,11 @@ returns one PR comment.
   names an unknown harness is refused before any model call. Authority is "operator-selected", not
   an authenticated signature. A contract applies when `git diff base head` touches its anchors' files
   or dependencies. The steps only annotate which anchors no step's lines cover ("omits dismiss").
-  With `--trust-head SHA` equal to HEAD, docviz copies the head's committed files into a temp folder
+  `--trust-head` takes HEAD's full SHA (`git rev-parse HEAD`, any case) and docviz compares the
+  text with HEAD; git never resolves it. A short SHA, tag, branch or `HEAD` is refused (exit 2)
+  before any work: until 2026-11-06 they went through git's ref lookup, and the independent CLI
+  matrix showed a tag named like the base's short SHA, pointing at head, trusting head. A full SHA
+  of another commit runs nothing (`trust-other-head`). With `--trust-head` equal to HEAD, docviz copies the head's committed files into a temp folder
   and runs its own harness there, in a child process with a scrubbed environment and a 30 s timeout.
   `card-spend` drives `extension/background.js` through draw → fail after spending → Retry →
   Dismiss → late return, with chrome.* and the helper as controlled fixtures, and records the ledger,

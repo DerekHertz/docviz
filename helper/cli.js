@@ -65,7 +65,8 @@ if (opts.help || !['serve', 'code', 'pr', 'lab'].includes(opts.cmd) || (opts.cmd
                          check the contracts in your profile (kept outside the reviewed checkout) whatever
                          the summary covers: which apply to the changed files, and which steps leave them out
             [--trust-head SHA]
-                         run docviz's registered contract harnesses against exactly this commit's code
+                         run docviz's registered contract harnesses against exactly this commit's code.
+                         SHA is HEAD's full SHA (git rev-parse HEAD); short SHAs, tags and branches are refused
             [--coverage-out FILE]
                          write the contract coverage result as JSON (for the review studio)
   docviz pr --rules [--glossary FILE]
