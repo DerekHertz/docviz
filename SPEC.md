@@ -241,7 +241,14 @@ returns one PR comment.
   that detects the harness, for example by its Node globals, can make different chrome.storage
   calls here than in Chrome; a Node without `--permission` can't start the reviewed code, so the
   run reads as a harness error; the side panel's code is matched, not run, so how Chrome renders it
-  (DOM, CSS, timing of its refreshes) is not observed. The harness's identity (`harnessDigest`)
+  (DOM, CSS, timing of its refreshes) is not observed. The 50 ms IPC quiet checkpoint is a finite
+  observation bound, not a latency contract or proof that all asynchronous work finished. A Node
+  async hook in the device counts one-shot timers before the reviewed module loads; callbacks
+  that have fired or timers that have been cleared no longer count. A pending timer at a page
+  snapshot, or an additional unanswered helper request, yields uncertainty with no completed
+  frames. The count can only withhold judgement. Other unresolved promises and I/O, and code
+  that detects or alters its test environment, remain outside this completion check.
+  The harness's identity (`harnessDigest`)
   covers all three files.
   `card-spend` drives `extension/background.js` through draw → fail after spending → Retry →
   Dismiss → late return, with chrome.* and the helper as controlled fixtures, and records the ledger,

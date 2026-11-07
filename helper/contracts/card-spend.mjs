@@ -18,7 +18,7 @@ import { knownPanel, refreshCards } from './card-spend-panel.mjs';
 const DEVICE = join(dirname(fileURLToPath(import.meta.url)), 'card-spend-device.mjs');
 const root = realpathSync(resolve(process.argv[2]));
 const PATH = ['draw one card', 'call fails after spending', 'retry', 'dismiss while the call is out', 'helper returns usage', 'compare ledger with card and page totals'];
-const SCOPE = 'Target’s committed extension code, run by a docviz controller that loads none of it. background.js runs in a Node child process under Node’s permission model (no file writes, no reads outside its copy, no child processes or workers); its messages are taken only as chrome.storage and fetch calls and its runtime listener’s replies, never as a value or result. The controller holds chrome.* storage and the helper’s replies, drives the exported visualizeSelection and the registered card:retry / card:dismiss handlers, and records the ledger, card and page total after each action (observed.frames). No side-panel code runs. The side panel (manifest side_panel page, sidepanel.html and every module and stylesheet it loads) must match, byte for byte, a side panel a reviewer registered in docviz (card-spend-panel.mjs); any other side panel is unsupported. After each action docviz sends the background the panel’s own panel:get { tabId } message and computes the page total from the reply with docviz’s copy of that panel’s refreshCards. The ledger is chrome.storage.local spend.total, which that panel reads directly. No browser, DOM or provider call. One scenario, not every path, and code that detects this harness can behave differently in Chrome.';
+const SCOPE = 'Target’s committed extension code, run by a docviz controller that loads none of it. background.js runs in a Node child process under Node’s permission model (no file writes, no reads outside its copy, no child processes or workers); its messages are taken only as chrome.storage and fetch calls and its runtime listener’s replies, never as a value or result. The controller holds chrome.* storage and the helper’s replies, drives the exported visualizeSelection and the registered card:retry / card:dismiss handlers, and records the ledger, card and page total after each action (observed.frames). No side-panel code runs. The side panel (manifest side_panel page, sidepanel.html and every module and stylesheet it loads) must match, byte for byte, a side panel a reviewer registered in docviz (card-spend-panel.mjs); any other side panel is unsupported. After each action docviz sends the background the panel’s own panel:get { tabId } message and computes the page total from the reply with docviz’s copy of that panel’s refreshCards. The ledger is chrome.storage.local spend.total, which that panel reads directly. No browser, DOM or provider call. A 50 ms quiet checkpoint is only a finite observation bound; pending one-shot timer callbacks or additional unanswered helper requests make the scenario unknown. Other unresolved promises and I/O are not established complete. One scenario, not every path, and code that detects this harness can behave differently in Chrome.';
 const LIMIT = { messages: 10_000, quietMs: 50, requestMs: 3000, totalMs: 20_000 };
 
 const children = new Set();
@@ -108,6 +108,7 @@ const act = async (type, fields) => {
   background.post({ type, seq: n, ...fields });
   const r = await done;
   if (!r.ok) await stop('error', `${type === 'draw' ? 'visualizeSelection' : `${fields.message.type}`} threw: ${said(r.detail)}`);
+  if (!Number.isSafeInteger(r.pendingTimers) || r.pendingTimers < 0) await stop('error', 'the background acknowledgment lacks a valid pending timer count');
   return r;
 };
 
@@ -117,7 +118,9 @@ const usage = { usd: 1, estimated: false, provider: 'controlled-helper', inputTo
 // chrome.storage.local, which that panel reads directly (settings.js getSettings, `s.spend?.total || 0`).
 const frames = [];
 const snapshot = async (id, action, key) => {
-  const { response } = await act('send', { message: { type: 'panel:get', tabId: 1 } });
+  const { response, pendingTimers } = await act('send', { message: { type: 'panel:get', tabId: 1 } });
+  if (pendingTimers > 0) return stop('error', 'pending timer callbacks remain at the page observation; silence does not establish completion');
+  if (requests.length > 0) return stop('error', 'an additional helper request remains unresolved at the page observation');
   let shown;
   try { shown = refreshCards(response); } catch (e) { return stop('error', `the side panel can’t show panel:get’s reply after: ${action} (${said(e?.message || e)})`); }
   if (!Number.isFinite(shown.page)) return stop('error', `the side panel’s page total is not a number after: ${action}`);
