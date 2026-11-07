@@ -246,7 +246,13 @@ returns one PR comment.
   `card-spend` drives `extension/background.js` through draw → fail after spending → Retry →
   Dismiss → late return, with chrome.* and the helper as controlled fixtures, and records the ledger,
   card and side-panel page total it read after each action in `observed.frames` (the studio animates
-  only those; a record without frames has none to show). "Inside the checkout" is by path segment, for
+  only those; a record without frames has none to show). It holds when the ledger records both
+  calls and the page total rises by each call's usage as that call lands (`shownOnLanding`), so
+  the page is checked per call. A page that rises by less leaves that spend `unattributed`
+  (`fails`). A page that rises by more shows spend that was never paid, which is a harness
+  error. Until 2026-11-07 the check was the sum reported − shown before Dismiss − page after.
+  A panel:get that always showed $1 made the genuine gap hold under that sum, and a design that
+  keeps a dismissed card's spend on the page read `fails`. "Inside the checkout" is by path segment, for
   the named path, its folder's real location and the file it reads, so `..profile.json` and links
   are caught while a sibling `repo-profiles/` is not. Only a record that run
   made counts as executed. A record read from a file is "reported", whatever its fields or digest say.

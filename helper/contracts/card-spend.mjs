@@ -141,11 +141,11 @@ try {
   const first = await nextRequest();
   const key = records.session['tab:1']?.keys?.[0];
   if (typeof key !== 'string') await stop('inapplicable', 'visualizeSelection made no card for the tab');
-  await snapshot('before-first-reply', 'draw one card; the helper call is out', key);
+  const pageBeforeFirst = await snapshot('before-first-reply', 'draw one card; the helper call is out', key);
   first({ ok: false, status: 500, body: { error: 'controlled failure after spending', usage } });
   await drawing;
   await settle();
-  await snapshot('after-failed-draw', 'the call fails after spending $1', key);
+  const pageAfterFirst = await snapshot('after-failed-draw', 'the call fails after spending $1', key);
 
   await act('send', { message: { type: 'card:retry', key } });
   const second = await nextRequest();
@@ -153,7 +153,7 @@ try {
   const chargedBeforeDismiss = await snapshot('after-retry-request', 'Retry; a second call is out', key);
   await act('send', { message: { type: 'card:dismiss', key } });
   await settle();
-  await snapshot('after-dismiss', 'Dismiss while the call is out', key);
+  const pageBeforeLate = await snapshot('after-dismiss', 'Dismiss while the call is out', key);
   const dismissed = !records.session[`card:${key}`];
 
   second({ ok: true, status: 200, body: { result: { title: 'Returned', mermaid: 'flowchart TD\n A["Returned"]' }, usage } });
@@ -161,12 +161,19 @@ try {
   const pageTotalAfter = await snapshot('after-late-return', 'the late call returns with $1 of usage', key);
   const ledgerPaid = frames.at(-1).ledgerPaid;
   const helperReported = 2 * usage.usd;
-  const unattributed = helperReported - chargedBeforeDismiss - pageTotalAfter;
-  const observed = { helperReported, ledgerPaid, chargedBeforeDismiss, dismissed, pageTotalAfter, unattributed, cardRecordAfter: records.session[`card:${key}`] ? 'present' : 'absent', frames };
+  // Each paid call is carried by a card or the unassigned total, so the page total rises by its usage
+  // when it lands. Only that call lands between the two frames. A page that never moves can't carry
+  // the spend, whatever it shows.
+  const shownOnLanding = [pageAfterFirst - pageBeforeFirst, pageTotalAfter - pageBeforeLate];
+  if (shownOnLanding.some((d) => d > usage.usd)) {
+    await stop('error', `the side panel’s page total rose by ${shownOnLanding.join(' and ')} as each $${usage.usd} call landed, more than was paid, so docviz can’t tell which spend it shows`);
+  }
+  const unattributed = shownOnLanding.reduce((t, d) => t + (usage.usd - d), 0);
+  const observed = { helperReported, ledgerPaid, chargedBeforeDismiss, dismissed, pageTotalAfter, shownOnLanding, unattributed, cardRecordAfter: records.session[`card:${key}`] ? 'present' : 'absent', frames };
   const holds = ledgerPaid === helperReported && unattributed === 0;
   print({ outcome: holds ? 'holds' : 'fails', observed,
     detail: holds ? 'every reported call is in the ledger and on a card or the page total'
-      : `ledger ${ledgerPaid} for ${helperReported} reported; cards and page showed ${chargedBeforeDismiss} before Dismiss and show ${pageTotalAfter} after the late return; ${unattributed} unattributed` });
+      : `ledger ${ledgerPaid} for ${helperReported} reported; cards and page showed ${chargedBeforeDismiss} before Dismiss and show ${pageTotalAfter} after the late return; ${unattributed} unattributed (the page rose by ${shownOnLanding.join(' and ')} as each call landed)` });
 } catch (e) {
   await stop('error', said(e?.message || e));
 }
