@@ -40,7 +40,7 @@ test('without trust the studio sees pending uncertainty, not a violation',t=>{
 
 test('an edited stored result is rejected: by fingerprint, or as a claim with no matching execution',t=>{
  const real=realCoverage(t,{trust:false});
- const edited=structuredClone(real);edited.obligations[0].status='supported-in-scope';
+ const edited=structuredClone(real);Object.assign(edited.obligations[0],{status:'supported-in-scope',reason:'executed-holds'});
  assert.throws(()=>validateCoverage(edited),/fingerprint/);
  const {id,...payload}=edited;assert.throws(()=>validateCoverage({...payload,id:digest(payload)}),/without a matching docviz execution/);
  const authority=structuredClone(real);authority.obligations[0].authority.kind='human-confirmed';const {id:_,...p2}=authority;
@@ -51,10 +51,9 @@ test('the view carries only the frames the harness captured, and says so when th
  const real=realCoverage(t),[row]=coverageView(real).rows,recorded=real.obligations[0].evidence.observed.frames;
  assert.ok(Array.isArray(recorded)&&recorded.length>=5,'the CLI result records frames');
  assert.deepEqual(row.evidence.frames,recorded);
- const reseal=edit=>{const copy=structuredClone(real);edit(copy);const {id,...payload}=copy;return{...payload,id:digest(payload)};};
- assert.equal(coverageView(reseal(c=>{delete c.obligations[0].evidence.observed.frames;})).rows[0].evidence.frames,null);
- assert.throws(()=>validateCoverage(reseal(c=>{c.obligations[0].evidence.observed.frames=[{action:'made up'}];})),/frames/);
- assert.throws(()=>validateCoverage(reseal(c=>{c.obligations[0].evidence.observed.frames='after-late-return';})),/frames/);
+ assert.equal(coverageView(resealed(real,e=>{delete e.observed.frames;})).rows[0].evidence.frames,null);
+ assert.throws(()=>validateCoverage(resealed(real,e=>{e.observed.frames=[{action:'made up'}];})),/frames/);
+ assert.throws(()=>validateCoverage(resealed(real,e=>{e.observed.frames='after-late-return';})),/frames/);
 });
 
 test('a stack serves declared coverage through the same fingerprinted artifacts as evidence',async t=>{
@@ -68,4 +67,97 @@ test('a stack serves declared coverage through the same fingerprinted artifacts 
  assert.equal((await store.evidence('example',real.id)).kind,'contract-coverage');
  writeFileSync(join(dir,'artifacts',real.id+'.json'),JSON.stringify({...real,base:null}));
  await assert.rejects(()=>store.read('example'),/fingerprint/);
+});
+
+// Rewrites a stored result the way a forger would: edit the execution record, then recompute its own
+// fingerprint (the producer's payload, in the producer's key order) and the outer one.
+const resealed=(real,edit)=>{
+ const copy=structuredClone(real),e=copy.obligations[0].evidence;edit(e,copy.obligations[0],copy);
+ if(e){const {provenance:_p,id:_i,...payload}=e;e.id=digest(payload);}
+ const {id,...payload}=copy;return{...payload,id:digest(payload)};
+};
+
+test('the real CLI record carries its own fingerprint and the harness the contract selected',t=>{
+ const real=realCoverage(t),o=real.obligations[0],{provenance:_p,id,...payload}=o.evidence;
+ assert.equal(id,digest(payload),'the execution record id is the digest of its payload');
+ assert.deepEqual(o.check,{harness:'card-spend',digest:o.evidence.harness.digest});
+ assert.doesNotThrow(()=>validateCoverage(resealed(real,()=>{})),'resealing an unedited record changes nothing');
+});
+
+test('a stored executed record bound to another contract, definition, repository or harness is rejected, even with both fingerprints recomputed',t=>{
+ const real=realCoverage(t);
+ const cases={
+  definitionDigest:e=>{e.definitionDigest='d'.repeat(64);},
+  contractId:e=>{e.contractId='another-contract';},
+  repositoryRoot:e=>{e.repositoryRoot='c'.repeat(40);},
+  'harness id':e=>{e.harness={...e.harness,id:'other-harness'};},
+  'harness digest':e=>{e.harness={...e.harness,digest:'f'.repeat(64)};},
+  'selected harness':(e,o)=>{o.check={...o.check,digest:'e'.repeat(64)};},
+  'no selected harness':(e,o)=>{delete o.check;},
+  base:e=>{e.base='a'.repeat(40);},
+  'a reason that is not the status':(e,o)=>{o.reason='executed-holds';},
+ };
+ for(const [field,edit] of Object.entries(cases))assert.throws(()=>validateCoverage(resealed(real,edit)),/Invalid contract coverage/,field);
+});
+
+test('an executed record whose own fingerprint does not match its content is rejected',t=>{
+ const real=realCoverage(t),copy=structuredClone(real);copy.obligations[0].evidence.observed.unattributed=0;
+ const {id,...payload}=copy;assert.throws(()=>validateCoverage({...payload,id:digest(payload)}),/record fingerprint/);
+});
+
+test('a reported record stays reported: never a violation or support, whatever its fields say',t=>{
+ const real=realCoverage(t);
+ assert.throws(()=>validateCoverage(resealed(real,e=>{e.provenance='reported';})),/without a matching docviz execution/);
+ const [row]=coverageView(resealed(real,(e,o)=>{e.provenance='reported';e.id='0'.repeat(64);o.status='unverified';o.reason='reported-only';})).rows;
+ assert.deepEqual([row.status,row.evidence.provenance],['unverified','reported']);
+});
+
+test('each row shows the promised condition and expectation, and keeps the raw anchors and execution record',t=>{
+ const real=realCoverage(t),o=real.obligations[0],[row]=coverageView(real).rows;
+ assert.deepEqual([row.condition,row.expectation,row.violation],[o.condition,o.expectation,o.violation]);
+ assert.deepEqual(row.anchors,o.summary);assert.deepEqual(row.sources,o.authority.governing);assert.deepEqual(row.check,o.check);
+ assert.deepEqual(row.evidence.record,o.evidence);
+});
+
+test('the card-spend detail says what cards and page showed before Dismiss, and what they show after',t=>{
+ const {detail}=realCoverage(t).obligations[0];
+ assert.match(detail,/showed 1 before Dismiss/);assert.match(detail,/show 0 after the late return/);
+ assert.doesNotMatch(detail,/cards and page show 1/);
+});
+
+async function stackWith(t,real,{target=real.base,tip=real.head,layers=[],declared={id:real.id},repository=real.checkout}={}){
+ const root=mkdtempSync(join(tmpdir(),'docviz-stack-binding-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const dir=join(root,'stacks','example');mkdirSync(join(dir,'artifacts'),{recursive:true});
+ writeFileSync(join(dir,'stack.json'),JSON.stringify({id:'example',repository:await repositoryAt(repository),target,tip,layers,nodes:[],edges:[],claims:[],evidence:[],captures:[],coverage:[declared]}));
+ writeFileSync(join(dir,'artifacts',real.id+'.json'),JSON.stringify(real));
+ return (await createStackStore(root).read('example')).coverage[0];
+}
+
+test('stack coverage counts as current only for the comparison it was recorded on',async t=>{
+ const real=realCoverage(t),g=(...a)=>execFileSync('git',a,{cwd:real.checkout,encoding:'utf8'}).trim();
+ g('commit','-q','--allow-empty','-m','later');const later=g('rev-parse','HEAD');
+ const layers=[{id:'cards',number:1,parent:real.base,head:real.head},{id:'later',number:2,parent:real.head,head:later}];
+ const whole=await stackWith(t,real);
+ assert.deepEqual([whole.binding.current,whole.binding.scope,whole.rows[0].status],[true,'stack','violated']);
+ const layer=await stackWith(t,real,{tip:later,layers,declared:{id:real.id,layerId:'cards'}});
+ assert.deepEqual([layer.binding.current,layer.binding.scope,layer.binding.layerId,layer.rows[0].status],[true,'layer','cards','violated']);
+ // The first layer's report, attached as if it covered the whole stack.
+ const asWhole=await stackWith(t,real,{tip:later,layers});
+ assert.deepEqual([asWhole.binding.current,asWhole.rows[0].status,asWhole.rows[0].reason,asWhole.counts.violated],[false,'stale','other-head',0]);
+ assert.deepEqual([asWhole.rows[0].recorded.status,asWhole.rows[0].evidence.outcome],['violated','fails'],'the recorded result stays inspectable');
+ const wrongLayer=await stackWith(t,real,{tip:later,layers,declared:{id:real.id,layerId:'later'}});
+ assert.deepEqual([wrongLayer.binding.current,wrongLayer.rows[0].status,wrongLayer.rows[0].reason],[false,'stale','other-head']);
+ // Same head, compared with another base.
+ const otherBase=await stackWith(t,real,{target:real.head});
+ assert.deepEqual([otherBase.binding.current,otherBase.rows[0].status,otherBase.rows[0].reason,otherBase.needsReview],[false,'stale','other-base',true]);
+ await assert.rejects(()=>stackWith(t,real,{declared:{id:real.id,layerId:'missing'}}),/layer this stack does not have/);
+});
+
+test('stack coverage from another repository is never current',async t=>{
+ // Self-consistent, both fingerprints recomputed: the same commits, recorded as another repository's.
+ const original=realCoverage(t),real=resealed(original,(e,o,c)=>{c.repository={...c.repository,root:'c'.repeat(40)};e.repositoryRoot='c'.repeat(40);});
+ Object.defineProperty(real,'checkout',{value:original.checkout});
+ assert.doesNotThrow(()=>validateCoverage(real));
+ const view=await stackWith(t,real);
+ assert.deepEqual([view.binding.current,view.rows[0].status,view.rows[0].reason,view.needsReview],[false,'stale','other-repository',true]);
 });

@@ -56,6 +56,12 @@ test('evidence bound to another repository, head, base, definition or harness is
   assert.deepEqual(status(judge(contract, facts({ currentHarness: 'f'.repeat(64) }))), ['stale', 'harness-changed']);
 });
 
+test('each obligation records the harness its contract selected, so a stored record can be checked against it', () => {
+  assert.deepEqual(judge(contract, facts()).check, { harness: 'card-spend', digest: harnessDigest('card-spend') });
+  const { check: _, ...unchecked } = contract;
+  assert.equal(judge(unchecked, facts({ evidence: null, currentHarness: null })).check, null);
+});
+
 test('evidence for another contract checks nothing here', () => {
   const other = { ...contract, id: 'something-else' };
   assert.deepEqual(status(judge(other, facts())), ['unverified', 'unrelated-evidence']);
