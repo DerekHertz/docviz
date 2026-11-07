@@ -114,6 +114,45 @@ test('reviewed code that patches the globals a harness would compute with can’
   assert.deepEqual([r.observed.chargedBeforeDismiss, r.observed.pageTotalAfter, r.observed.unattributed], [1, 0, 1]);
 });
 
+const withPage = (expr) => { const files = extension(); files['extension/sidepanel.js'] = files['extension/sidepanel.js'].replace(/const page = .*;/, `const page = ${expr};`); return repoWith(files); };
+
+test('a side panel page total that reports its own values over the harness channel is not a form docviz computes, so nothing holds', () => {
+  // Root's proof at 33d7a2d: this expression evaluates to 0 but sent totals that read holds. The second never
+  // lets the genuine totals follow, so the forged ones are all the controller could read.
+  for (const expr of [`(process.send({type:'totals',values:[0,1,1,0,1]}),0)`, `(process.send({type:'totals',values:[0,1,1,0,1]}),(() => { for (;;); })())`]) {
+    const r = runHarness(contract, withPage(expr));
+    assert.equal(r.outcome, 'inapplicable', `${expr}: ${r.outcome} ${r.detail}`);
+    assert.match(r.detail, /page total/);
+  }
+});
+
+test('a page total with anything beyond the supported sum is uncertainty, never evaluated', () => {
+  for (const expr of [
+    `cards.reduce((t, c) => t + (c.cost?.usd || 0), state.unassigned || 0) + (globalThis.x = 0)`,
+    `cards.reduce((t, c) => t + (c.cost?.usd || 0), state.unassigned || 1)`,
+    `cards.reduce((t, c) => c + (t.cost?.usd || 0), state.unassigned || 0)`,
+    `state.paid`,
+  ]) assert.equal(runHarness(contract, withPage(expr)).outcome, 'inapplicable', expr);
+});
+
+test('the supported page total is computed by docviz, whatever the reviewed code names its parameters', () => {
+  const renamed = runHarness(contract, withPage(`cards.reduce( (sum,card)=>sum + ( card.cost?.usd||0 ),state.unassigned||0 )`));
+  assert.deepEqual([renamed.outcome, renamed.observed.frames.map((f) => f.pageTotal)], ['fails', [0, 1, 1, 0, 0]]);
+  const noUnassigned = runHarness(contract, withPage(`cards.reduce((t, c) => t + (c.cost?.usd || 0), 0)`));
+  assert.equal(noUnassigned.outcome, 'fails', 'a page that leaves out unassigned spend is observed, not skipped');
+});
+
+test('reviewed background code that sends a result-shaped message or exits mid-scenario is a harness error', () => {
+  for (const prefix of [
+    `process.send({ outcome: 'holds' });\n`,
+    `process.send({ type: 'totals', values: [0, 1, 1, 0, 1] });\n`,
+    `const realFetch = globalThis.fetch;\nglobalThis.fetch = (...a) => { setTimeout(() => process.exit(0), 0); return realFetch(...a); };\n`,
+  ]) {
+    const r = runHarness(contract, withPrefix(prefix));
+    assert.equal(r.outcome, 'error', `${prefix}: ${r.detail}`);
+  }
+});
+
 test('the summary only annotates: citing or dropping steps never changes the status', () => {
   const anchors = [{ id: 'generate', path: 'extension/background.js', start: 1, end: 5 }, { id: 'dismiss', path: 'extension/background.js', start: 10, end: 20 }];
   const cited = judge(contract, facts({ anchors, cuts: [{ path: 'extension/background.js', start: 1, end: 4 }] }));
