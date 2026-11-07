@@ -34,7 +34,14 @@ export function createStackStore(dataRoot){
    captures.push(captured);
   }
   for(const declared of stack.evidence||[])evidence.push(evidenceCard(stack,declared,await artifact(id,stack,declared.id)));
-  const coverage=[];for(const declared of stack.coverage||[])coverage.push(coverageView(await artifact(id,stack,declared.id)));
+  // Coverage is bound to one comparison: the whole stack (target..tip), or the layer it declares. Anything else reads stale.
+  const coverage=[],declaredCoverage=stack.coverage||[];
+  const repositoryRoot=declaredCoverage.length?(await git(stack.repository.path,['rev-list','--max-parents=0',stack.tip])).split('\n').filter(Boolean).sort()[0]||null:null;
+  for(const declared of declaredCoverage){
+   let expected={repositoryRoot,scope:'stack',layerId:null,base:stack.target,head:stack.tip};
+   if(declared.layerId!==undefined){const layer=(stack.layers||[]).find(item=>item.id===declared.layerId);if(!layer)throw new Error('Stored coverage names a layer this stack does not have.');expected={repositoryRoot,scope:'layer',layerId:layer.id,base:layer.parent,head:layer.head};}
+   coverage.push(coverageView(await artifact(id,stack,declared.id),expected));
+  }
   const mapped=await maps.forStack(stack);return{...stack,...mapped,claims:stack.claims||[],evidence,captures,coverage,jevConfigured:!!process.env.TYPESAFE_API_KEY};
  };
  return{

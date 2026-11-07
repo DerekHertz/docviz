@@ -136,6 +136,8 @@ export function judge(contract, facts) {
   return {
     contractId: contract.id, title: contract.title, condition: contract.condition, expectation: contract.expectation, violation: contract.violation,
     consequential: contract.consequential, definitionDigest: definition,
+    // The harness this contract selected and its digest here, so a stored record can be checked against it.
+    check: contract.check ? { harness: contract.check.harness, digest: facts.currentHarness ?? null } : null,
     authority: { kind: 'operator-selected', note: 'Chosen by the operator on the command line; not an authenticated human signature.', governing: facts.governing },
     applicability, summary, ...verdict, evidence: evidence || null,
   };

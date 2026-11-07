@@ -218,7 +218,14 @@ returns one PR comment.
   something else), both **Look**, or `supported-in-scope` (held on the one scenario, which is not
   proof) or `not-applicable`, neither of which adds a reason. Harnesses are local and free (footer).
   `--coverage-out FILE` writes the result (`kind: 'contract-coverage'`) that the review studio reads
-  through `tools/review-studio/coverage.mjs`.
+  through `tools/review-studio/coverage.mjs`. Each obligation records the harness its contract
+  selected and that harness's digest (`check`). A stored result is integrity-checked, never
+  authenticated: its id and each executed record's id must match their content, and a `violated` or
+  `supported-in-scope` row must carry an executed record bound to the result's repository root, base
+  and head, the obligation's contract id and definition, and its selected harness, or the file is
+  refused. A stack attaches coverage to one comparison, the whole stack (target to tip) or the layer
+  it names. A report for another repository, head or base still shows, but every row reads `stale`
+  with its recorded status kept for inspection.
 - `.atlas/` is the reviewed repo's text, checked where it is read and never dropped silently: a
   `rules.md` heading that isn't `## Name` (one TLA+ word), a rule with no sentence, a repeated
   name, or prose with no rule heading is a "look" reason naming its line; a `model.json` of the

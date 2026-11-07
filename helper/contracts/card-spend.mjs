@@ -105,7 +105,7 @@ try {
   const holds = ledgerPaid === helperReported && unattributed === 0;
   print({ outcome: holds ? 'holds' : 'fails', observed,
     detail: holds ? 'every reported call is in the ledger and on a card or the page total'
-      : `ledger ${ledgerPaid} for ${helperReported} reported; cards and page show ${chargedBeforeDismiss + pageTotalAfter}; ${unattributed} unattributed` });
+      : `ledger ${ledgerPaid} for ${helperReported} reported; cards and page showed ${chargedBeforeDismiss} before Dismiss and show ${pageTotalAfter} after the late return; ${unattributed} unattributed` });
   process.exit(0);
 } catch (e) {
   print({ outcome: 'error', observed: {}, detail: String(e?.message || e).slice(0, 400) });
