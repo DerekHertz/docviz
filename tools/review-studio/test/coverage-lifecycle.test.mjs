@@ -154,7 +154,7 @@ test('missing coverage opens as uncertainty with no observed assertion',async()=
  assert.doesNotMatch(f.host.innerHTML,/lifecycle-mark violation/);
  await f.click({behaviorAction:'obligation',id:'dismiss'});
  assert.match(f.dialog.innerHTML,/No executed evidence/);
- assert.doesNotMatch(f.dialog.innerHTML,/Executed counterexample|ledgerPaid/);
+ assert.doesNotMatch(f.dialog.innerHTML,/Executed counterexample|ledgerPaid|This execution/);
  f.view.dispose();
 });
 
