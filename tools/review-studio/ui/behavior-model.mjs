@@ -72,16 +72,20 @@ export function coverageLifecycle(stack,{lifecycleId,step}={}){
   railEdges:lifecycle.rail.filter(r=>r.from).map(r=>({from:r.from,to:r.id}))};
 }
 
-// Linear left-to-right lifecycle. Each gap is wide enough for its event label plus visible arrow ends.
-export function lifecycleLayout(lc,{stateWidth=124,stateHeight=48,rowY=64}={}){
+// Linear left-to-right lifecycle. Forward event labels sit above their arrow on two alternating rows,
+// so neighbours never collide and gaps stay short; widths assume 7.4px per 12px monospace character.
+export function lifecycleLayout(lc,{stateWidth=108,stateHeight=48,gap=76,labelHeight=22}={}){
  const order=lc.lifecycle.states.map(s=>s.id),states=new Map(),labels=new Map();
- const labelWidth=e=>Math.round(e.label.length*6.4+(e.omitted?40:22));
- let x=24;
- order.forEach((id,i)=>{states.set(id,{x,y:rowY-stateHeight/2,w:stateWidth,h:stateHeight});const next=lc.events.find(e=>e.from===id&&e.to===order[i+1]);x+=stateWidth+(next?Math.max(70,labelWidth(next)+44):70);});
- lc.events.forEach((e,i)=>{const a=states.get(e.from),b=states.get(e.to);if(!a||!b)return;const w=labelWidth(e),adjacent=order.indexOf(e.to)===order.indexOf(e.from)+1;
-  labels.set(e.id,adjacent?{x:Math.round((a.x+a.w+b.x)/2-w/2),y:rowY-11,w,h:22}:{x:Math.round((a.x+b.x+b.w)/2-w/2),y:rowY+stateHeight/2+30+i*26,w,h:22});});
- const bottom=Math.max(rowY+stateHeight/2+34,...[...labels.values()].map(l=>l.y+l.h+12));
- return{width:x-70+24,height:bottom,states,labels,rowY};
+ const labelWidth=e=>Math.ceil(e.label.length*7.4+(e.omitted?40:24));
+ const rowY=24+2*(labelHeight+6)+10+stateHeight/2,top=rowY-stateHeight/2;
+ order.forEach((id,i)=>states.set(id,{x:24+i*(stateWidth+gap),y:top,w:stateWidth,h:stateHeight}));
+ let forward=0,below=0;
+ for(const e of lc.events){const a=states.get(e.from),b=states.get(e.to);if(!a||!b)continue;const w=labelWidth(e);
+  if(order.indexOf(e.to)===order.indexOf(e.from)+1){const row=forward++%2;labels.set(e.id,{x:Math.round((a.x+a.w+b.x)/2-w/2),y:top-10-labelHeight-row*(labelHeight+6),w,h:labelHeight});}
+  else labels.set(e.id,{x:Math.round((a.x+b.x+b.w)/2-w/2),y:top+stateHeight+30+below++*(labelHeight+6),w,h:labelHeight});}
+ const xs=[...states.values(),...labels.values()],right=Math.max(...xs.map(b=>b.x+b.w)),left=Math.min(0,...xs.map(b=>b.x));
+ if(left<0)for(const b of xs)b.x-=left-8;
+ return{width:right-Math.min(0,left-8)+24,height:Math.max(top+stateHeight+34,...[...labels.values()].map(l=>l.y+l.h+12)),states,labels,rowY};
 }
 
 export function sourceAssessments(review,propertyIds){
