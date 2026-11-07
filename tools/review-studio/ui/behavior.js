@@ -21,7 +21,7 @@ export function createBehaviorView({api,onProperty,onAgents,onReview,onFiles,onO
  function mount(el,data,doc){
   stop();host=el;review=doc;
   if(stack?.id!==data.id||stack?.tip!==data.tip){selection={comparison:'whole',nodeId:data.scenarios?.[0]?.nodeId||data.nodes[0]?.id,scenarioId:data.scenarios?.[0]?.id,step:2};drawer=null;lcStep=undefined;}
-  stack=data;host.onclick=click;host.onchange=event=>{if(event.target.matches('[data-behavior-module]')){stop();selection.nodeId=event.target.value;selection.scenarioId=stack.scenarios.find(s=>s.nodeId===selection.nodeId)?.id||null;selection.step=2;render();}};host.onkeydown=event=>{if(event.key==='Escape')closeDrawer();if(event.key==='Enter'&&event.target.matches('[role="button"][data-behavior-action]')){event.preventDefault();event.target.click();}};render();
+  stack=data;host.onclick=click;host.onchange=event=>{if(event.target.matches('[data-behavior-module]')){stop();selection.nodeId=event.target.value;selection.scenarioId=stack.scenarios.find(s=>s.nodeId===selection.nodeId)?.id||null;selection.step=2;render();}};host.onkeydown=event=>{if(event.key==='Escape')closeDrawer();if((event.key==='Enter'||event.key===' ')&&event.target.matches?.('[role="button"][data-behavior-action]')){event.preventDefault();return click(event);}};render();
  }
  function render(){
   const current=story(),s=current.scenario,node=stack.nodes.find(n=>n.id===selection.nodeId),layers=stack.layers;

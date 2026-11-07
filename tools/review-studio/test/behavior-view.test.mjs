@@ -70,7 +70,7 @@ test('Enter leaves native button activation to the browser and activates custom 
  const f=fixture();let clicks=0,prevented=0;
  f.host.onkeydown({key:'Enter',preventDefault(){prevented++;},target:{matches(){return false;},click(){clicks++;}}});
  assert.equal(clicks,0);assert.equal(prevented,0);
- f.host.onkeydown({key:'Enter',preventDefault(){prevented++;},target:{matches(){return true;},click(){clicks++;}}});
+ f.host.onkeydown({key:'Enter',preventDefault(){prevented++;},target:{matches(){return true;},closest(){clicks++;return null;}}});
  assert.equal(clicks,1);assert.equal(prevented,1);
  f.view.dispose();
 });
