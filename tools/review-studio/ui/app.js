@@ -10,7 +10,7 @@ const evidenceBadge=e=>{const p=sourceJudgmentPresentation(e);return badge(p.lab
 function sourceJudgmentDetails(e){if(e.kind!=='source-judgment')return '';const p=sourceJudgmentPresentation(e),score=v=>v==null?'not returned':String(v);return `<div class="source-judgment-detail ${p.tone}"><p>${esc(p.detail)}</p><p>Source context sufficient: ${e.criteriaVersion?esc(score(e.contextSufficient)):'not assessed under the original criteria'} · support: ${esc(score(e.supported))} · contradiction: ${esc(score(e.contradicted))}.</p><small>Criteria: ${esc(e.criteriaVersion||'original two-question assessment')}. These are model judgments, not measured pass rates.</small></div>`;}
 const state={boot:null,doc:null,selected:null,mode:'world',level:'verify',inspector:'overview',lens:'change',search:'',file:null,fileMode:'diff',sourceCache:new Map(),modal:null,stack:[],reviewDraft:null,jobs:[],busy:false};
 let toastTimer,saveTimer,pendingPatch={},mutationQueue=Promise.resolve(),lastNodeClick={id:null,at:0};
-const behaviorView=createBehaviorView({api,onProperty:id=>modal('property',{id}),onAgents:()=>modal('agents'),onReview:()=>modal('review'),onFiles:()=>{state.mode='component';state.level='implementation';render();}});
+const behaviorView=createBehaviorView({api,onProperty:id=>modal('property',{id}),onAgents:()=>modal('agents'),onReview:()=>modal('review'),onFiles:()=>modal('snapshot')});
 const component=()=>state.doc?.components.find(c=>c.id===state.selected);
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,6000);}
 async function api(path,body){return request(path,body,state.boot?.token);}
