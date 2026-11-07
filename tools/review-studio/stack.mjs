@@ -2,6 +2,7 @@ import {readFile,readdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {createSystemMapCache} from './system-maps.mjs';
 import {git,digest} from './git.mjs';
+import {coverageView} from './coverage.mjs';
 const json=async path=>JSON.parse(await readFile(path,'utf8'));
 const validId=id=>{if(!/^[a-z0-9][a-z0-9-]{0,80}$/.test(id))throw new Error('Unknown stack.');return id;};
 export function createStackStore(dataRoot){
@@ -10,7 +11,7 @@ export function createStackStore(dataRoot){
  const maps=createSystemMapCache(dataRoot);
  async function artifact(id,stack,artifactId){
   if(!/^[a-f0-9]{64}$/.test(artifactId))throw new Error('Unknown stack evidence.');
-  if(![...(stack.evidence||[]),...(stack.captures||[])].some(e=>e.id===artifactId))throw new Error('This evidence does not belong to the stack.');
+  if(![...(stack.evidence||[]),...(stack.captures||[]),...(stack.coverage||[])].some(e=>e.id===artifactId))throw new Error('This evidence does not belong to the stack.');
   const record=await json(resolve(folder(id),'artifacts',artifactId+'.json'));
   const{id:storedId,...payload}=record;if(storedId!==artifactId||digest(payload)!==artifactId)throw new Error('Stored evidence fingerprint does not match.');return record;
  }
@@ -33,7 +34,8 @@ export function createStackStore(dataRoot){
    captures.push(captured);
   }
   for(const declared of stack.evidence||[])evidence.push(evidenceCard(stack,declared,await artifact(id,stack,declared.id)));
-  const mapped=await maps.forStack(stack);return{...stack,...mapped,claims:stack.claims||[],evidence,captures,jevConfigured:!!process.env.TYPESAFE_API_KEY};
+  const coverage=[];for(const declared of stack.coverage||[])coverage.push(coverageView(await artifact(id,stack,declared.id)));
+  const mapped=await maps.forStack(stack);return{...stack,...mapped,claims:stack.claims||[],evidence,captures,coverage,jevConfigured:!!process.env.TYPESAFE_API_KEY};
  };
  return{
   async forReview(doc){
