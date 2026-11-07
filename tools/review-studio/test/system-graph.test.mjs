@@ -16,6 +16,9 @@ const pr18={nodes:[['git','Git adapter'],['snapshot','Change snapshot'],['cache'
  edges:edgeList([['git','snapshot','source + diff'],['snapshot','cache','component model'],['snapshot','judgment','claim + code'],['snapshot','checks','check snapshot'],['cache','review','map context'],['judgment','review','assessment'],['checks','review','test outcomes'],['review','handoff','review record'],['cli','contracts','profile + changed paths + trusted head'],['contracts','verdict','contract statuses'],['contracts','checks','coverage record (fingerprinted)']])};
 const stored=JSON.parse(readFileSync(new URL('../examples/stack/docviz.json',import.meta.url),'utf8'));
 const history={nodes:stored.nodes.map(n=>[n.id,n.title]),changed:[],edges:stored.edges};
+// Not a published graph: two flows between the same modules, a flow skipping two ranks, and fan-in.
+const parallel={nodes:[['a','Source'],['b','Middle'],['c','Later'],['d','Sink']],changed:['a'],
+ edges:edgeList([['a','b','request'],['a','b','retry request'],['b','c','result'],['c','d','record'],['a','d','audit copy'],['b','d','usage']])};
 // Not a published graph: a cycle and a self-reference, to check the fallback stays legible and honest.
 const cyclic={nodes:[['a','Planner'],['b','Executor'],['c','Reviewer'],['d','Archive']],changed:['b'],
  edges:edgeList([['a','b','plan'],['b','c','result'],['c','a','revision request'],['c','d','approved record'],['b','b','retry']])};
@@ -90,12 +93,12 @@ function checkGeometry(graph,width){
  return{r,g,problems};
 }
 
-for(const[name,graph]of[['PR1',pr1],['PR18',pr18],['reconstructed history',history],['cyclic fallback',cyclic]])for(const width of[1676,1280,390])
+for(const[name,graph]of[['PR1',pr1],['PR18',pr18],['reconstructed history',history],['parallel and skipping flows',parallel],['cyclic fallback',cyclic]])for(const width of[1676,1280,390])
  test(`${name} system map at ${width}px: arrows run between their declared modules and labels sit on their own arrow`,()=>{
   const{problems,g,r}=checkGeometry(graph,width);
   assert.deepEqual(problems,[]);
   assert.equal(attr(g.svgTag,'width'),String(g.W),'drawn at its own size so 11px labels are not scaled down');
-  const available=width-68;
+  const available=Math.min(width,1340)-70;// .behavior-workspace: max-width 1340, 34px padding, 1px border
   if(g.W>available)assert.match(r.html,/class="flow-pan-cue"[^>]*>[^<]*scroll/i,'a wider-than-view map says it pans');
   else assert.doesNotMatch(r.html,/flow-pan-cue/);
   r.view.dispose();
