@@ -16,7 +16,7 @@ function realCoverage(t,{trust=true}={}){
  const g=(...a)=>execFileSync('git',a,{cwd:dir,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
  g('init','-q');g('config','user.email','t@example.test');g('config','user.name','t');g('remote','add','origin','https://example.test/a/b.git');
  writeFileSync(join(dir,'package.json'),'{ "type": "module" }\n');g('add','-A');g('commit','-qm','base');const base=g('rev-parse','HEAD');
- mkdirSync(join(dir,'extension'));for(const f of readdirSync(join(repoRoot,'extension')).filter(f=>f.endsWith('.js')))writeFileSync(join(dir,'extension',f),readFileSync(join(repoRoot,'extension',f)));
+ mkdirSync(join(dir,'extension'));for(const d of readdirSync(join(repoRoot,'extension'),{withFileTypes:true}).filter(d=>d.isFile()))writeFileSync(join(dir,'extension',d.name),readFileSync(join(repoRoot,'extension',d.name)));
  g('add','-A');g('commit','-qm','cards');const head=g('rev-parse','HEAD');
  const steps=join(dir,'..',`${dir.split('/').at(-1)}-steps.json`),out=join(dir,'..',`${dir.split('/').at(-1)}-coverage.json`);t.after(()=>{rmSync(steps,{force:true});rmSync(out,{force:true});});
  writeFileSync(steps,JSON.stringify({steps:[{id:'draw',label:'A selection becomes a card',changed:true,sources:[{path:'extension/background.js',from:'export async function visualizeSelection(',to:'// ---------- per-card actions'}]}],card:{caption:'Draw.',mermaid:'flowchart TD\n  draw["A selection becomes a card"]:::changed\n  classDef changed stroke:#d29922,stroke-width:3px'}}));
