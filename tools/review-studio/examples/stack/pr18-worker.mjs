@@ -5,7 +5,7 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 const [root,scenarioId,scratch,targetRoot,stepsFile,profileFile]=process.argv.slice(2);
-if(!root||!scratch||!['malformed-cache','missing-context','canonical-evidence','contract-review'].includes(scenarioId))throw new Error('Usage: pr18-worker.mjs CHECKOUT SCENARIO SCRATCH [TARGET_CHECKOUT STEPS PROFILE]');
+if(!root||!scratch||!['malformed-cache','missing-context','source-context','canonical-evidence','contract-review'].includes(scenarioId))throw new Error('Usage: pr18-worker.mjs CHECKOUT SCENARIO SCRATCH [TARGET_CHECKOUT STEPS PROFILE]');
 await mkdir(scratch,{recursive:true});
 const load=path=>import(pathToFileURL(resolve(root,'tools/review-studio',path)).href);
 const commit=spawnSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).stdout.trim();
@@ -44,6 +44,21 @@ if(scenarioId==='malformed-cache'){
  output={status:evidence.result,supported:evidence.supported,contradicted:evidence.contradicted,contextSufficient:evidence.contextSufficient??null,uncertaintyReason:evidence.uncertaintyReason??null,criteriaVersion:evidence.criteriaVersion??'original-two-question',thresholds:evidence.thresholds??null};
  frame('transform','Run judgeClaims with the intercepted response','judgment',{scores:answers,requestedQuestions:Object.keys(request.questions)},output,true);
  frame('output','Read the actual recorded source judgment','judgment',{recordKind:evidence.kind},output,true);
+}else if(scenarioId==='source-context'){
+ const {judgeClaims}=await load('agents.mjs');
+ const sourceText="const THRESHOLD = 0.6;\nfunction allowed(score) { return score >= THRESHOLD; }\nexport function decide(score) {\n return allowed(score) ? 'accept' : 'review';\n}\n";
+ const property={id:'complete-source',condition:'decide is checked',expectation:'decide accepts at its declared threshold',sources:[{side:'head',path:'controlled-source.js',from:3,to:5}]};
+ const input={claim:property.expectation,anchor:property.sources[0],controlledSource:sourceText};
+ frame('input','The anchor omits the threshold and helper','judgment',input,{anchorOnly:sourceText.split('\n').slice(2,5).join('\n')},false);
+ process.env.TYPESAFE_API_KEY='docviz-capture-fixture-not-a-real-key';
+ let request,record,requests=0;
+ globalThis.fetch=async(url,options)=>{if(url!=='https://api.typesafe.ai/v1/systemone')throw Error('Unexpected fixture request');request=JSON.parse(options.body);requests++;return{ok:true,json:async()=>({model:'controlled-response',answers:{contextSufficient:{noul:1},supported:{noul:1},contradicted:{noul:0}}})};};
+ await judgeClaims({properties:[property]},async()=>({text:sourceText}),async e=>{record=e;return e;});
+ if(requests!==1)throw Error('Expected one intercepted request');
+ const includesThreshold=request.state.code.includes('const THRESHOLD'),includesHelper=request.state.code.includes('function allowed');
+ output={status:includesThreshold&&includesHelper?'expanded':'clipped',includesThreshold,includesHelper,files:record.sourceContext?.files.map(f=>({path:f.path,from:f.from,to:f.to}))||[],packetBytes:Buffer.byteLength(request.state.code),packetDigest:record.sourceContext?.digest??null};
+ frame('transform','Inspect the actual outgoing source packet','judgment',input,output,true);
+ frame('output','Definitions supplied, not runtime certified','judgment',{requestIntercepted:true},output,true);
 }else if(scenarioId==='contract-review'){
  // This revision's own `docviz pr`, run as a process on the frozen PR1 target. The verdict and any
  // coverage come only from what that process printed and wrote; nothing is read from the candidate.
