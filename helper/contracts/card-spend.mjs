@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url';
 
 const root = resolve(process.argv[2]);
 const PATH = ['draw one card', 'call fails after spending', 'retry', 'dismiss while the call is out', 'helper returns usage', 'compare ledger with card and page totals'];
-const SCOPE = 'Target’s committed extension code in a Node child process: its exported visualizeSelection and registered card:retry / card:dismiss handlers, with chrome.* storage and helper replies as controlled fixtures. The side panel’s page-total expression is evaluated on the captured state; no browser, DOM or provider call. One scenario, not every path.';
+const SCOPE = 'Target’s committed extension code in a Node child process: its exported visualizeSelection and registered card:retry / card:dismiss handlers, with chrome.* storage and helper replies as controlled fixtures. The side panel’s page-total expression is evaluated on the captured state after each action (observed.frames); no browser, DOM or provider call. One scenario, not every path.';
 const print = (o) => process.stdout.write(JSON.stringify({ path: PATH, scope: SCOPE, ...o }));
 const inapplicable = (detail) => { print({ outcome: 'inapplicable', observed: {}, detail }); process.exit(0); };
 
@@ -55,6 +55,18 @@ const usage = { usd: 1, estimated: false, provider: 'controlled-helper', inputTo
 const settle = () => new Promise((r) => setTimeout(r, 50));
 const cardsOf = (tab) => (records.session[`tab:${tab}`]?.keys || []).map((k) => records.session[`card:${k}`]).filter(Boolean);
 const costOf = (card) => card?.cost?.usd || 0;
+const pageTotal = (state) => Function('cards', 'state', `return (${pageExpr});`)(cardsOf(1), state);
+// What storage held right after an action: the ledger, the card record and the side panel's page total.
+const frames = [];
+const snapshot = (id, action, key) => {
+  const card = key ? records.session[`card:${key}`] : undefined;
+  const state = records.session['tab:1'] || { keys: [] };
+  frames.push({
+    id, action, ledgerPaid: records.local.spend.total, ledgerCalls: records.local.spend.calls,
+    card: { present: !!card, status: card?.status ?? null, cost: card?.cost?.usd ?? null },
+    tabCards: state.keys.length, unassigned: state.unassigned || 0, pageTotal: pageTotal(state),
+  });
+};
 
 try {
   const background = await import(pathToFileURL(backgroundFile).href);
@@ -66,26 +78,30 @@ try {
   const first = await nextRequest();
   const key = records.session['tab:1']?.keys?.[0];
   if (!key) inapplicable('visualizeSelection made no card for the tab');
+  snapshot('before-first-reply', 'draw one card; the helper call is out', key);
   first({ ok: false, status: 500, json: async () => ({ error: 'controlled failure after spending', usage }) });
   await drawing;
   await settle();
+  snapshot('after-failed-draw', 'the call fails after spending $1', key);
 
   await send({ type: 'card:retry', key });
   const second = await nextRequest();
+  snapshot('after-retry-request', 'Retry; a second call is out', key);
   const chargedBeforeDismiss = cardsOf(1).reduce((t, c) => t + costOf(c), 0) + (records.session['tab:1']?.unassigned || 0);
   await send({ type: 'card:dismiss', key });
   await settle();
+  snapshot('after-dismiss', 'Dismiss while the call is out', key);
   const dismissed = !records.session[`card:${key}`];
 
   second({ ok: true, status: 200, json: async () => ({ result: { title: 'Returned', mermaid: 'flowchart TD\n A["Returned"]' }, usage }) });
   await settle();
+  snapshot('after-late-return', 'the late call returns with $1 of usage', key);
 
-  const state = records.session['tab:1'] || { keys: [] };
-  const pageTotalAfter = Function('cards', 'state', `return (${pageExpr});`)(cardsOf(1), state);
+  const pageTotalAfter = frames.at(-1).pageTotal;
   const ledgerPaid = records.local.spend.total;
   const helperReported = 2 * usage.usd;
   const unattributed = helperReported - chargedBeforeDismiss - pageTotalAfter;
-  const observed = { helperReported, ledgerPaid, chargedBeforeDismiss, dismissed, pageTotalAfter, unattributed, cardRecordAfter: records.session[`card:${key}`] ? 'present' : 'absent' };
+  const observed = { helperReported, ledgerPaid, chargedBeforeDismiss, dismissed, pageTotalAfter, unattributed, cardRecordAfter: records.session[`card:${key}`] ? 'present' : 'absent', frames };
   const holds = ledgerPaid === helperReported && unattributed === 0;
   print({ outcome: holds ? 'holds' : 'fails', observed,
     detail: holds ? 'every reported call is in the ledger and on a card or the page total'

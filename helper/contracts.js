@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, isAbsolute, join, relative } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -68,9 +68,14 @@ export const definitionDigest = (contract) => digest(contract);
 
 /** Reads the profile the operator named; one inside the reviewed checkout is the author's text, so it's refused. */
 export function loadProfile(file, root) {
-  const real = realpathSync(file);
-  const rel = relative(realpathSync(root), real);
-  if (!rel.startsWith('..') && !isAbsolute(rel)) throw new Error(`contract profile: ${file} is inside the reviewed checkout, where the author can edit it; keep it outside`);
+  // By path segments, not prefixes: `..profile.json` is inside, `repo-profiles/` beside `repo/` is not.
+  const within = (p, dir) => { const rel = relative(dir, p); return rel === '' || (!isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${sep}`)); };
+  const named = resolve(file);
+  const real = realpathSync(named);
+  // The named path, its folder's real location, and the file it finally reads: an inside link is the author's choice too.
+  const paths = [named, join(realpathSync(dirname(named)), basename(named)), real];
+  const roots = [resolve(root), realpathSync(root)];
+  if (paths.some((p) => roots.some((r) => within(p, r)))) throw new Error(`contract profile: ${file} is inside the reviewed checkout, where the author can edit it; keep it outside`);
   const text = readFileSync(real, 'utf8');
   return { contracts: parseProfile(text), digest: digest(text), label: basename(real) };
 }

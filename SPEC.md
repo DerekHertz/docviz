@@ -206,7 +206,11 @@ returns one PR comment.
   With `--trust-head SHA` equal to HEAD, docviz copies the head's committed files into a temp folder
   and runs its own harness there, in a child process with a scrubbed environment and a 30 s timeout.
   `card-spend` drives `extension/background.js` through draw → fail after spending → Retry →
-  Dismiss → late return, with chrome.* and the helper as controlled fixtures. Only a record that run
+  Dismiss → late return, with chrome.* and the helper as controlled fixtures, and records the ledger,
+  card and side-panel page total it read after each action in `observed.frames` (the studio animates
+  only those; a record without frames has none to show). "Inside the checkout" is by path segment, for
+  the named path, its folder's real location and the file it reads, so `..profile.json` and links
+  are caught while a sibling `repo-profiles/` is not. Only a record that run
   made counts as executed. A record read from a file is "reported", whatever its fields or digest say.
   Each contract is `violated` (the harness failed at this repo, base, head, definition and
   harness: **Needs you**), `unverified` (no run, no harness, reported-only, unrelated evidence, code

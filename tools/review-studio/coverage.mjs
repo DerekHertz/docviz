@@ -21,6 +21,8 @@ export function validateCoverage(result) {
     if (o.authority?.kind !== 'operator-selected') fail(`${o.contractId} has authority other than operator-selected`);
     const e = o.evidence;
     if (e !== null && (typeof e !== 'object' || !['executed-by-docviz', 'reported'].includes(e.provenance))) fail(`${o.contractId} evidence has unknown provenance`);
+    const frames = e?.observed?.frames;
+    if (frames !== undefined && (!Array.isArray(frames) || frames.some((f) => !f || typeof f.id !== 'string' || !f.id || typeof f.action !== 'string') || new Set(frames.map((f) => f.id)).size !== frames.length)) fail(`${o.contractId} has malformed recorded frames`);
     if (o.status === 'violated' || o.status === 'supported-in-scope') {
       const outcome = o.status === 'violated' ? 'fails' : 'holds';
       if (e?.provenance !== 'executed-by-docviz' || e.outcome !== outcome || e.head !== result.head || e.base !== result.base) fail(`${o.contractId} is ${o.status} without a matching docviz execution at this head`);
@@ -40,7 +42,8 @@ export function coverageView(result) {
     applies: o.applicability?.applies ?? null, touched: o.applicability?.touched || [],
     omittedBySummary: !!o.summary?.omittedBySummary, omitted: o.summary?.omitted || [],
     authority: 'Operator-selected (not a signature)', governing: (o.authority.governing || []).map(span),
-    evidence: o.evidence && { provenance: o.evidence.provenance, outcome: o.evidence.outcome, scope: o.evidence.scope, observed: o.evidence.observed, path: o.evidence.path, head: o.evidence.head, harness: o.evidence.harness?.id },
+    // frames: the states the harness captured after each action, as recorded; null means none were recorded.
+    evidence: o.evidence && { provenance: o.evidence.provenance, outcome: o.evidence.outcome, scope: o.evidence.scope, observed: o.evidence.observed, frames: o.evidence.observed?.frames ?? null, path: o.evidence.path, head: o.evidence.head, harness: o.evidence.harness?.id },
   })).sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status));
   return { id: result.id, head: result.head, base: result.base, counts, needsReview: counts.violated + counts.unverified + counts.stale > 0, rows };
 }

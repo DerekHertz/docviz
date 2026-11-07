@@ -190,6 +190,8 @@ test('the same target with the late return charged to the page holds within the 
   const o = run.coverage.obligations[0];
   assert.deepEqual([o.status, o.reason, o.evidence.outcome], ['supported-in-scope', 'executed-holds', 'holds']);
   assert.deepEqual([o.evidence.observed.ledgerPaid, o.evidence.observed.pageTotalAfter, o.evidence.observed.unattributed], [2, 1, 0]);
+  assert.deepEqual(o.evidence.observed.frames.map((f) => [f.id, f.ledgerPaid, f.pageTotal, f.unassigned]), [
+    ['before-first-reply', 0, 0, 0], ['after-failed-draw', 1, 1, 0], ['after-retry-request', 1, 1, 0], ['after-dismiss', 1, 0, 0], ['after-late-return', 2, 1, 1]]);
   assert.doesNotMatch(run.stdout.split('## How this PR works')[0], /spend-attribution/, 'a held contract adds no verdict reason');
   assert.notEqual(verdictLine(run.stdout), '**Needs you**');
 });
