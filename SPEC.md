@@ -210,18 +210,24 @@ returns one PR comment.
   of another commit runs nothing (`trust-other-head`). With `--trust-head` equal to HEAD, docviz copies the head's committed files into a temp folder
   and runs its own harness there, in a child process with a scrubbed environment and a 30 s timeout.
   Trusting a head lets its code run; it never makes that code's account of itself evidence. The
-  harness's controller loads none of the reviewed code. `background.js` runs in one child process
-  and the side panel's page-total expression in another (`card-spend-device.mjs`), each under
-  Node's permission model (`--permission`: no file writes, no reads outside its copy, no child
-  processes or workers) with only an IPC channel back. The controller holds chrome.* storage and the
-  helper's replies and computes every frame and the outcome; a child's messages are the target's
-  effects, and one it doesn't expect, or a child that exits early, is a harness error. Until
-  2026-11-06 the harness imported the reviewed code into its own process and printed the result,
-  so code that printed `holds` and exited read `supported-in-scope`. Limits: Node calls its
-  permission model a seat belt, not a guarantee against malicious code, and code that escapes it runs
-  as the operator's user; code that detects the harness can behave differently in Chrome; a Node
-  without `--permission` can't start the reviewed code, so the run reads as a harness error. The
-  harness's identity (`harnessDigest`) covers both files.
+  harness's controller loads none of the reviewed code. `background.js` runs in a child process
+  (`card-spend-device.mjs`) under Node's permission model (`--permission`: no file writes, no
+  reads outside its copy, no child processes or workers) with only an IPC channel back. The
+  controller holds chrome.* storage and the helper's replies and computes every frame and the
+  outcome. It takes the child's messages only as chrome.storage and fetch calls, never as a value
+  or result; a message it doesn't expect, or a child that exits early, is a harness error. No
+  side-panel code runs. The page total is read from `sidepanel.js` only when its
+  `const page = …;` is the card-cost sum (`cards.reduce` adding each `cost.usd || 0`, from
+  `state.unassigned || 0` or `0`, any parameter names or spacing), and the controller computes
+  that sum; any other page total is unsupported (`surface-missing`). The harness evaluates no
+  general JS. Until 2026-11-06 the harness imported the reviewed code into its own process and
+  printed the result, so code that printed `holds` and exited read `supported-in-scope`; the
+  first fix then ran the page expression in a child whose reported value that expression could
+  forge over the same channel. Limits: Node calls its permission model a seat belt, not a
+  guarantee against malicious code, and code that escapes it runs as the operator's user; code
+  that detects the harness, for example by its Node globals, can make different chrome.storage
+  calls here than in Chrome; a Node without `--permission` can't start the reviewed code, so the
+  run reads as a harness error. The harness's identity (`harnessDigest`) covers both files.
   `card-spend` drives `extension/background.js` through draw → fail after spending → Retry →
   Dismiss → late return, with chrome.* and the helper as controlled fixtures, and records the ledger,
   card and side-panel page total it read after each action in `observed.frames` (the studio animates

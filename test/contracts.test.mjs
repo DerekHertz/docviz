@@ -83,7 +83,7 @@ test('code the harness can’t drive, or a harness that breaks, is uncertainty',
   const inapplicable = runHarness(contract, bare);
   assert.equal(inapplicable.outcome, 'inapplicable');
   assert.deepEqual(status(judge(contract, facts({ binding: bare.binding, evidence: inapplicable }))), ['unverified', 'surface-missing']);
-  const broken = repoWith({ 'package.json': '{ "type": "module" }\n', 'extension/background.js': 'throw new Error("boom")\n', 'extension/sidepanel.js': 'const page = 0;\n' });
+  const broken = repoWith({ 'package.json': '{ "type": "module" }\n', 'extension/background.js': 'throw new Error("boom")\n', 'extension/sidepanel.js': 'const page = cards.reduce((t, c) => t + (c.cost?.usd || 0), 0);\n' });
   const error = runHarness(contract, broken);
   assert.equal(error.outcome, 'error');
   assert.deepEqual(status(judge(contract, facts({ binding: broken.binding, evidence: error }))), ['unverified', 'harness-error']);

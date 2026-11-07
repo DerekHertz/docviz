@@ -1,10 +1,10 @@
 // The card-spend harness, run by helper/contracts.js in a child process over a copy of the target's
 // committed extension/ files. This controller loads none of that code. The target's background.js runs
-// in one child process and the side panel's page-total expression in another (card-spend-device.mjs),
-// each under Node's permission model. The controller holds chrome.* storage and the helper's HTTP
-// replies, drives visualizeSelection and the registered Retry and Dismiss handlers, and computes every
-// frame and the outcome from what the code did at that boundary. A child's messages are the target's
-// effects, never a result: what the reviewed code prints, sends or patches can't author the outcome.
+// in a child process under Node's permission model (card-spend-device.mjs). The controller holds
+// chrome.* storage and the helper's HTTP replies, drives visualizeSelection and the registered Retry and
+// Dismiss handlers, and computes every frame and the outcome from what the code did at that boundary.
+// The child's messages are taken only as its chrome.storage and fetch calls, never as a value or result.
+// No side-panel code runs: its page total is recognized in the source and computed here.
 // It prints one JSON object: { outcome, observed, path, scope, detail }.
 // Ported from historical-review/grounding/replay-pr1-dismiss-gap.mjs.
 import { fork } from 'node:child_process';
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const DEVICE = join(dirname(fileURLToPath(import.meta.url)), 'card-spend-device.mjs');
 const root = realpathSync(resolve(process.argv[2]));
 const PATH = ['draw one card', 'call fails after spending', 'retry', 'dismiss while the call is out', 'helper returns usage', 'compare ledger with card and page totals'];
-const SCOPE = 'Target’s committed extension code, run by a docviz controller that loads none of it: background.js in one Node child process and the side panel’s page-total expression in another, each under Node’s permission model (no file writes, no reads outside its copy, no child processes or workers). The controller holds chrome.* storage and the helper’s replies, drives the exported visualizeSelection and the registered card:retry / card:dismiss handlers, and records the ledger, card and page total after each action (observed.frames); nothing the reviewed code prints or sends is taken as a result. No browser, DOM or provider call. One scenario, not every path, and code that detects this harness can behave differently in Chrome.';
+const SCOPE = 'Target’s committed extension code, run by a docviz controller that loads none of it. background.js runs in a Node child process under Node’s permission model (no file writes, no reads outside its copy, no child processes or workers); its messages are taken only as chrome.storage and fetch calls, never as a value or result. The controller holds chrome.* storage and the helper’s replies, drives the exported visualizeSelection and the registered card:retry / card:dismiss handlers, and records the ledger, card and page total after each action (observed.frames). No side-panel code runs: the page total is read from sidepanel.js only when it is the card-cost sum (cards.reduce adding each cost.usd || 0, from state.unassigned || 0 or 0) and docviz computes that sum; any other page total is unsupported. No browser, DOM or provider call. One scenario, not every path, and code that detects this harness can behave differently in Chrome.';
 const LIMIT = { messages: 10_000, quietMs: 50, requestMs: 3000, totalMs: 20_000 };
 
 const children = new Set();
@@ -30,11 +30,11 @@ const stop = (outcome, detail) => { print({ outcome, observed: {}, detail }); re
 const said = (text) => String(text).split('\n')[0].slice(0, 300);
 setTimeout(() => stop('error', `the scenario did not finish in ${LIMIT.totalMs / 1000} s`), LIMIT.totalMs);
 
-/** A child process holding reviewed code, and the messages it sent, each checked before use. */
-function device(role, readable) {
-  const child = fork(DEVICE, [role, root], {
+/** The child process holding the reviewed background.js, and the messages it sent, each checked before use. */
+function device() {
+  const child = fork(DEVICE, [root], {
     cwd: root, env: {}, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], serialization: 'json',
-    execArgv: ['--permission', ...readable.map((p) => `--allow-fs-read=${p}`)],
+    execArgv: ['--permission', `--allow-fs-read=${root}`, `--allow-fs-read=${DEVICE}`],
   });
   children.add(child);
   const waiting = new Map();
@@ -54,16 +54,25 @@ function device(role, readable) {
     if (waiting.has(key)) { const ok = waiting.get(key); waiting.delete(key); return ok(m); }
     if (!d.handle(m)) stop('error', `the reviewed code sent the harness an unexpected “${said(m.type).slice(0, 40)}” message`);
   });
-  child.on('error', (e) => stop('error', `the ${role} process failed: ${said(e.message)}`));
-  child.on('exit', (code, signal) => stop('error', `the reviewed code’s ${role} process exited (${signal || `code ${code}`}) before the scenario finished`));
+  child.on('error', (e) => stop('error', `the background process failed: ${said(e.message)}`));
+  child.on('exit', (code, signal) => stop('error', `the reviewed code’s background process exited (${signal || `code ${code}`}) before the scenario finished`));
   return d;
 }
 
+// The side panel's page total, recognized and never run: the card-cost sum under any parameter names
+// and spacing, from `state.unassigned || 0` or `0`. This harness supports no other JS for it.
+const NAME = '([A-Za-z_$][\\w$]*)';
+const S = '\\s*';
+const PAGE_SUM = new RegExp(`^cards${S}\\.${S}reduce${S}\\(${S}\\(${S}${NAME}${S},${S}${NAME}${S}\\)${S}=>${S}\\1${S}\\+${S}\\(${S}\\2${S}\\.${S}cost${S}\\?\\.${S}usd${S}\\|\\|${S}0${S}\\)${S},${S}(state${S}\\.${S}unassigned${S}\\|\\|${S}0|0)${S}\\)$`);
 const backgroundFile = join(root, 'extension/background.js');
 const sidepanelFile = join(root, 'extension/sidepanel.js');
 if (!existsSync(backgroundFile)) await stop('inapplicable', 'extension/background.js is absent');
-const pageExpr = existsSync(sidepanelFile) && readFileSync(sidepanelFile, 'utf8').match(/const page = (.*);/)?.[1];
-if (!pageExpr) await stop('inapplicable', 'extension/sidepanel.js has no `const page = …;` page total');
+const pageSource = existsSync(sidepanelFile) && readFileSync(sidepanelFile, 'utf8').match(/const page = (.*);/)?.[1];
+if (!pageSource) await stop('inapplicable', 'extension/sidepanel.js has no `const page = …;` page total');
+const pageForm = pageSource.trim().match(PAGE_SUM);
+if (!pageForm || pageForm[1] === pageForm[2]) await stop('inapplicable', 'extension/sidepanel.js’s page total is not the card-cost sum this harness computes (cards.reduce adding each cost.usd || 0, from state.unassigned || 0 or 0); docviz runs no side-panel code');
+const withUnassigned = pageForm[3] !== '0';
+const pageTotalOf = (cards, state) => cards.reduce((t, c) => t + (c.cost?.usd || 0), withUnassigned ? (state.unassigned || 0) : 0);
 
 // chrome.storage as the target wrote it. Null-prototype areas: a stored "__proto__" is just a key.
 const area = (values = {}) => Object.assign(Object.create(null), values);
@@ -76,7 +85,7 @@ const STORAGE = {
   remove: (r, arg) => { for (const k of keysOf(arg)) delete r[k]; return null; },
 };
 
-const background = device('background', [root, DEVICE]);
+const background = device();
 const requests = [];
 const waiters = [];
 background.handle = (m) => {
@@ -111,18 +120,18 @@ const act = async (type, fields) => {
 const usage = { usd: 1, estimated: false, provider: 'controlled-helper', inputTokens: 10, outputTokens: 10 };
 const cardsOf = (tab) => (records.session[`tab:${tab}`]?.keys || []).map((k) => records.session[`card:${k}`]).filter(Boolean);
 const costOf = (card) => card?.cost?.usd || 0;
-// What storage held right after an action: the ledger, the card record and what the side panel reads.
+// What storage held right after an action: the ledger, the card record and the side panel's page total.
 const frames = [];
-const pageInputs = [];
 const snapshot = (id, action, key) => {
   const card = key ? records.session[`card:${key}`] : undefined;
   const state = records.session['tab:1'] || { keys: [] };
+  const pageTotal = pageTotalOf(cardsOf(1), state);
+  if (!Number.isFinite(pageTotal)) return stop('error', `the page total is not a number after: ${action}`);
   frames.push({
     id, action, ledgerPaid: records.local.spend.total, ledgerCalls: records.local.spend.calls,
     card: { present: !!card, status: card?.status ?? null, cost: card?.cost?.usd ?? null },
-    tabCards: state.keys.length, unassigned: state.unassigned || 0, pageTotal: null,
+    tabCards: state.keys.length, unassigned: state.unassigned || 0, pageTotal,
   });
-  pageInputs.push(clone({ cards: cardsOf(1), state }));
 };
 
 try {
@@ -152,15 +161,6 @@ try {
   second({ ok: true, status: 200, body: { result: { title: 'Returned', mermaid: 'flowchart TD\n A["Returned"]' }, usage } });
   await settle();
   snapshot('after-late-return', 'the late call returns with $1 of usage', key);
-
-  // The side panel is its own page: its expression runs apart from background.js, on the states recorded above.
-  const page = device('page', [DEVICE]);
-  const totals = page.next('totals');
-  page.handle = (m) => { if (m.type !== 'failed') return false; return stop('error', `the side panel’s page total threw: ${said(m.detail)}`); };
-  page.post({ expr: pageExpr, inputs: pageInputs });
-  const { values } = await totals;
-  if (!Array.isArray(values) || values.length !== frames.length || !values.every(Number.isFinite)) await stop('error', 'the side panel’s page total is not a number at every frame');
-  frames.forEach((f, i) => { f.pageTotal = values[i]; });
 
   const pageTotalAfter = frames.at(-1).pageTotal;
   const ledgerPaid = records.local.spend.total;
