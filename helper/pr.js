@@ -14,6 +14,7 @@ import { movedSinceBase, resolveBase } from './moved-git.js';
 import { runBehavior } from './behavior.js';
 import { verdict, verdictLines } from './verdict.js';
 import { UNTRUSTED_GIT } from './git.js';
+import { assessContracts, contractFindings, contractsSection, loadProfile } from './contracts.js';
 
 export const MARKER = '<!-- docviz-pr-diagrams -->';
 const DOCVIZ_REPO = 'https://github.com/DerekHertz/docviz';
@@ -72,14 +73,15 @@ function checkSummary(checks) {
  * (markdown: Behavior, Modules moved) go after the step table, before the footer; `tlc` says TLC
  * ran, at no cost. `verdict` (helper/verdict.js verdictLines) opens the comment.
  */
-export function prComment({ card, steps, sha, repoUrl, usage, checked, version, checks, costs, drawnBy, sections = [], tlc = false, verdict }) {
+export function prComment({ card, steps, sha, repoUrl, usage, checked, version, checks, costs, drawnBy, sections = [], tlc = false, harness = false, verdict }) {
   const link = codeLink(repoUrl, sha);
   const agent = drawnBy === 'agent';
   const parts = costs ? [['diagram', costs.diagram], ['step checks', costs.checks], ['model checks', costs.models]].filter(([, u]) => u)
     : agent && checks ? [['step checks', usage]] : [];
   const cost = money(usage)
     + (parts.length > 1 ? ` (${parts.map(([k, u]) => `${k} ${money(u)}`).join(', ')})` : parts.length ? ` (${parts[0][0]})` : '')
-    + (tlc ? '; TLC runs locally, free' : '');
+    + (tlc ? '; TLC runs locally, free' : '')
+    + (harness ? '; contract harnesses run locally, free' : '');
   return [
     MARKER,
     ...(verdict ? [verdict.trimEnd(), ''] : []),
@@ -160,10 +162,13 @@ function baseFor(ref, cwd, log) {
  * Returns { body, missing, usage, moved, behavior }; throws with `usage` when the diagram can't be used.
  * `cwd` is the reviewed checkout (default: the current directory), so one process can review several.
  */
-export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: requested, model, check = true, ask, base: baseRef, trustAtlas = false, cwd = process.cwd(), log = () => {} }) {
+export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: requested, model, check = true, ask, base: baseRef, trustAtlas = false, contracts: profileFile, trustHead, cwd = process.cwd(), log = () => {} }) {
   const git = (...a) => execFileSync('git', [...UNTRUSTED_GIT, ...a], { encoding: 'utf8', cwd }).trim();
   const root = git('rev-parse', '--show-toplevel');
   const gitRaw = (...a) => execFileSync('git', [...UNTRUSTED_GIT, ...a], { encoding: 'utf8', cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+  const gitBuffer = (...a) => execFileSync('git', [...UNTRUSTED_GIT, ...a], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 << 20 });
+  // The operator's contract profile is read before any model call, so a bad one costs nothing.
+  const profile = profileFile ? loadProfile(resolve(cwd, profileFile), root) : null;
   const sha = git('rev-parse', 'HEAD');
   const repoUrl = repoWebUrl(git('remote', 'get-url', 'origin'));
   if (git('status', '--porcelain', '--untracked-files=no')) log('warning: uncommitted changes; links point at HEAD as committed');
@@ -186,6 +191,11 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
     }),
   }));
   const glossary = glossaryFile ? readFileSync(resolve(cwd, glossaryFile), 'utf8') : '';
+  // Contracts come from the operator's profile; the steps above only annotate what the summary left out.
+  const coverage = profile && assessContracts({
+    profile, gitRaw, gitBuffer, steps, trustHead, log, origin: repoUrl,
+    binding: { repositoryRoot: git('rev-list', '--max-parents=0', 'HEAD').split('\n').sort()[0], base: base.sha, head: sha },
+  });
 
   const provider = doc.card ? null : pickProvider(requested || 'auto', detectProviders());
   const spent = [];
@@ -251,11 +261,12 @@ export async function runPr({ stepsFile, prUrl, title, glossaryFile, provider: r
     const error = checks ? checks[i]?.error : notChecked;
     return { kind: 'step', source: 'pr', id: s.id, label: s.label, verdict: checks?.[i]?.verdict || 'unchecked', ...(error && { error }) };
   });
-  const v = verdict([...prSteps, ...behavior.findings]);
+  const v = verdict([...prSteps, ...behavior.findings, ...(coverage ? contractFindings(coverage) : [])]);
   log(`verdict: ${v.level}`);
   const body = prComment({
     card, steps, sha, repoUrl, usage, checked, version: docvizVersion(), checks, costs, drawnBy,
-    sections: [behavior.section(codeLink(repoUrl, sha)), movedPart.markdown], tlc: behavior.runs.length > 0, verdict: verdictLines(v),
+    sections: [...(coverage ? [contractsSection(coverage, codeLink(repoUrl, sha))] : []), behavior.section(codeLink(repoUrl, sha)), movedPart.markdown],
+    tlc: behavior.runs.length > 0, harness: !!coverage?.obligations.some((o) => o.evidence), verdict: verdictLines(v),
   });
-  return { body, missing: missingSteps(steps, card.mermaid), usage, checks, moved: movedPart.moved, behavior, verdict: v };
+  return { body, missing: missingSteps(steps, card.mermaid), usage, checks, moved: movedPart.moved, behavior, coverage, verdict: v };
 }

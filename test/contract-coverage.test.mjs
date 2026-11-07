@@ -194,6 +194,19 @@ test('the same target with the late return charged to the page holds within the 
   assert.notEqual(verdictLine(run.stdout), '**Needs you**');
 });
 
+test('a held scenario whose governing text can’t be found stays unverified, not supported', () => {
+  const r = otherRepo({ fixed: true });
+  const p = JSON.parse(readFileSync(renamedProfile(), 'utf8'));
+  p.contracts[0].governing = [{ path: 'POLICY.md', from: '## Spend', to: '' }];
+  const file = join(temp('profile'), 'profile.json');
+  writeFileSync(file, JSON.stringify(p));
+  const run = docviz(r.dir, oneStep(r.dir), '--base', r.base, '--contracts', file, '--trust-head', r.head);
+  assert.equal(run.status, 0, run.stderr);
+  const o = run.coverage.obligations[0];
+  assert.deepEqual([o.status, o.reason, o.evidence.outcome, o.authority.governing[0].resolved], ['unverified', 'governing-source-missing', 'holds', false]);
+  assert.match(run.stdout, /Contracts not checked at this head: `spend-attribution`/);
+});
+
 test('a change that touches none of the contract’s code is not applicable and runs nothing', () => {
   const r = otherRepo();
   g(r.dir, 'checkout', '--quiet', r.docsOnly);

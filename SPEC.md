@@ -159,8 +159,8 @@ returns one PR comment.
   through, 1 of 9 held-out can't-tell passed. Adding the definitions a step calls (one hop,
   `helper/context.js`) didn't help overall and let a wrong link pass on its helper's code, so it is
   not used.
-- The comment, top to bottom: marker, verdict and its reasons, diagram and step table, Behavior,
-  Modules moved, and last the footer with every model call's cost: the total and its parts
+- The comment, top to bottom: marker, verdict and its reasons, diagram and step table, Contracts
+  (with `--contracts`), Behavior, Modules moved, and last the footer with every model call's cost: the total and its parts
   (diagram, step checks, model checks). Below a cent a figure keeps two significant digits
   (`$0.00004`, `$0.00012`), so a Jev check never reads as `$0.000` and every figure, total or part,
   is within 5% of what was spent.
@@ -193,6 +193,28 @@ returns one PR comment.
   models run only with `--trust-atlas`; TLC needs `TLA2TOOLS` and `JAVA`, statechart is found in
   pstack's plugin cache or `DOCVIZ_STATECHART`. TLC is local and free; model-step checks are in the
   footer as "model checks".
+- Contracts (`helper/contracts.js`, 2026-11-06; regression: historical PR #1, whose five-step summary
+  left out dismissal and read "Look" while its late return lost spend). The summary is the author's
+  choice, so it can't decide which promises get checked. `--contracts PROFILE.json` names the
+  operator's contract profile, which must sit outside the reviewed checkout. Each contract has a
+  definition, its governing text (`path`/`from`/`to`, quoted from head, else base), its code
+  anchors, the files it depends on, and optionally a registered harness id. A profile that sets
+  `authority`, `confirmed`, `status`, `evidence` or `result`, names a command or path to run, or
+  names an unknown harness is refused before any model call. Authority is "operator-selected", not
+  an authenticated signature. A contract applies when `git diff base head` touches its anchors' files
+  or dependencies. The steps only annotate which anchors no step's lines cover ("omits dismiss").
+  With `--trust-head SHA` equal to HEAD, docviz copies the head's committed files into a temp folder
+  and runs its own harness there, in a child process with a scrubbed environment and a 30 s timeout.
+  `card-spend` drives `extension/background.js` through draw → fail after spending → Retry →
+  Dismiss → late return, with chrome.* and the helper as controlled fixtures. Only a record that run
+  made counts as executed. A record read from a file is "reported", whatever its fields or digest say.
+  Each contract is `violated` (the harness failed at this repo, base, head, definition and
+  harness: **Needs you**), `unverified` (no run, no harness, reported-only, unrelated evidence, code
+  the harness can't drive, harness error, or governing text not found), `stale` (evidence bound to
+  something else), both **Look**, or `supported-in-scope` (held on the one scenario, which is not
+  proof) or `not-applicable`, neither of which adds a reason. Harnesses are local and free (footer).
+  `--coverage-out FILE` writes the result (`kind: 'contract-coverage'`) that the review studio reads
+  through `tools/review-studio/coverage.mjs`.
 - `.atlas/` is the reviewed repo's text, checked where it is read and never dropped silently: a
   `rules.md` heading that isn't `## Name` (one TLA+ word), a rule with no sentence, a repeated
   name, or prose with no rule heading is a "look" reason naming its line; a `model.json` of the
