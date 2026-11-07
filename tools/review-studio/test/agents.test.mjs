@@ -80,3 +80,20 @@ test('a null provider response records an incomplete source check',async t=>{
  const evidence=await judgeClaims({properties:[{id:'p',condition:'a claim is checked',expectation:'its source can be assessed',sources:[{path:'a.js',side:'head',from:1,to:1}]}]},async()=>({text:'export const a = 1;'}),async e=>e);
  assert.equal(evidence.result,'unknown');assert.equal(evidence.uncertaintyReason,'invalid-model-response');
 });
+
+test('Jev receives and retains the complete source packet, not just its display anchor',async t=>{
+ controlledJev(t,{supported:{noul:1},contradicted:{noul:0},contextSufficient:{noul:1}});
+ let request;t.mock.method(globalThis,'fetch',async(_url,options)=>{request=JSON.parse(options.body);return{ok:true,json:async()=>({answers:{supported:{noul:1},contradicted:{noul:0},contextSufficient:{noul:1}}})};});
+ const doc={components:[{id:'c',files:['a.mjs','device.mjs']}],properties:[{id:'p',componentId:'c',condition:'the check runs',expectation:'the helper definition is included',sources:[{side:'head',path:'a.mjs',from:2,to:2}]}]};
+ const files={'a.mjs':'const threshold = 0.6;\nexport const check = () => threshold;','device.mjs':'export const pendingTimers = 0;'};
+ const evidence=await judgeClaims(doc,async path=>({text:files[path],commit:'a'.repeat(40),blob:'b'.repeat(40)}),async e=>e);
+ assert.match(request.state.code,/const threshold/);assert.match(request.state.code,/pendingTimers/);
+ assert.equal(evidence.sourceContext.code,request.state.code);assert.equal(evidence.requestSent,true);assert.equal(evidence.sourceContext.files.length,2);assert.equal(evidence.criteriaVersion,'source-context-v2');
+});
+
+test('unreadable seeds produce a local unknown without claiming a Jev request',async t=>{
+ controlledJev(t,{supported:{noul:1},contradicted:{noul:0},contextSufficient:{noul:1}});let calls=0;t.mock.method(globalThis,'fetch',async()=>{calls++;throw Error('must not call');});
+ const doc={properties:[{id:'p',condition:'a source is read',expectation:'it can be checked',sources:[{side:'head',path:'missing.js',from:1,to:1}]}]};
+ const evidence=await judgeClaims(doc,async()=>{throw Error('missing');},async e=>e);
+ assert.equal(calls,0);assert.equal(evidence.result,'unknown');assert.equal(evidence.uncertaintyReason,'source-unavailable');assert.equal(evidence.requestSent,false);assert.equal(evidence.actor.kind,'local-process');assert.equal(evidence.usage,null);
+});
