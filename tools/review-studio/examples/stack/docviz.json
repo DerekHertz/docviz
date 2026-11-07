@@ -1,0 +1,1003 @@
+{
+  "schema": 1,
+  "id": "docviz-review-pipeline",
+  "title": "From repository behavior to review attention",
+  "kind": "reconstructed-history",
+  "description": "A reconstructed stack of actual Docviz history: merged PRs #13, #14 and #15. These are historical layers, not currently open stacked GitHub PRs. No GitHub state is changed.",
+  "repository": {
+    "name": "docviz",
+    "remote": "https://github.com/DerekHertz/docviz"
+  },
+  "remote": "https://github.com/DerekHertz/docviz",
+  "target": "a616493d7124e9804b5d9550794a02dd77b536f1",
+  "tip": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+  "producer": {
+    "kind": "source-review",
+    "name": "Independent source reviewer",
+    "agent": "standalone_ground",
+    "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+    "role": "independent-reviewer"
+  },
+  "summary": "The cumulative change makes versioned repository behavior part of PR review. A model catalog supplies contracts and code-linked steps; the behavior layer produces comparison, rule and fidelity findings; the final layer turns those findings into explicit review attention and reasons.",
+  "layers": [
+    {
+      "id": "atlas",
+      "number": 13,
+      "title": "Give repository behavior a versioned home",
+      "summary": "Adds .atlas loading and validation: model files describe covered implementation, code-linked steps and checked rules. This layer makes behavior metadata readable from either the working directory or a Git revision; it does not run the models.",
+      "base": "a616493d7124e9804b5d9550794a02dd77b536f1",
+      "head": "31163ce9943ea7451db5ed0c2786a025e4e1454b",
+      "claims": [
+        {
+          "id": "atlas-models",
+          "label": "Malformed model metadata is retained as a model error.",
+          "condition": "A .atlas model folder has missing, invalid JSON or incorrectly shaped metadata.",
+          "expectation": "atlasFrom returns the model record with its error; valid covered-code paths are retained when possible.",
+          "sources": [
+            {
+              "path": "helper/atlas.js",
+              "from": 104,
+              "to": 131,
+              "side": "head",
+              "commit": "31163ce9943ea7451db5ed0c2786a025e4e1454b"
+            }
+          ],
+          "basis": "source-interpretation",
+          "producer": {
+            "kind": "source-review",
+            "name": "Independent source reviewer",
+            "agent": "standalone_ground",
+            "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+            "role": "independent-reviewer"
+          },
+          "layerId": "atlas",
+          "nodeId": "atlas",
+          "jev": {
+            "status": "not-assessed",
+            "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+            "questions": {
+              "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+              "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+            }
+          }
+        },
+        {
+          "id": "atlas-rules",
+          "label": "Unrecognized or incomplete rules text is reported rather than silently treated as a valid rule.",
+          "condition": "rules.md has invalid headings, empty named rules, repeated names or no rule headings.",
+          "expectation": "parseRules returns explicit problems alongside the accepted named rules.",
+          "sources": [
+            {
+              "path": "helper/atlas.js",
+              "from": 23,
+              "to": 53,
+              "side": "head",
+              "commit": "31163ce9943ea7451db5ed0c2786a025e4e1454b"
+            }
+          ],
+          "basis": "source-interpretation",
+          "producer": {
+            "kind": "source-review",
+            "name": "Independent source reviewer",
+            "agent": "standalone_ground",
+            "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+            "role": "independent-reviewer"
+          },
+          "layerId": "atlas",
+          "nodeId": "atlas",
+          "jev": {
+            "status": "not-assessed",
+            "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+            "questions": {
+              "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+              "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+            }
+          }
+        }
+      ],
+      "behaviorBefore": "The PR tooling has no helper/atlas.js loader and no repository .atlas model catalog at this target. PR diagrams and module movement already exist; behavior modeling itself is not being invented from nothing.",
+      "behaviorAfter": "Versioned model metadata, code membership, source-linked steps and rule names can be loaded and validated. Reading a model does not execute TLA or its view.",
+      "changedNodes": [
+        "atlas"
+      ],
+      "limitations": [
+        "The bundled card-money model has no .atlas/rules.md in this snapshot; user-rule ownership is not established by the bundled invariants.",
+        "Coverage is declared by model code paths, not an exhaustive dependency or execution analysis.",
+        "No model execution, Jev check or behavioral correctness follows from successfully reading the catalog."
+      ],
+      "parent": "a616493d7124e9804b5d9550794a02dd77b536f1",
+      "before": "The PR tooling has no helper/atlas.js loader and no repository .atlas model catalog at this target. PR diagrams and module movement already exist; behavior modeling itself is not being invented from nothing.",
+      "after": "Versioned model metadata, code membership, source-linked steps and rule names can be loaded and validated. Reading a model does not execute TLA or its view.",
+      "claimIds": [
+        "atlas-models",
+        "atlas-rules"
+      ],
+      "evidenceIds": [],
+      "stats": {
+        "files": 7,
+        "added": 475,
+        "removed": 0
+      }
+    },
+    {
+      "id": "behavior",
+      "number": 14,
+      "title": "Compare behavior and expose missing checks",
+      "summary": "Connects repository models to PR review: touched models can run at base and head, chart deltas and rule findings are reported, model step labels can be checked against code by Jev, and changed source with no model is exposed.",
+      "base": "31163ce9943ea7451db5ed0c2786a025e4e1454b",
+      "head": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+      "claims": [
+        {
+          "id": "behavior-trust",
+          "label": "Touched runnable models execute at base and head only when repository trust and required tooling permit it.",
+          "condition": "The comparison touches a valid model.",
+          "expectation": "runBehavior either records why the model was not run, or executes the available valid base/head models and retains run errors.",
+          "sources": [
+            {
+              "path": "helper/behavior.js",
+              "from": 330,
+              "to": 359,
+              "side": "head",
+              "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867"
+            }
+          ],
+          "basis": "source-interpretation",
+          "producer": {
+            "kind": "source-review",
+            "name": "Independent source reviewer",
+            "agent": "standalone_ground",
+            "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+            "role": "independent-reviewer"
+          },
+          "layerId": "behavior",
+          "nodeId": "compare",
+          "jev": {
+            "status": "not-assessed",
+            "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+            "questions": {
+              "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+              "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+            }
+          }
+        },
+        {
+          "id": "behavior-jev",
+          "label": "An unavailable Jev check remains an unchecked model-step finding.",
+          "condition": "A touched model has a code-linked step and source checking is disabled or no key is configured.",
+          "expectation": "The step is retained as unchecked. Disabled checks and missing keys include an explanatory reason; an absent provider answer may have no reason.",
+          "sources": [
+            {
+              "path": "helper/behavior.js",
+              "from": 374,
+              "to": 393,
+              "side": "head",
+              "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867"
+            }
+          ],
+          "basis": "source-interpretation",
+          "producer": {
+            "kind": "source-review",
+            "name": "Independent source reviewer",
+            "agent": "standalone_ground",
+            "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+            "role": "independent-reviewer"
+          },
+          "layerId": "behavior",
+          "nodeId": "claims",
+          "jev": {
+            "status": "not-assessed",
+            "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+            "questions": {
+              "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+              "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+            }
+          }
+        }
+      ],
+      "behaviorBefore": "Atlas metadata can be read, but the PR command does not yet run helper/behavior.js to compare model behavior and report its findings.",
+      "behaviorAfter": "PR review includes model runs, chart state/edge changes, rule outcomes, code-fidelity checks and coverage gaps. Failed or unavailable checks remain findings.",
+      "changedNodes": [
+        "compare",
+        "claims"
+      ],
+      "limitations": [
+        "Model results concern the model and its configured bounds; source correspondence is separate.",
+        "The unit-test harness explicitly fakes TLC output. Parser/transformer execution against that data is real, but it is not a fresh model-checking result.",
+        "Jev is unavailable without TYPESAFE_API_KEY, so a live source judgment cannot be claimed.",
+        "Source coverage is a declared-path heuristic; it is not all runtime behavior or dependency coverage."
+      ],
+      "parent": "31163ce9943ea7451db5ed0c2786a025e4e1454b",
+      "before": "Atlas metadata can be read, but the PR command does not yet run helper/behavior.js to compare model behavior and report its findings.",
+      "after": "PR review includes model runs, chart state/edge changes, rule outcomes, code-fidelity checks and coverage gaps. Failed or unavailable checks remain findings.",
+      "claimIds": [
+        "behavior-trust",
+        "behavior-jev"
+      ],
+      "evidenceIds": [],
+      "stats": {
+        "files": 8,
+        "added": 851,
+        "removed": 39
+      }
+    },
+    {
+      "id": "verdict",
+      "number": 15,
+      "title": "Turn findings into review attention",
+      "summary": "Adds a deterministic ordered policy that combines PR-step and behavior findings into needs you, look when you can, or nothing for you. The verdict appears at the beginning of the generated PR comment.",
+      "base": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+      "head": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+      "claims": [
+        {
+          "id": "verdict-break",
+          "label": "A breaking modeled rule routes to needs you.",
+          "condition": "A rule or extra-rule finding has status breaks.",
+          "expectation": "The rule-breaks row assigns needs; the aggregate preserves that highest attention level and reason.",
+          "sources": [
+            {
+              "path": "helper/verdict.js",
+              "from": 24,
+              "to": 28,
+              "side": "head",
+              "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2"
+            },
+            {
+              "path": "helper/verdict.js",
+              "from": 89,
+              "to": 100,
+              "side": "head",
+              "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2"
+            }
+          ],
+          "basis": "source-interpretation",
+          "producer": {
+            "kind": "source-review",
+            "name": "Independent source reviewer",
+            "agent": "standalone_ground",
+            "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+            "role": "independent-reviewer"
+          },
+          "layerId": "verdict",
+          "nodeId": "policy",
+          "jev": {
+            "status": "not-assessed",
+            "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+            "questions": {
+              "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+              "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+            }
+          }
+        },
+        {
+          "id": "verdict-unknown",
+          "label": "An unrecognized finding kind routes to look when you can.",
+          "condition": "A supplied finding matches none of the ordered policy rows.",
+          "expectation": "The UNKNOWN fallback supplies a look reason instead of discarding the finding.",
+          "sources": [
+            {
+              "path": "helper/verdict.js",
+              "from": 86,
+              "to": 100,
+              "side": "head",
+              "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2"
+            }
+          ],
+          "basis": "source-interpretation",
+          "producer": {
+            "kind": "source-review",
+            "name": "Independent source reviewer",
+            "agent": "standalone_ground",
+            "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+            "role": "independent-reviewer"
+          },
+          "layerId": "verdict",
+          "nodeId": "policy",
+          "jev": {
+            "status": "not-assessed",
+            "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+            "questions": {
+              "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+              "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+            }
+          }
+        }
+      ],
+      "behaviorBefore": "Behavior findings are displayed, but this helper/verdict.js policy and aggregate attention headline do not exist.",
+      "behaviorAfter": "A PR gets one attention level plus ordered reasons derived from PR-step and behavior findings. This is routing based on supplied findings, not approval of the implementation.",
+      "changedNodes": [
+        "policy",
+        "outcome"
+      ],
+      "limitations": [
+        "verdict([]) returns nothing. An empty finding list does not prove a complete assessment; the application must keep coverage and completeness separate.",
+        "The policy can only classify findings supplied to it; missing observations are not automatically discovered here.",
+        "Controlled findings used in a replay are fixture inputs, not live Jev or TLC results."
+      ],
+      "parent": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+      "before": "Behavior findings are displayed, but this helper/verdict.js policy and aggregate attention headline do not exist.",
+      "after": "A PR gets one attention level plus ordered reasons derived from PR-step and behavior findings. This is routing based on supplied findings, not approval of the implementation.",
+      "claimIds": [
+        "verdict-break",
+        "verdict-unknown"
+      ],
+      "evidenceIds": [],
+      "stats": {
+        "files": 6,
+        "added": 493,
+        "removed": 17
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "input",
+      "title": "PR implementation and intent",
+      "role": "input",
+      "purpose": "Exact target/candidate source, selected PR flow and the stated requirements.",
+      "sources": [],
+      "inputs": [
+        "Pinned target and candidate",
+        "Stated intent and requirements"
+      ],
+      "outputs": [
+        "Changed source and selected PR-flow claims"
+      ],
+      "introducedBy": null,
+      "steps": []
+    },
+    {
+      "id": "atlas",
+      "title": "Repository behavior contracts",
+      "role": "module",
+      "purpose": "Load .atlas model metadata, covered code and source-linked steps.",
+      "sources": [
+        {
+          "commit": "31163ce9943ea7451db5ed0c2786a025e4e1454b",
+          "path": "helper/atlas.js",
+          "from": 104,
+          "to": 131,
+          "side": "head"
+        }
+      ],
+      "inputs": [
+        ".atlas files at selected revision"
+      ],
+      "outputs": [
+        "Validated models",
+        "Covered code paths",
+        "Code-linked steps and rule names"
+      ],
+      "introducedBy": "atlas",
+      "steps": [
+        {
+          "title": "Inspect the source-linked responsibility",
+          "detail": "Load .atlas model metadata, covered code and source-linked steps.",
+          "sources": [
+            {
+              "commit": "31163ce9943ea7451db5ed0c2786a025e4e1454b",
+              "path": "helper/atlas.js",
+              "from": 104,
+              "to": 131,
+              "side": "head"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "compare",
+      "title": "Behavior comparison",
+      "role": "module",
+      "purpose": "Run eligible touched models, compare base/head charts and retain rule findings or gaps.",
+      "sources": [
+        {
+          "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+          "path": "helper/behavior.js",
+          "from": 330,
+          "to": 370,
+          "side": "head"
+        }
+      ],
+      "inputs": [
+        "Touched model metadata",
+        "Base/head reports and charts"
+      ],
+      "outputs": [
+        "State/edge delta",
+        "Rule outcomes",
+        "Run and coverage gaps"
+      ],
+      "introducedBy": "behavior",
+      "steps": [
+        {
+          "title": "Inspect the source-linked responsibility",
+          "detail": "Run eligible touched models, compare base/head charts and retain rule findings or gaps.",
+          "sources": [
+            {
+              "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+              "path": "helper/behavior.js",
+              "from": 330,
+              "to": 370,
+              "side": "head"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "claims",
+      "title": "Code-linked claim checks",
+      "role": "dependency",
+      "purpose": "Check source fidelity of PR/model steps when Jev is available; retain unchecked status otherwise.",
+      "sources": [
+        {
+          "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+          "path": "helper/behavior.js",
+          "from": 374,
+          "to": 393,
+          "side": "head"
+        }
+      ],
+      "inputs": [
+        "Step labels",
+        "Exact source cuts",
+        "Optional Jev response"
+      ],
+      "outputs": [
+        "Source fidelity findings",
+        "Explicit unchecked status"
+      ],
+      "introducedBy": "behavior",
+      "steps": [
+        {
+          "title": "Inspect the source-linked responsibility",
+          "detail": "Check source fidelity of PR/model steps when Jev is available; retain unchecked status otherwise.",
+          "sources": [
+            {
+              "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+              "path": "helper/behavior.js",
+              "from": 374,
+              "to": 393,
+              "side": "head"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "policy",
+      "title": "Attention policy",
+      "role": "module",
+      "purpose": "Combine known findings using explicit ordered rows and preserve unknown finding kinds.",
+      "sources": [
+        {
+          "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+          "path": "helper/verdict.js",
+          "from": 24,
+          "to": 100,
+          "side": "head"
+        }
+      ],
+      "inputs": [
+        "PR-step findings",
+        "Behavior findings"
+      ],
+      "outputs": [
+        "Attention level",
+        "Ordered reasons"
+      ],
+      "introducedBy": "verdict",
+      "steps": [
+        {
+          "title": "Inspect the source-linked responsibility",
+          "detail": "Combine known findings using explicit ordered rows and preserve unknown finding kinds.",
+          "sources": [
+            {
+              "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+              "path": "helper/verdict.js",
+              "from": 24,
+              "to": 100,
+              "side": "head"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "outcome",
+      "title": "Review attention and reasons",
+      "role": "output",
+      "purpose": "Show needs you, look when you can or nothing for you with the policy reasons. This is not a merge approval.",
+      "sources": [
+        {
+          "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+          "path": "helper/verdict.js",
+          "from": 102,
+          "to": 117,
+          "side": "head"
+        }
+      ],
+      "inputs": [
+        "Attention level and reasons"
+      ],
+      "outputs": [
+        "Needs you / look when you can / nothing for you"
+      ],
+      "introducedBy": "verdict",
+      "steps": [
+        {
+          "title": "Inspect the source-linked responsibility",
+          "detail": "Show needs you, look when you can or nothing for you with the policy reasons. This is not a merge approval.",
+          "sources": [
+            {
+              "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+              "path": "helper/verdict.js",
+              "from": 102,
+              "to": 117,
+              "side": "head"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "source-atlas",
+      "from": "input",
+      "to": "atlas",
+      "label": "Read versioned contracts",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "31163ce9943ea7451db5ed0c2786a025e4e1454b",
+          "path": "helper/atlas.js",
+          "from": 150,
+          "to": 162,
+          "side": "head"
+        }
+      ]
+    },
+    {
+      "id": "atlas-compare",
+      "from": "atlas",
+      "to": "compare",
+      "label": "Select touched models",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+          "path": "helper/behavior.js",
+          "from": 330,
+          "to": 355,
+          "side": "head"
+        }
+      ]
+    },
+    {
+      "id": "atlas-claims",
+      "from": "atlas",
+      "to": "claims",
+      "label": "Supply model steps and source spans",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+          "path": "helper/behavior.js",
+          "from": 374,
+          "to": 384,
+          "side": "head"
+        }
+      ]
+    },
+    {
+      "id": "compare-policy",
+      "from": "compare",
+      "to": "policy",
+      "label": "Behavior and coverage findings",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+          "path": "helper/pr.js",
+          "from": 245,
+          "to": 251,
+          "side": "head"
+        }
+      ]
+    },
+    {
+      "id": "claims-policy",
+      "from": "claims",
+      "to": "policy",
+      "label": "PR/model source-check findings",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+          "path": "helper/pr.js",
+          "from": 245,
+          "to": 251,
+          "side": "head"
+        }
+      ]
+    },
+    {
+      "id": "policy-outcome",
+      "from": "policy",
+      "to": "outcome",
+      "label": "Attention level and ordered reasons",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+          "path": "helper/verdict.js",
+          "from": 89,
+          "to": 117,
+          "side": "head"
+        }
+      ]
+    }
+  ],
+  "composition": {
+    "summary": "Atlas identity and code membership feed both model comparison and source checks. Their findings meet at one attention policy; gaps in either producer must remain visible rather than being averaged away.",
+    "obligations": [
+      "All layer summaries, source anchors and captures name their exact local base/head; the holistic scope is target to tip.",
+      "The output finding shape from behavior and PR source checking must remain compatible with verdict rows.",
+      "A code-fidelity score cannot stand in for a model run; a model result cannot establish implementation fidelity.",
+      "An empty or incomplete finding set cannot establish that the whole stack needs no review.",
+      "Real captured execution of parser/routing functions must identify mocked or controlled upstream inputs."
+    ],
+    "unverified": [
+      "No fresh live Jev result is available.",
+      "No fresh TLC execution is established by this source review.",
+      "End-to-end provider execution and Chrome rendering are outside a controlled parser/routing replay."
+    ]
+  },
+  "captureRecommendations": [
+    {
+      "id": "routine",
+      "title": "Known checks hold",
+      "input": [
+        {
+          "kind": "rule",
+          "name": "ShipsPaid",
+          "text": "An order ships only after it is paid.",
+          "status": "holds",
+          "model": "order"
+        },
+        {
+          "kind": "step",
+          "source": "pr",
+          "id": "ship",
+          "label": "A paid order ships",
+          "verdict": "pass"
+        }
+      ],
+      "expected": {
+        "level": "nothing",
+        "reasons": []
+      },
+      "scope": "Controlled findings from the historical verdict tests; not actual Jev/TLC results."
+    },
+    {
+      "id": "unchecked",
+      "title": "A source claim has no check",
+      "input": [
+        {
+          "kind": "step",
+          "source": "pr",
+          "id": "ship",
+          "label": "A paid order ships",
+          "verdict": "unchecked",
+          "error": "TYPESAFE_API_KEY not set"
+        }
+      ],
+      "expected": {
+        "level": "look"
+      },
+      "scope": "A missing-key fixture exercises the actual verdict function; the classification input is supplied by the harness."
+    },
+    {
+      "id": "counterexample",
+      "title": "A modeled rule breaks",
+      "input": [
+        {
+          "kind": "rule",
+          "name": "ShipsPaid",
+          "text": "An order ships only after it is paid.",
+          "status": "breaks",
+          "model": "order",
+          "path": [
+            "cart",
+            "you ship it: shipped"
+          ]
+        }
+      ],
+      "expected": {
+        "level": "needs"
+      },
+      "scope": "A controlled counterexample finding exercises actual routing. It is not a new detected bug in Docviz."
+    },
+    {
+      "id": "unknown",
+      "title": "A new finding kind appears",
+      "input": [
+        {
+          "kind": "something-new"
+        }
+      ],
+      "expected": {
+        "level": "look"
+      },
+      "scope": "Controlled unknown-kind input shows conservative fallback."
+    },
+    {
+      "id": "empty",
+      "title": "No findings supplied",
+      "input": [],
+      "expected": {
+        "level": "nothing"
+      },
+      "scope": "Important limit: real routing returns nothing for empty input; that output cannot establish analysis completeness."
+    }
+  ],
+  "label": "Reconstructed historical stack \u00b7 actual commits \u00b7 PRs already merged",
+  "claims": [
+    {
+      "id": "atlas-models",
+      "label": "Malformed model metadata is retained as a model error.",
+      "condition": "A .atlas model folder has missing, invalid JSON or incorrectly shaped metadata.",
+      "expectation": "atlasFrom returns the model record with its error; valid covered-code paths are retained when possible.",
+      "sources": [
+        {
+          "path": "helper/atlas.js",
+          "from": 104,
+          "to": 131,
+          "side": "head",
+          "commit": "31163ce9943ea7451db5ed0c2786a025e4e1454b"
+        }
+      ],
+      "basis": "source-interpretation",
+      "producer": {
+        "kind": "source-review",
+        "name": "Independent source reviewer",
+        "agent": "standalone_ground",
+        "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+        "role": "independent-reviewer"
+      },
+      "layerId": "atlas",
+      "nodeId": "atlas",
+      "jev": {
+        "status": "not-assessed",
+        "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+        "questions": {
+          "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+          "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+        }
+      }
+    },
+    {
+      "id": "atlas-rules",
+      "label": "Unrecognized or incomplete rules text is reported rather than silently treated as a valid rule.",
+      "condition": "rules.md has invalid headings, empty named rules, repeated names or no rule headings.",
+      "expectation": "parseRules returns explicit problems alongside the accepted named rules.",
+      "sources": [
+        {
+          "path": "helper/atlas.js",
+          "from": 23,
+          "to": 53,
+          "side": "head",
+          "commit": "31163ce9943ea7451db5ed0c2786a025e4e1454b"
+        }
+      ],
+      "basis": "source-interpretation",
+      "producer": {
+        "kind": "source-review",
+        "name": "Independent source reviewer",
+        "agent": "standalone_ground",
+        "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+        "role": "independent-reviewer"
+      },
+      "layerId": "atlas",
+      "nodeId": "atlas",
+      "jev": {
+        "status": "not-assessed",
+        "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+        "questions": {
+          "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+          "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+        }
+      }
+    },
+    {
+      "id": "behavior-trust",
+      "label": "Touched runnable models execute at base and head only when repository trust and required tooling permit it.",
+      "condition": "The comparison touches a valid model.",
+      "expectation": "runBehavior either records why the model was not run, or executes the available valid base/head models and retains run errors.",
+      "sources": [
+        {
+          "path": "helper/behavior.js",
+          "from": 330,
+          "to": 359,
+          "side": "head",
+          "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867"
+        }
+      ],
+      "basis": "source-interpretation",
+      "producer": {
+        "kind": "source-review",
+        "name": "Independent source reviewer",
+        "agent": "standalone_ground",
+        "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+        "role": "independent-reviewer"
+      },
+      "layerId": "behavior",
+      "nodeId": "compare",
+      "jev": {
+        "status": "not-assessed",
+        "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+        "questions": {
+          "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+          "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+        }
+      }
+    },
+    {
+      "id": "behavior-jev",
+      "label": "An unavailable Jev check remains an unchecked model-step finding.",
+      "condition": "A touched model has a code-linked step and source checking is disabled or no key is configured.",
+      "expectation": "The step is retained as unchecked. Disabled checks and missing keys include an explanatory reason; an absent provider answer may have no reason.",
+      "sources": [
+        {
+          "path": "helper/behavior.js",
+          "from": 374,
+          "to": 393,
+          "side": "head",
+          "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867"
+        }
+      ],
+      "basis": "source-interpretation",
+      "producer": {
+        "kind": "source-review",
+        "name": "Independent source reviewer",
+        "agent": "standalone_ground",
+        "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+        "role": "independent-reviewer"
+      },
+      "layerId": "behavior",
+      "nodeId": "claims",
+      "jev": {
+        "status": "not-assessed",
+        "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+        "questions": {
+          "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+          "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+        }
+      }
+    },
+    {
+      "id": "verdict-break",
+      "label": "A breaking modeled rule routes to needs you.",
+      "condition": "A rule or extra-rule finding has status breaks.",
+      "expectation": "The rule-breaks row assigns needs; the aggregate preserves that highest attention level and reason.",
+      "sources": [
+        {
+          "path": "helper/verdict.js",
+          "from": 24,
+          "to": 28,
+          "side": "head",
+          "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2"
+        },
+        {
+          "path": "helper/verdict.js",
+          "from": 89,
+          "to": 100,
+          "side": "head",
+          "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2"
+        }
+      ],
+      "basis": "source-interpretation",
+      "producer": {
+        "kind": "source-review",
+        "name": "Independent source reviewer",
+        "agent": "standalone_ground",
+        "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+        "role": "independent-reviewer"
+      },
+      "layerId": "verdict",
+      "nodeId": "policy",
+      "jev": {
+        "status": "not-assessed",
+        "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+        "questions": {
+          "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+          "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+        }
+      }
+    },
+    {
+      "id": "verdict-unknown",
+      "label": "An unrecognized finding kind routes to look when you can.",
+      "condition": "A supplied finding matches none of the ordered policy rows.",
+      "expectation": "The UNKNOWN fallback supplies a look reason instead of discarding the finding.",
+      "sources": [
+        {
+          "path": "helper/verdict.js",
+          "from": 86,
+          "to": 100,
+          "side": "head",
+          "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2"
+        }
+      ],
+      "basis": "source-interpretation",
+      "producer": {
+        "kind": "source-review",
+        "name": "Independent source reviewer",
+        "agent": "standalone_ground",
+        "scope": "Independent examination of exact historical commits. Source interpretation only; no test, Jev or TLC execution is claimed.",
+        "role": "independent-reviewer"
+      },
+      "layerId": "verdict",
+      "nodeId": "policy",
+      "jev": {
+        "status": "not-assessed",
+        "reason": "TYPESAFE_API_KEY is not configured. No live Jev judgment was made.",
+        "questions": {
+          "supported": "Is every material clause of this claim shown by the supplied exact-revision source?",
+          "contradicted": "Does the supplied exact-revision source contradict any material clause of this claim?"
+        }
+      }
+    }
+  ],
+  "observableFunctions": [
+    {
+      "nodeId": "atlas",
+      "commit": "31163ce9943ea7451db5ed0c2786a025e4e1454b",
+      "path": "helper/atlas.js",
+      "name": "atlasFrom",
+      "from": 104,
+      "to": 131
+    },
+    {
+      "nodeId": "atlas",
+      "commit": "31163ce9943ea7451db5ed0c2786a025e4e1454b",
+      "path": "helper/atlas.js",
+      "name": "parseRules",
+      "from": 23,
+      "to": 53
+    },
+    {
+      "nodeId": "compare",
+      "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+      "path": "helper/behavior.js",
+      "name": "parseReport",
+      "from": 75,
+      "to": 93
+    },
+    {
+      "nodeId": "compare",
+      "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+      "path": "helper/behavior.js",
+      "name": "delta",
+      "from": 98,
+      "to": 115
+    },
+    {
+      "nodeId": "compare",
+      "commit": "d4bf0379ace72ed8125684d4c2d8b5393ea6d867",
+      "path": "helper/behavior.js",
+      "name": "ruleFindings",
+      "from": 191,
+      "to": 225
+    },
+    {
+      "nodeId": "policy",
+      "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+      "path": "helper/verdict.js",
+      "name": "verdict",
+      "from": 89,
+      "to": 100
+    }
+  ]
+}

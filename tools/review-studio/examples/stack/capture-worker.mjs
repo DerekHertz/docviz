@@ -1,0 +1,24 @@
+import {existsSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
+const [root,scenarioId]=process.argv.slice(2),frames=[];
+if(!root||!['clear','unchecked','broken'].includes(scenarioId))throw new Error('Expected snapshot folder and scenario.');
+const frame=(id,title,nodeId,input,output,observed)=>frames.push({id,title,nodeId,input:structuredClone(input),output:structuredClone(output),observed});
+const load=async file=>existsSync(resolve(root,file))?import(pathToFileURL(resolve(root,file))):null;
+const report=scenarioId==='broken'?'## SpendShows breaks\n1. request starts\n2. result is lost\n':'## Rules that hold\nSpendShows\n';
+const step={kind:'step',source:'model',model:'card-money',id:'LateReturn',label:'A completed call is accounted for',verdict:scenarioId==='unchecked'?'unchecked':'pass',...(scenarioId==='unchecked'?{error:'TYPESAFE_API_KEY not set (controlled fixture)'}:{})};
+frame('input','Choose the same controlled scenario','input',{scenarioId,report,step},{scenarioId,fixture:true},false);
+const atlas=await load('helper/atlas.js');
+const catalog=atlas?.readAtlasDir(root);
+const atlasOut=catalog?{models:catalog.models.map(m=>({name:m.name,code:m.code,rules:m.rules,error:m.error||null})),ownerRules:catalog.rules,problems:catalog.problems}:null;
+frame('atlas',atlas?'Read the actual model catalog':'No model catalog loader at this revision','atlas',{root:'isolated pinned checkout'},atlasOut,!!atlas);
+const behavior=await load('helper/behavior.js');
+let behaviorOut=null,findings=[];
+if(behavior){const parsed=behavior.parseReport(report);const model={name:'card-money',rules:['SpendShows']};const run={model:'card-money',side:'head',holds:parsed.holds,breaks:parsed.breaks,unchecked:parsed.unchecked};findings=behavior.ruleFindings({rules:[{name:'SpendShows',text:'Every completed call is accounted for.'}],runs:[run],models:[model],touched:['card-money']});behaviorOut={parsed,findings:structuredClone(findings)};}
+frame('compare',behavior?'Parse the supplied report and derive findings':'No behavior comparison helper at this revision','compare',{report,upstream:'Controlled report text, not a live TLC run'},behaviorOut,!!behavior);
+if(behavior)findings.push(step);
+frame('claims','Inspect the controlled source-check input','claims',{source:'Fixture supplied to routing; Jev was not called'},behavior?step:null,false);
+const policy=await load('helper/verdict.js');
+const policyOut=policy?policy.verdict(findings):null;
+frame('outcome',policy?'Run the actual attention policy':'No attention policy output at this revision','policy',{findings},policyOut,!!policy);
+process.stdout.write(JSON.stringify({scenarioId,frames,output:{atlas:atlasOut,behavior:behaviorOut,policy:policyOut}})+'\n');

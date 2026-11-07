@@ -1,0 +1,935 @@
+{
+  "id": "afterclass-pr94",
+  "title": "Diagram sources on demand, with the full frame visible",
+  "number": 94,
+  "base": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+  "head": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+  "summary": "PR94 changes how AfterClass presents cited topic diagrams: citation controls start hidden, a diagram-wide toggle reveals one grouped Sources (n) button per line, and the frame comes before the heading with targeted natural-height CSS. Backend frame selection and citation filtering remain source-identical; the shared renderer also affects illustrated record pages.",
+  "before": "The diagram panel shows individual Evidence n buttons for every citation, places its heading before the frame, and can inherit fixed-height source-stand/frame caps.",
+  "after": "The diagram keeps the frame and summary visible while source controls start hidden. A learner can reveal one grouped source button per line; the panel declares natural-height layout and is keyed by topic to reset its local state.",
+  "nodes": [
+    {
+      "id": "review",
+      "title": "Review workspace",
+      "purpose": "Presents the current review conversation while a topic diagram and its selected source evidence are inspected.",
+      "inputs": [
+        "Review view and selected topic",
+        "Tutor conversation and learner actions"
+      ],
+      "outputs": [
+        "Selected topic for the diagram",
+        "Source selection and visible evidence"
+      ],
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/review.tsx",
+          "from": 233,
+          "to": 251
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/review.tsx",
+          "from": 26,
+          "to": 58
+        }
+      ],
+      "pseudocode": [
+        {
+          "text": "read the current review and selected topic",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/review.tsx",
+              "from": 26,
+              "to": 58
+            }
+          ]
+        },
+        {
+          "text": "show the conversation beside the diagram and evidence",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/review.tsx",
+              "from": 233,
+              "to": 251
+            }
+          ]
+        },
+        {
+          "text": "route a citation selection to the existing evidence pane",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/review.tsx",
+              "from": 233,
+              "to": 251
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "title": "Select the topic",
+          "detail": "The selected topic supplies the diagram view; this is review-local context.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/review.tsx",
+              "from": 233,
+              "to": 251
+            }
+          ]
+        },
+        {
+          "title": "Keep the conversation present",
+          "detail": "Diagram and evidence are rendered beside the conversation, not a new learning assessment.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/review.tsx",
+              "from": 145,
+              "to": 177
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "frames",
+      "title": "Topic frame selection",
+      "purpose": "Selects one frame from the frozen review evidence, using claim citations first and cited passage timing as fallback.",
+      "inputs": [
+        "Usable topic claims",
+        "Frames and passages inside the review scope"
+      ],
+      "outputs": [
+        "Chosen frame or no frame",
+        "Bounded evidence set for the summary"
+      ],
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/backend/diagram/core.ts",
+          "from": 29,
+          "to": 54
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/backend/diagram/core.ts",
+          "from": 58,
+          "to": 70
+        }
+      ],
+      "pseudocode": [
+        {
+          "text": "rank cited in-scope frames by claim count, then earliest time",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/backend/diagram/core.ts",
+              "from": 29,
+              "to": 54
+            }
+          ]
+        },
+        {
+          "text": "otherwise select a frame within a cited passage",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/backend/diagram/core.ts",
+              "from": 29,
+              "to": 54
+            }
+          ]
+        },
+        {
+          "text": "put the chosen frame first in the summary evidence set",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/backend/diagram/core.ts",
+              "from": 58,
+              "to": 70
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "title": "Prefer explicit citations",
+          "detail": "A frame cited by more usable claims wins; ties use time and stable identifiers.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/backend/diagram/core.ts",
+              "from": 29,
+              "to": 54
+            }
+          ]
+        },
+        {
+          "title": "Fallback inside cited passages",
+          "detail": "Only frames in the supplied review evidence are considered.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/backend/diagram/core.ts",
+              "from": 29,
+              "to": 54
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "title": "Cited summary preparation",
+      "purpose": "Prepares the topic summary through the existing memo/task mechanism and filters every returned or stored line against allowed evidence.",
+      "inputs": [
+        "Topic, usable claims and scoped evidence",
+        "Optional frame bytes and cached task output"
+      ],
+      "outputs": [
+        "Summary state and title",
+        "Only lines with allowed, nonempty citations"
+      ],
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/backend/diagram/tasks.ts",
+          "from": 80,
+          "to": 105
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/backend/diagram/core.ts",
+          "from": 74,
+          "to": 85
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/backend/diagram/index.ts",
+          "from": 65,
+          "to": 80
+        }
+      ],
+      "pseudocode": [
+        {
+          "text": "request a summary for this topic and evidence set",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/backend/diagram/tasks.ts",
+              "from": 80,
+              "to": 105
+            }
+          ]
+        },
+        {
+          "text": "drop empty, uncited or out-of-scope lines",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/backend/diagram/core.ts",
+              "from": 74,
+              "to": 85
+            }
+          ]
+        },
+        {
+          "text": "filter stored lines again before returning the topic view",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/backend/diagram/index.ts",
+              "from": 65,
+              "to": 80
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "title": "Generate on demand",
+          "detail": "The task declares diagram_summary and uses the established provider/memo boundary.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/backend/diagram/tasks.ts",
+              "from": 80,
+              "to": 105
+            }
+          ]
+        },
+        {
+          "title": "Enforce citations",
+          "detail": "The task and reader both enforce the cited-evidence constraint; provider execution is not observed by this source review.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/backend/diagram/core.ts",
+              "from": 74,
+              "to": 85
+            },
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/backend/diagram/index.ts",
+              "from": 65,
+              "to": 80
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "diagram",
+      "title": "Diagram presentation",
+      "purpose": "Shows the selected frame and the topic summary in the review source column, including preparation and failure states.",
+      "inputs": [
+        "Topic frame and summary state",
+        "Request, citation and close callbacks",
+        "Source-column and scene stylesheet constraints"
+      ],
+      "outputs": [
+        "Visible frame, title and summary lines",
+        "Citation actions for source inspection"
+      ],
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/diagram.tsx",
+          "from": 78,
+          "to": 132
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/diagram-view.ts",
+          "from": 79,
+          "to": 85
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/review.css",
+          "from": 12,
+          "to": 19
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/reference.css",
+          "from": 47,
+          "to": 54
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/hd-room.css",
+          "from": 23,
+          "to": 25
+        }
+      ],
+      "pseudocode": [
+        {
+          "text": "show an explanation for missing or preparing summaries",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram-view.ts",
+              "from": 28,
+              "to": 36
+            }
+          ]
+        },
+        {
+          "text": "when ready, show each line and its individual evidence buttons",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram.tsx",
+              "from": 78,
+              "to": 132
+            },
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram-view.ts",
+              "from": 79,
+              "to": 85
+            }
+          ]
+        },
+        {
+          "text": "render title, frame and summary in the panel",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram.tsx",
+              "from": 78,
+              "to": 132
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "title": "Choose the visible state",
+          "detail": "A summary can be no_claims, not_requested, preparing, failed or ready.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram.tsx",
+              "from": 78,
+              "to": 108
+            }
+          ]
+        },
+        {
+          "title": "Render and expose citations",
+          "detail": "At this baseline, each evidence item has its own visible citation button.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram.tsx",
+              "from": 78,
+              "to": 132
+            },
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram-view.ts",
+              "from": 79,
+              "to": 85
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "evidence",
+      "title": "Evidence inspection",
+      "purpose": "Loads and displays the evidence IDs selected by the review or diagram, with explicit missing-item and loading states.",
+      "inputs": [
+        "Selected evidence IDs",
+        "Source titles and optional video links"
+      ],
+      "outputs": [
+        "Passages and frame references",
+        "Missing evidence or request errors"
+      ],
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/ui.tsx",
+          "from": 140,
+          "to": 175
+        }
+      ],
+      "pseudocode": [
+        {
+          "text": "load the selected evidence IDs",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/ui.tsx",
+              "from": 140,
+              "to": 175
+            }
+          ]
+        },
+        {
+          "text": "show frames and passages with their source references",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/ui.tsx",
+              "from": 140,
+              "to": 175
+            }
+          ]
+        },
+        {
+          "text": "say which requested evidence is missing",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/ui.tsx",
+              "from": 140,
+              "to": 175
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "title": "Resolve the selection",
+          "detail": "The pane uses the IDs supplied by its caller; the caller contract matters when grouped IDs replace single IDs.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/ui.tsx",
+              "from": 140,
+              "to": 175
+            }
+          ]
+        },
+        {
+          "title": "Show gaps explicitly",
+          "detail": "Missing IDs remain visible rather than being silently replaced.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/ui.tsx",
+              "from": 140,
+              "to": 175
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "record",
+      "title": "Illustrated record pages",
+      "purpose": "Presents a saved topic page using the same frame and summary components alongside the learner answer and recorded status.",
+      "inputs": [
+        "Saved illustrated page for a topic",
+        "Shared diagram summary and evidence callbacks"
+      ],
+      "outputs": [
+        "Question, frame and summary",
+        "Learner answer, status and selected evidence"
+      ],
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/diagram.tsx",
+          "from": 135,
+          "to": 161
+        }
+      ],
+      "pseudocode": [
+        {
+          "text": "render the saved topic question and frame",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram.tsx",
+              "from": 135,
+              "to": 161
+            }
+          ]
+        },
+        {
+          "text": "reuse the diagram summary renderer",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram.tsx",
+              "from": 135,
+              "to": 161
+            }
+          ]
+        },
+        {
+          "text": "show learner answers and recorded status separately from source inspection",
+          "indent": 0,
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram.tsx",
+              "from": 135,
+              "to": 161
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "title": "Reuse the renderer",
+          "detail": "A change to DiagramSummaryView affects this consumer even if the page body stays structurally similar.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram.tsx",
+              "from": 135,
+              "to": 161
+            }
+          ]
+        },
+        {
+          "title": "Inspect source without changing assessment",
+          "detail": "Source selection is local UI state; this component displays the saved status.",
+          "sources": [
+            {
+              "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+              "path": "src/app/diagram.tsx",
+              "from": 135,
+              "to": 161
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "review-frame",
+      "from": "review",
+      "to": "frames",
+      "label": "scoped topic evidence",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/review.tsx",
+          "from": 233,
+          "to": 251
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/backend/diagram/core.ts",
+          "from": 29,
+          "to": 54
+        }
+      ]
+    },
+    {
+      "id": "frame-summary",
+      "from": "frames",
+      "to": "summary",
+      "label": "selected frame + citations",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/backend/diagram/core.ts",
+          "from": 58,
+          "to": 70
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/backend/diagram/tasks.ts",
+          "from": 80,
+          "to": 105
+        }
+      ]
+    },
+    {
+      "id": "summary-diagram",
+      "from": "summary",
+      "to": "diagram",
+      "label": "summary state + lines",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/backend/diagram/index.ts",
+          "from": 65,
+          "to": 80
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/diagram.tsx",
+          "from": 78,
+          "to": 132
+        }
+      ]
+    },
+    {
+      "id": "review-diagram",
+      "from": "review",
+      "to": "diagram",
+      "label": "selected topic + callbacks",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/review.tsx",
+          "from": 233,
+          "to": 251
+        }
+      ]
+    },
+    {
+      "id": "diagram-evidence",
+      "from": "diagram",
+      "to": "evidence",
+      "label": "selected citation IDs",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/diagram.tsx",
+          "from": 78,
+          "to": 132
+        },
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/ui.tsx",
+          "from": 140,
+          "to": 175
+        }
+      ]
+    },
+    {
+      "id": "diagram-record",
+      "from": "diagram",
+      "to": "record",
+      "label": "shared summary renderer",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/diagram.tsx",
+          "from": 135,
+          "to": 161
+        }
+      ]
+    },
+    {
+      "id": "review-record",
+      "from": "review",
+      "to": "record",
+      "label": "saved topic observations",
+      "basis": "source-interpretation",
+      "sources": [
+        {
+          "commit": "f67b99ec80cab9dc9e182f5e2fa7b7be662b7483",
+          "path": "src/app/diagram.tsx",
+          "from": 135,
+          "to": 161
+        }
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "afterclass-sources-default",
+      "nodeId": "diagram",
+      "label": "A ready diagram summary hides its citation controls by default and offers one diagram-wide Show sources toggle.",
+      "condition": "DiagramSummaryView mounts for a topic with a ready summary and no initialSources override.",
+      "expectation": "Summary text remains visible, aria-expanded is false, and citation buttons are not rendered until sources are shown.",
+      "sources": [
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/diagram.tsx",
+          "from": 78,
+          "to": 113
+        }
+      ],
+      "verificationNeed": "Run actual React server rendering for the default state, then verify the interactive toggle and topic switch/reset in a browser. SSR alone does not verify click behavior.",
+      "producer": {
+        "name": "Independent source reviewer",
+        "role": "source reviewer",
+        "scope": "Read exact baseline and candidate source; no test, Jev or live provider result is claimed."
+      }
+    },
+    {
+      "id": "afterclass-source-grouping",
+      "nodeId": "diagram",
+      "label": "When sources are shown, each cited summary line has one Sources (n) button that passes all of that line\u2019s evidence IDs to the source handler.",
+      "condition": "The ready summary is rendered with sources visible and the line has one or more evidence IDs.",
+      "expectation": "One compact button uses the line\u2019s count and complete ID list; uncited lines receive no source button.",
+      "sources": [
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/diagram-view.ts",
+          "from": 79,
+          "to": 85
+        },
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/diagram.tsx",
+          "from": 97,
+          "to": 109
+        }
+      ],
+      "verificationNeed": "Execute lineSources and SSR with initialSources:true. Reverify that clicking the grouped selection opens the correct items in the unchanged EvidencePane and restores focus when closed.",
+      "producer": {
+        "name": "Independent source reviewer",
+        "role": "source reviewer",
+        "scope": "Read exact baseline and candidate source; no test, Jev or live provider result is claimed."
+      }
+    },
+    {
+      "id": "afterclass-natural-layout",
+      "nodeId": "diagram",
+      "label": "The panel places its frame before the title and declares uncapped, natural-height diagram layout rules.",
+      "condition": "A diagram panel is displayed in a review source stand, including the hd-pixel scene.",
+      "expectation": "The component orders frame before title/lines; the targeted CSS removes max-height/overflow caps for that stand and frame.",
+      "sources": [
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/diagram.tsx",
+          "from": 124,
+          "to": 135
+        },
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/review.css",
+          "from": 20,
+          "to": 23
+        }
+      ],
+      "verificationNeed": "Inspect rendered order and CSS rules, then test actual computed layout and full-frame visibility at representative widths/scenes. Static markup/CSS assertions do not establish uncropped browser rendering.",
+      "producer": {
+        "name": "Independent source reviewer",
+        "role": "source reviewer",
+        "scope": "Read exact baseline and candidate source; no test, Jev or live provider result is claimed."
+      }
+    },
+    {
+      "id": "afterclass-citation-boundary",
+      "nodeId": "summary",
+      "label": "The backend citation filter remains unchanged; hiding source controls does not remove the cited-evidence requirement from topic summaries.",
+      "condition": "A task result or cached summary is returned through the diagram service.",
+      "expectation": "Empty or out-of-scope citations are filtered before topic lines reach the app; this PR changes presentation rather than that backend filter.",
+      "sources": [
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/backend/diagram/core.ts",
+          "from": 74,
+          "to": 85
+        },
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/backend/diagram/index.ts",
+          "from": 65,
+          "to": 80
+        }
+      ],
+      "verificationNeed": "Compare backend source blobs and rerun citation-boundary tests. This establishes code continuity/scoped assertions, not truth of generated summaries or live provider fidelity.",
+      "producer": {
+        "name": "Independent source reviewer",
+        "role": "source reviewer",
+        "scope": "Read exact baseline and candidate source; no test, Jev or live provider result is claimed."
+      }
+    }
+  ],
+  "tests": [
+    "test/diagram-app.test.tsx",
+    "test/diagram.test.ts",
+    "test/diagram-http.test.ts",
+    "test/rules.test.ts"
+  ],
+  "changedNodes": [
+    "review",
+    "diagram",
+    "record"
+  ],
+  "scopeLimitations": [
+    "This is a partial, source-derived map of the diagram/review path, not the entire AfterClass repository.",
+    "Source-file fingerprints conservatively flag all components mapped to a changed file; they do not establish that every function changed.",
+    "EvidencePane source is unchanged, but the diagram now sends grouped IDs, so that connection needs interaction verification.",
+    "Natural-height CSS declarations are present; actual crop/layout behavior requires a running browser with the scene styles.",
+    "No live Claude/Jev call, capture-feasibility result or learning-effectiveness claim is made.",
+    "No Bun executable was found on PATH or the usual local install paths inspected; existing compiler and React packages are present.",
+    "Shared source-column constraints in reference.css and hd-room.css are unchanged dependencies of the new CSS overrides; verify their computed interaction rather than treating unchanged files as unaffected behavior."
+  ],
+  "pseudocode": [
+    {
+      "text": "mount each topic\u2019s diagram with source controls hidden",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/diagram.tsx",
+          "from": 78,
+          "to": 83
+        },
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/review.tsx",
+          "from": 246,
+          "to": 249
+        }
+      ]
+    },
+    {
+      "text": "show the full frame, then title and summary lines",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/diagram.tsx",
+          "from": 124,
+          "to": 135
+        },
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/review.css",
+          "from": 20,
+          "to": 23
+        }
+      ]
+    },
+    {
+      "text": "when the learner shows sources, render one counted button per cited line",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/diagram.tsx",
+          "from": 95,
+          "to": 109
+        }
+      ]
+    },
+    {
+      "text": "send that line\u2019s complete evidence ID list to the existing source handler",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/diagram-view.ts",
+          "from": 81,
+          "to": 85
+        },
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/app/diagram.tsx",
+          "from": 100,
+          "to": 105
+        }
+      ]
+    },
+    {
+      "text": "keep backend citation filtering and learner assessment separate from this display state",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+          "path": "src/backend/diagram/core.ts",
+          "from": 74,
+          "to": 85
+        }
+      ]
+    }
+  ],
+  "knownRule": "R19 `[test]` Every line of a diagram summary cites something I watched; a line without a citation is never shown.",
+  "runtimeRecommendations": {
+    "pure": [
+      "src/backend/diagram/core.ts:pickFrame",
+      "src/backend/diagram/core.ts:enforceCitations",
+      "src/app/diagram-view.ts:lineSources"
+    ],
+    "reactSSR": "Render DiagramSummaryView through existing react-dom/server: baseline default always shows individual Evidence labels; candidate default hides citations; candidate initialSources:true reveals grouped Sources labels. initialSources is a fixture-selected render state, not an observed toggle click.",
+    "fixtures": "test/diagram-app.test.tsx: topic() has two ready summary lines with evidence counts 1 and 2, plus a frame at 125 seconds. Use that synthetic fixture; no lecture or user database is required.",
+    "compiler": "Installed typescript package is a native TS7 compiler shim; no transpileModule JS API found. Compile with existing CLI if its vendor executable is supported, without installing dependencies."
+  }
+}

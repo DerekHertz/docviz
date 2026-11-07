@@ -1,0 +1,11 @@
+import {pathToFileURL} from 'node:url';
+import fs from 'node:fs';
+import {syncBuiltinESMExports} from 'node:module';
+const fileReads=[],originalRead=fs.readFileSync;fs.readFileSync=function(path,...args){if(/(?:steps\.json|glossary\.txt|door\.js)$/.test(String(path)))fileReads.push(String(path));return originalRead.call(this,path,...args);};syncBuiltinESMExports();
+const [moduleRoot,requested,decoy]=process.argv.slice(2);
+const {runPr}=await import(pathToFileURL(moduleRoot+'/helper/pr.js'));
+const input={stepsFile:'steps.json',glossaryFile:'glossary.txt',cwd:requested,check:false,trustAtlas:false,providedDiagram:true};
+const result=await runPr({...input,prUrl:'https://github.com/fixture/requested/pull/1'});
+const selected=result.body.includes('REQUESTED-CHECKOUT')?'requested':result.body.includes('DECOY-CHECKOUT')?'decoy':'unknown';
+const output={selectedCheckout:selected,stepsRead:fileReads.find(p=>p.endsWith('steps.json'))||null,glossaryRead:fileReads.find(p=>p.endsWith('glossary.txt'))||null,requestedCheckoutSelected:selected==='requested',caption:result.body.match(/(?:REQUESTED|DECOY)-CHECKOUT/)?.[0]||null};
+process.stdout.write(JSON.stringify({frames:[{id:'input',title:'Request a checkout different from the process directory',nodeId:'input',input,output:{processDirectory:decoy,requestedDirectory:requested},observed:false},{id:'invoke',title:'Run the actual PR command implementation',nodeId:'input',input,output,observed:true},{id:'result',title:'Inspect which checkout the review describes',nodeId:'outcome',input:{requested:'requested'},output,observed:true}],output,rawBody:result.body,usage:result.usage})+'\n');

@@ -1,0 +1,4 @@
+data/
+.cache/
+github-extension/
+.DS_Store

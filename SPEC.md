@@ -1,4 +1,21 @@
-# docviz — spec (v0)
+# docviz — product specification
+
+## Visual review studio
+
+The standalone studio is the current product direction for reviewing agent-written changes before opening or merging a PR. The earlier documentation-extension specification follows as the existing implementation.
+
+- Start with a holistic system map for a batch or stack. Zoom into each parent-to-candidate layer without losing connected context.
+- A capability describes its purpose, inputs, outputs, properties and implementation. Follow visual behavior through concise pseudocode to exact pinned source.
+- Keep source interpretations, observed execution, model judgments and human decisions distinct. Recorded-output diagrams show captured fields, with raw evidence available.
+- Cache immutable repository models by exact revision and registered repository identity. Reuse descriptions separately from new claims, tests, Jev results or decisions. Changed source/contracts and unmapped files remain visible.
+- Agents propose contracts. The human confirms consequential contracts and makes the final review decision. Independent reviewers challenge authoring-agent claims.
+- Jev can assess claim/source correspondence and help triage. Missing assessments stay explicit. A source judgment cannot establish runtime behavior or formal verification.
+- The local prototype includes manually prepared historical Docviz and AfterClass reviews. Its graph is partial; automatic repository modeling and live stack-claim Jev execution are not implemented.
+- Live Jev end-to-end validation and independent merge verification are pending before this new design merges.
+
+See [the studio guide](tools/review-studio/README.md) for setup and [validation](tools/review-studio/STANDALONE-VALIDATION.md) for recorded checks and gaps.
+
+## Documentation extension specification (v0)
 
 Annotate any docs page — or any selected text/code — with technical visuals, powered by the
 user's own Claude Code or Codex login. Audience: SWEs.

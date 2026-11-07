@@ -1,0 +1,19 @@
+{
+  "name": "docviz-review-studio",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Local component-oriented review for real Git changesets",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "build:extension": "node extension/build.mjs",
+    "check": "for f in *.mjs ui/*.js ui/*.mjs extension/*.js extension/*.mjs examples/stack/*.mjs; do node --check \"$f\" || exit 1; done"
+  },
+  "bin": {
+    "docviz-review": "cli.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

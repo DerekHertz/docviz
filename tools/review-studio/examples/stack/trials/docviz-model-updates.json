@@ -1,0 +1,137 @@
+[
+  {
+    "id": "input",
+    "title": "Proposed change",
+    "purpose": "Select the reviewed checkout explicitly, then derive checkout-local source, revision and comparison context for the review.",
+    "inputs": [
+      "Reviewed checkout: cwd, defaulting to the process directory",
+      "Steps file and optional glossary, relative to cwd",
+      "Base reference and PR intent"
+    ],
+    "outputs": [
+      "Selected repository root, HEAD and origin",
+      "Checkout-local source cuts and code links",
+      "Shared base and root context for behavior and module comparisons"
+    ],
+    "sources": [
+      {
+        "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+        "path": "helper/pr.js",
+        "from": 163,
+        "to": 188
+      },
+      {
+        "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+        "path": "helper/pr.js",
+        "from": 203,
+        "to": 210
+      },
+      {
+        "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+        "path": "helper/pr.js",
+        "from": 254,
+        "to": 260
+      }
+    ],
+    "steps": [
+      {
+        "title": "Select the reviewed checkout",
+        "detail": "Use cwd for the initial Git queries, then retain the selected repository root, HEAD and origin.",
+        "sources": [
+          {
+            "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+            "path": "helper/pr.js",
+            "from": 163,
+            "to": 169
+          }
+        ]
+      },
+      {
+        "title": "Read checkout-local inputs",
+        "detail": "Resolve relative steps and glossary files from cwd; read each code-linked range from the selected repository root.",
+        "sources": [
+          {
+            "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+            "path": "helper/pr.js",
+            "from": 174,
+            "to": 188
+          }
+        ]
+      },
+      {
+        "title": "Pass one comparison context",
+        "detail": "Use the selected root and shared base for module movement and behavior checks, then generate links with that checkout\u2019s HEAD and origin.",
+        "sources": [
+          {
+            "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+            "path": "helper/pr.js",
+            "from": 171,
+            "to": 172
+          },
+          {
+            "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+            "path": "helper/pr.js",
+            "from": 207,
+            "to": 210
+          },
+          {
+            "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+            "path": "helper/pr.js",
+            "from": 254,
+            "to": 260
+          }
+        ]
+      }
+    ],
+    "pseudocode": [
+      {
+        "text": "use explicit cwd, defaulting to the process directory; discover root, HEAD and origin",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+            "path": "helper/pr.js",
+            "from": 163,
+            "to": 169
+          }
+        ]
+      },
+      {
+        "text": "read steps and glossary from cwd; read linked code from the selected root",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+            "path": "helper/pr.js",
+            "from": 174,
+            "to": 188
+          }
+        ]
+      },
+      {
+        "text": "pass the selected root and shared base into comparisons; link output to the selected revision",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+            "path": "helper/pr.js",
+            "from": 171,
+            "to": 172
+          },
+          {
+            "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+            "path": "helper/pr.js",
+            "from": 207,
+            "to": 210
+          },
+          {
+            "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+            "path": "helper/pr.js",
+            "from": 254,
+            "to": 260
+          }
+        ]
+      }
+    ]
+  }
+]

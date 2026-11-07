@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {resolve} from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {createWorkspace} from '../workspace.mjs';
+import {judgeClaims} from '../agents.mjs';
+
+test('a Jev answer arriving after a property edit stays bound to the original definition',async t=>{
+ const root=await mkdtemp(resolve(tmpdir(),'docviz-jev-test-')),repo=resolve(root,'repo');
+ await mkdir(repo);t.after(()=>rm(root,{recursive:true,force:true}));
+ const git=(...args)=>execFileSync('git',['-c','core.hooksPath=/dev/null','-c','core.fsmonitor=','-C',repo,...args],{encoding:'utf8'}).trim();
+ git('init','-q','-b','main');git('config','user.name','Fixture');git('config','user.email','fixture@example.invalid');
+ await writeFile(resolve(repo,'answer.js'),'export const answer = 1;\n');git('add','.');git('commit','-qm','Base');git('checkout','-qb','candidate');
+ await writeFile(resolve(repo,'answer.js'),'export const answer = 2;\n');git('add','.');git('commit','-qm','Candidate');
+ const ws=await createWorkspace(resolve(root,'data'));let doc=await ws.open({repositoryPath:repo,baseRef:'main',headRef:'candidate'});
+ doc=await ws.changeProperty(doc.id,doc.version,{componentId:doc.components[0].id,title:'Answer',condition:'the value is read',expectation:'answer is two',violation:'answer differs',sources:[{side:'head',path:'answer.js',from:1,to:1}]});
+ const property=doc.properties[0],reviewId=doc.id,previousKey=process.env.TYPESAFE_API_KEY;
+ process.env.TYPESAFE_API_KEY='controlled-test-value';t.after(()=>{if(previousKey===undefined)delete process.env.TYPESAFE_API_KEY;else process.env.TYPESAFE_API_KEY=previousKey;});
+ let release,started;const waiting=new Promise(resolveWait=>{release=resolveWait;}),requested=new Promise(resolveRequest=>{started=resolveRequest;});
+ t.mock.method(globalThis,'fetch',async()=>{started();await waiting;return{ok:true,json:async()=>({answers:{supported:{noul:1},contradicted:{noul:0}}})};});
+ const judge=sourceDoc=>judgeClaims(sourceDoc,(path,side)=>ws.source(reviewId,path,side),evidence=>ws.recordEvidence(reviewId,evidence));
+ const pending=judge(doc);await requested;
+ doc=await ws.changeProperty(reviewId,doc.version,{...property,expectation:'answer is three'},property.id);release();
+ doc=await pending;const oldAnswer=doc.evidence[0];
+ assert.match(oldAnswer.label,/answer is two/);assert.equal(doc.properties[0].expectation,'answer is three');
+ assert(oldAnswer.outdatedPropertyIds?.includes(property.id),'an answer for the edited definition must be historical');
+ doc=await judge(doc);const currentAnswer=doc.evidence.at(-1);
+ assert.match(currentAnswer.label,/answer is three/);assert(!currentAnswer.outdatedPropertyIds?.includes(property.id));
+});
