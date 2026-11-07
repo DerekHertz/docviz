@@ -74,3 +74,31 @@ test('Enter leaves native button activation to the browser and activates custom 
  assert.equal(clicks,1);assert.equal(prevented,1);
  f.view.dispose();
 });
+
+test('a reviewer comparison names each tool revision apart from the frozen target it reviewed, and opens that target',async()=>{
+ const target={repository:'docviz',pr:1,base:'5'.repeat(40),head:'8'.repeat(40)};
+ const run=(commit,status,contract)=>({commit,scenarioId:'contract-review',harnessDigest:'h',execution:'cli-process',tool:{commit},target,
+  frames:[{id:'input',title:'The same frozen PR1 target, steps and profile',observed:false,output:{target}},{id:'transform',title:'Run this revision\'s docviz pr',observed:true,output:{exitCode:0}},{id:'output',title:'Read the review it printed',observed:true,output:{status,contract}}]});
+ const stack={id:'pr18',target:base,tip:head,kind:'pr-checkpoints',layers:[{id:'initial',title:'Initial',parent:base,head,changedNodes:['cli','contracts']}],
+  nodes:[{id:'cli',title:'Docviz PR review',inputs:['PR checkout'],outputs:['verdict'],sources:[]},{id:'contracts',title:'Contract assessment',inputs:[],outputs:[],sources:[]}],edges:[{id:'e',from:'cli',to:'contracts',label:'operator profile'}],
+  scenarios:[{id:'contract-review',nodeId:'cli',label:'Review frozen PR1 with the contract profile',inputLabel:'PR1 595f590 → 8967e5d · 5 author steps · card-spend profile',expectation:'The reviewer executes the contract and says Needs you.',expectedStatus:'needs',target:{...target,label:'PR #1',stackId:'docviz-pr1-coverage'},claimIds:[],sources:[],testSources:[]}],
+  captures:[run(base,'look',null),run(head,'needs',{contractId:'card-spend-accounting',status:'violated'})]};
+ const dialog={open:false,innerHTML:'',showModal(){this.open=true;},close(){this.open=false;}};
+ const host={innerHTML:'',getBoundingClientRect(){return{width:1200};},querySelector(s){return s==='#behavior-dialog'?dialog:null;}};
+ const opened=[];
+ const view=createBehaviorView({api:async()=>({}),onProperty(){},onAgents(){},onReview(){},onFiles(){},onOpenComparison:c=>opened.push(c)});
+ view.mount(host,stack,{repository:{name:'docviz'},properties:[],evidence:[],findings:[]});
+ const click=dataset=>host.onclick({target:{closest(){return{dataset};}}});
+ const html=host.innerHTML;
+ assert.match(html,/TOOL[^<]*<\/span><code>aaaaaaa<\/code>/,'before lane names the tool revision');
+ assert.match(html,/TOOL[^<]*<\/span><code>bbbbbbb<\/code>/,'after lane names the tool revision');
+ assert.ok((html.match(/5555555 → 8888888/g)||[]).length>=2,'both lanes name the same reviewed target');
+ assert.match(html,/Look when you can/);assert.match(html,/Needs you/);
+ assert.match(html,/Actual CLI executed/);assert.doesNotMatch(html,/No studio on base|Actual export executed/);
+ assert.doesNotMatch(html,/CONTRACT COVERAGE/,'the target\'s coverage is regression evidence, not this PR\'s coverage');
+ await click({behaviorAction:'detail',tab:'test'});
+ assert.match(dialog.innerHTML,/TOOL aaaaaaa · TARGET 5555555 → 8888888/);assert.match(dialog.innerHTML,/TOOL bbbbbbb · TARGET 5555555 → 8888888/);
+ await click({behaviorAction:'target-review'});
+ assert.deepEqual(opened,[{base:target.base,head:target.head,intent:'PR #1',stackId:'docviz-pr1-coverage'}]);
+ view.dispose();
+});
