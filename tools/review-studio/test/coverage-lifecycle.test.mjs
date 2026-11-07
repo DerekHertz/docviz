@@ -61,6 +61,39 @@ test('a coverage result for another head demotes every mark to unknown',()=>{
  assert.equal(lc.stale,true);assert.equal(lc.mark.kind,'unknown');assert.match(lc.banner,/fffffff/);
 });
 
+const otherBase='c'.repeat(40),mid='e'.repeat(40);
+const rebased=()=>{const w=world();w.coverage[0].base=otherBase;return w;};
+// A two-PR stack: whole a→b, layer one a→e, layer two e→b. `bound` names the comparison the report was made for.
+function layered(bound){
+ const w=world();w.kind='stack';
+ w.layers=[{id:'one',number:1,title:'PR 1',parent:base,head:mid,changedNodes:[]},{id:'two',number:2,title:'PR 2',parent:mid,head,changedNodes:['background']}];
+ w.coverage[0].base=bound==='two'?mid:base;return w;
+}
+
+test('coverage for the same head but another base is not current proof and plays nothing',()=>{
+ const lc=coverageLifecycle(rebased(),{step:4});
+ assert.equal(lc.stale,true);assert.equal(lc.mark.kind,'unknown');
+ assert.equal(lc.execution,null);assert.equal(lc.frames.length,0);assert.equal(lc.canPlay,false);assert.equal(lc.state,null);
+ assert.ok(lc.rail.every(r=>r.value===undefined&&r.history.length===0),'no recorded value from an incompatible report');
+ assert.match(lc.banner,/ccccccc → bbbbbbb/);assert.match(lc.banner,/aaaaaaa → bbbbbbb/);
+ const mark=r=>coverageLifecycle(world({rows:[r]})).mark.kind;
+ assert.equal(mark(row({evidence:{...row().evidence,base:'f'.repeat(40)}})),'missing','evidence bound to another base is not an execution here');
+});
+
+test('coverage binds to the selected comparison, so a layer report is not whole-stack proof',()=>{
+ const layerReport=layered('two');
+ const two=coverageLifecycle(layerReport,{comparison:'two'});
+ assert.equal(two.mark.kind,'violation');assert.equal(two.frames.length,5);assert.equal(two.stale,false);
+ const whole=coverageLifecycle(layerReport,{comparison:'whole'});
+ assert.equal(whole.mark.kind,'unknown');assert.equal(whole.frames.length,0);assert.equal(whole.stale,true);
+ assert.equal(coverageLifecycle(layerReport).mark.kind,'unknown','the default comparison is the whole stack');
+ assert.equal(coverageLifecycle(layerReport,{comparison:'one'}).mark.kind,'unknown');
+ const wholeReport=layered('whole');
+ const layer=coverageLifecycle(wholeReport,{comparison:'two'});
+ assert.equal(layer.mark.kind,'unknown');assert.equal(layer.frames.length,0);
+ assert.equal(coverageLifecycle(wholeReport,{comparison:'whole'}).mark.kind,'violation');
+});
+
 test('the data rail shows recorded frame values only, and the page total is fed by cards, not the ledger',()=>{
  let lc=coverageLifecycle(world(),{step:4});
  const value=(lc,id)=>lc.rail.find(r=>r.id===id).value;
@@ -157,6 +190,23 @@ test('missing coverage opens as uncertainty with no observed assertion',async()=
  assert.match(f.dialog.innerHTML,/No executed evidence/);
  assert.doesNotMatch(f.dialog.innerHTML,/Executed counterexample|ledgerPaid|This execution/);
  f.view.dispose();
+});
+
+test('the view binds marks, rows and playback to the comparison the reviewer selects',async()=>{
+ const f=mountView(layered('two'));
+ assert.doesNotMatch(f.host.innerHTML,/lifecycle-mark violation|lifecycle-play|Executed counterexample/);
+ assert.match(f.host.innerHTML,/coverage-banner/);
+ await f.click({behaviorAction:'comparison',id:'two'});
+ assert.match(f.host.innerHTML,/lifecycle-mark violation/);assert.match(f.host.innerHTML,/lifecycle-play/);
+ await f.click({behaviorAction:'obligation',id:'dismiss'});
+ assert.match(f.dialog.innerHTML,/Executed counterexample/);
+ f.view.dispose();
+ const g=mountView(rebased());
+ assert.doesNotMatch(g.host.innerHTML,/lifecycle-mark violation|lifecycle-play|Executed counterexample/);
+ await g.click({behaviorAction:'obligation',id:'dismiss'});
+ assert.doesNotMatch(g.dialog.innerHTML,/Executed counterexample|ledgerPaid/);
+ assert.match(g.dialog.innerHTML,/ccccccc → bbbbbbb/);
+ g.view.dispose();
 });
 
 test('a stack with no lifecycle keeps the existing behavior view without a coverage panel',()=>{
