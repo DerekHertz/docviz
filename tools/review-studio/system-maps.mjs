@@ -11,11 +11,29 @@ const validRepo=id=>{if(!/^[a-f0-9]{24,64}$/.test(id||''))throw new Error('Use a
 const validCommit=commit=>{if(!/^[a-f0-9]{40,64}$/.test(commit||''))throw new Error('Stored maps require an exact commit.');return commit;};
 const json=async path=>JSON.parse(await readFile(path,'utf8'));
 const maybe=async path=>{try{return await json(path);}catch(e){if(e.code==='ENOENT')return null;throw e;}};
-const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value[k]!==undefined).map(k=>[k,clean(value[k])]));
+const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>Object.hasOwn(value,k)&&value[k]!==undefined).map(k=>[k,clean(value[k])]));
+const ownList=(value,key)=>Object.hasOwn(value,key)&&value[key]!==undefined?value[key]:[];
+const invalid=path=>{throw new Error('Invalid stored map schema at '+path+'.');};
+function record(value,path){if(!value||typeof value!=='object'||Array.isArray(value)||![Object.prototype,null].includes(Object.getPrototypeOf(value)))invalid(path);}
+function stringField(value,key,path,required=false){if(!Object.hasOwn(value,key)||value[key]===undefined){if(required)invalid(path+'.'+key);return;}if(typeof value[key]!=='string')invalid(path+'.'+key);}
+function identifier(value,key,path){stringField(value,key,path,true);if(!value[key].trim())invalid(path+'.'+key);}
+function items(value,path,visit){if(!Array.isArray(value))invalid(path);for(const[i,item]of value.entries())visit(item,path+'['+i+']');}
+function fieldItems(value,key,path,visit){if(Object.hasOwn(value,key)&&value[key]!==undefined)items(value[key],path+'.'+key,visit);}
+function relativePath(value,path){if(typeof value!=='string'||!value||value.startsWith('/')||value.split('/').includes('..')||value.includes('\0'))invalid(path);}
+function validateGraph(nodes,edges){
+ const sources=(value,path)=>{record(value,path);stringField(value,'commit',path,true);validCommit(value.commit);stringField(value,'path',path,true);relativePath(value.path,path+'.path');if(!Object.hasOwn(value,'from')||!Object.hasOwn(value,'to')||!Number.isSafeInteger(value.from)||value.from<1||!Number.isSafeInteger(value.to)||value.to<value.from)invalid(path+'.range');};
+ const strings=(value,path)=>{if(typeof value!=='string')invalid(path);};
+ items(nodes,'nodes',(node,path)=>{record(node,path);identifier(node,'id',path);for(const key of['title','purpose'])stringField(node,key,path);for(const key of['inputs','outputs'])fieldItems(node,key,path,strings);fieldItems(node,'sources',path,sources);
+  fieldItems(node,'steps',path,(step,path)=>{record(step,path);stringField(step,'title',path,true);stringField(step,'detail',path);fieldItems(step,'sources',path,sources);});
+  fieldItems(node,'pseudocode',path,(step,path)=>{record(step,path);stringField(step,'text',path,true);if(Object.hasOwn(step,'indent')&&step.indent!==undefined&&(!Number.isSafeInteger(step.indent)||step.indent<0))invalid(path+'.indent');fieldItems(step,'sources',path,sources);});
+ });
+ items(edges,'edges',(edge,path)=>{record(edge,path);for(const key of['id','from','to'])identifier(edge,key,path);for(const key of['label','basis'])stringField(edge,key,path);});
+ const nodeIds=new Set(nodes.map(n=>n.id)),edgeIds=new Set(edges.map(e=>e.id));if(nodeIds.size!==nodes.length||edgeIds.size!==edges.length||edges.some(e=>!nodeIds.has(e.from)||!nodeIds.has(e.to)))throw new Error('Stored map has duplicate IDs or dangling connections.');
+}
 function graphOf(nodes=[],edges=[]){
- const sources=refs=>(refs||[]).map(s=>pick(s,['commit','path','from','to']));
- const graph={nodes:nodes.map(n=>({...pick(n,['id','title','purpose','inputs','outputs']),sources:sources(n.sources),steps:(n.steps||[]).map(step=>({...pick(step,['title','detail']),sources:sources(step.sources)})),pseudocode:(n.pseudocode||[]).map(step=>({...pick(step,['text','indent']),sources:sources(step.sources)}))})).sort((a,b)=>a.id.localeCompare(b.id)),edges:edges.map(e=>pick(e,['id','from','to','label','basis'])).sort((a,b)=>a.id.localeCompare(b.id))};
- const ids=new Set(graph.nodes.map(n=>n.id));if(ids.size!==graph.nodes.length||graph.edges.some(e=>!ids.has(e.from)||!ids.has(e.to)))throw new Error('Stored map has duplicate nodes or dangling connections.');
+ validateGraph(nodes,edges);
+ const sources=refs=>refs.map(s=>pick(s,['commit','path','from','to']));
+ const graph={nodes:nodes.map(n=>({...pick(n,['id','title','purpose','inputs','outputs']),sources:sources(ownList(n,'sources')),steps:ownList(n,'steps').map(step=>({...pick(step,['title','detail']),sources:sources(ownList(step,'sources'))})),pseudocode:ownList(n,'pseudocode').map(step=>({...pick(step,['text','indent']),sources:sources(ownList(step,'sources'))}))})).sort((a,b)=>a.id.localeCompare(b.id)),edges:edges.map(e=>pick(e,['id','from','to','label','basis'])).sort((a,b)=>a.id.localeCompare(b.id))};
  return graph;
 }
 const sourceRefs=node=>[...(node.sources||[]),...(node.steps||[]).flatMap(s=>s.sources||[]),...(node.pseudocode||[]).flatMap(s=>s.sources||[])];
@@ -37,7 +55,7 @@ export function createSystemMapCache(dataRoot){
  const mapPath=id=>resolve(root,'snapshots',validHash(id)+'.json');
  const revisionPath=(repoId,commit)=>resolve(root,'revisions',validRepo(repoId),validCommit(commit));
  async function atomic(path,value){const prior=await maybe(path);if(prior){if(canonical(prior)!==canonical(value))throw new Error('An immutable map record already exists with different content.');return;}await mkdir(dirname(path),{recursive:true});const temporary=path+'.'+randomUUID()+'.tmp';await writeFile(temporary,JSON.stringify(value,null,2)+'\n');await rename(temporary,path);}
- async function read(id){const record=await json(mapPath(id)),{id:storedId,...payload}=record;if(storedId!==id||hash(payload)!==id)throw new Error('Stored system map fingerprint does not match.');if(record.schema!==SCHEMA)throw new Error('Stored system map schema is incompatible.');return record;}
+ async function read(id){const record=await json(mapPath(id)),{id:storedId,...payload}=record;if(storedId!==id||hash(payload)!==id)throw new Error('Stored system map fingerprint does not match.');if(record.schema!==SCHEMA)throw new Error('Stored system map schema is incompatible.');const graph=graphOf(record.nodes,record.edges);if(canonical(graph)!==canonical({nodes:record.nodes,edges:record.edges}))throw new Error('Stored map schema contains undeclared or unnormalized graph fields.');return record;}
  async function at(repositoryId,commit,explicitId){
   validRepo(repositoryId);validCommit(commit);
   if(explicitId){const map=await read(explicitId);if(map.repositoryId!==repositoryId||map.commit!==commit)throw new Error('Stored map does not match this repository and exact base revision.');return{status:'exact',map};}
@@ -49,7 +67,7 @@ export function createSystemMapCache(dataRoot){
   if(existing){const map=await read(existing.id);if(map.repositoryId!==repositoryId||map.commit!==commit||map.definitionHash!==definitionHash)throw new Error('Stored map index does not match its snapshot.');return{map,status:'loaded'};}
   if((await git(repository.path,['rev-parse','--verify',commit+'^{commit}'])).trim()!==commit)throw new Error('The mapped revision is not available in this repository.');
   const refs=graph.nodes.flatMap(sourceRefs),files=new Map();
-  const blob=async(rev,path)=>{validCommit(rev);if(typeof path!=='string'||path.startsWith('/')||path.split('/').includes('..')||path.includes('\0'))throw new Error('Map source paths must stay inside the repository.');const key=rev+':'+path;if(!files.has(key)){const entry=await git(repository.path,['ls-tree','-z',rev,'--',path]);const match=entry.match(/^100\d+ blob ([a-f0-9]{40,64})\t/);files.set(key,match?match[1]:null);}return files.get(key);};
+  const blob=async(rev,path)=>{const key=rev+':'+path;if(!files.has(key)){const entry=await git(repository.path,['ls-tree','-z',rev,'--',path]);const match=entry.match(/^100\d+ blob ([a-f0-9]{40,64})\t/);files.set(key,match?match[1]:null);}return files.get(key);};
   const sourceFiles=[];for(const path of [...new Set(refs.map(s=>s.path))].sort())sourceFiles.push({path,blob:await blob(commit,path)});
   const current=new Map(sourceFiles.map(f=>[f.path,f.blob])),outdatedNodes=[];
   for(const node of graph.nodes){let stale=false;for(const s of sourceRefs(node)){const origin=await blob(s.commit,s.path);if(!origin||origin!==current.get(s.path))stale=true;}if(stale)outdatedNodes.push(node.id);}

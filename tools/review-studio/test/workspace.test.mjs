@@ -70,3 +70,11 @@ test('a PR reuses exact-commit review evidence while watching its fetched refs',
  const f=await fixture(t);let d=await f.ws.changeProperty(f.doc.id,f.doc.version,property(f.doc));d=await f.ws.recordEvidence(d.id,{kind:'reported',propertyIds:[d.properties[0].id],result:'source inspection',scope:'fixture'});f.git('update-ref','refs/docviz/pr-1/base',f.base);f.git('update-ref','refs/docviz/pr-1/head',f.head);
  const bound=await f.ws.open({repositoryId:d.repository.id,baseRef:'refs/docviz/pr-1/base',headRef:'refs/docviz/pr-1/head',pr:{url:'https://github.com/fixture/repo/pull/1',number:1}});assert.equal(bound.id,d.id);assert.equal(bound.properties.length,1);assert.equal(bound.evidence.length,1);assert.equal(bound.snapshot.base.ref,'main');assert.equal(bound.watchRefs.base,'refs/docviz/pr-1/base');f.git('checkout','--detach','-q',f.head);f.git('branch','-D','main','candidate');assert.equal((await f.ws.read(bound.id)).freshness.status,'current');f.git('commit','--allow-empty','-qm','new');f.git('update-ref','refs/docviz/pr-1/head',f.git('rev-parse','HEAD'));assert.equal((await f.ws.read(bound.id)).freshness.status,'refs-moved');
 });
+
+test('source uncertainty remains a gap while a direct contradiction creates a blocking finding',async t=>{
+ const f=await fixture(t);let d=await f.ws.changeProperty(f.doc.id,f.doc.version,property(f.doc)),p=d.properties[0];
+ d=await f.ws.recordEvidence(d.id,{kind:'source-judgment',propertyIds:[p.id],result:'uncertain',uncertaintyReason:'insufficient-source-context',contextSufficient:.1,supported:.1,contradicted:.9});
+ assert.equal(d.findings.length,0);assert.equal(d.evidence[0].result,'uncertain');assert.match(d.acceptance.gaps.join(),/no recorded executed property-specific/);
+ d=await f.ws.recordEvidence(d.id,{kind:'source-judgment',propertyIds:[p.id],result:'contradicts',contextSufficient:1,supported:0,contradicted:1});
+ assert.equal(d.findings.length,1);assert.equal(d.findings[0].severity,'blocking');assert.equal(d.findings[0].propertyId,p.id);
+});

@@ -1,10 +1,10 @@
 # Standalone studio validation
 
-Recorded November 6, 2026. This is validation of the local prototype, not approval to merge a new candidate. Live Jev checks and independent merge verification remain pending.
+Recorded November 6, 2026. This is validation of the local prototype, not approval to merge a new candidate. The initial live Jev run completed on the original PR head. The updated source-context criteria require a fresh live rerun and independent merge review; those results belong to their exact tested revision.
 
 ## Executed checks
 
-- Final repository checks: npm run check passed; npm test had 228 passes, 17 skips and no failures across 245 cases. The studio contributes 35 passing cases. Covers exact comparison scopes, capture pairing, source/evidence integrity, cache persistence, immutable historical records, contract/source changes, downstream context, unmapped files, repository/base matching and HTTP/extension boundaries. The new suite includes regressions for delayed Jev responses after a property edit and explicit decisions for reserved object-property names.
+- Final repository checks: npm run check passed; npm test had 279 passes, 17 skips and no failures across 296 cases. The studio contributes 86 passing cases, including nested boundary cases. Covers exact comparison scopes, capture pairing, source/evidence integrity, cache persistence, immutable historical records, contract/source changes, downstream context, unmapped files, repository/base matching and HTTP/extension boundaries. The new suite includes regressions for delayed Jev responses after a property edit and explicit decisions for reserved object-property names.
 - Existing Docviz suite before packaging: 193 passed, 17 skipped, no failures. Historical import caches were isolated. Skips concern unavailable TLC/statechart, rendering tooling and a local private fixture.
 - Historical stack PRs #13–15: three regression commands, 43 passing cases, and 12 recorded function captures. Upstream findings are controlled fixtures.
 - Docviz #16: 66 passed, 14 skipped, no failures. Actual isolated runPr executions select the decoy checkout at base and requested checkout at candidate, including relative steps/glossary files. Live provider/Jev and trusted-model execution are outside this capture.
@@ -26,7 +26,7 @@ Baseline maps are immutable. Candidate descriptions are proposed updates, separa
 
 ## Open verification
 
-- Jev has no recorded live result. Stack questions/status are inspectable; live checks currently run through workspace properties.
+- Jev live testing uses workspace properties. The stack view retains recorded status/questions. The initial results included an insufficient-context false flag; the updated gate and UI now need their exact-head live rerun and independent review.
 - AfterClass needs live toggle, topic-reset, grouped evidence selection, focus/keyboard, saved-record and uncropped-layout checks. Static rendering proves markup, not interaction or CSS layout.
 - The preparing text's usually 20–30 seconds claim has no captured timing measurement.
 - Unchanged frame selection and backend citation filtering are source context, not new execution evidence.
@@ -34,3 +34,9 @@ Baseline maps are immutable. Candidate descriptions are proposed updates, separa
 - The existing verify-docviz skill covers the legacy PR CLI/helper, not this studio UI. Its independent merge verdict remains separate.
 
 Runtime records, checkouts, credentials, CLI transcripts and generated extension bundles are ignored. Existing helper and documentation extension behavior remain available. The studio opens no PRs and merges nothing itself.
+
+## Cache schema and source-context correction
+
+Cache boundary regressions reproduced malformed allowed values being retained. The corrected validator rejects structured description fields, non-string ports, malformed nested records and source ranges before persistence. Reads reject correctly fingerprinted malformed graph records. Valid cached Docviz, Docviz PR16 and AfterClass PR94 snapshots still load with unchanged IDs. Cache regression file: 25 passing cases.
+
+The source-context regression reproduced a high contradiction score becoming a contradiction despite insufficient source. The updated criteria ask about source sufficiency first. Low context becomes `uncertain`; malformed/missing scores remain `unknown`; adequate source retains the support and contradiction cutoffs. The adapter records criteria version, thresholds, scores, reason and the original property definition. Workspace regressions confirm uncertainty remains an evidence gap without creating a blocking contradiction, while a direct contradiction still does. Amber UI presentation retains earlier historical results unchanged.

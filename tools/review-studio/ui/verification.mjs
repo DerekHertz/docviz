@@ -1,3 +1,14 @@
+export function sourceJudgmentPresentation(evidence){
+ if(evidence.kind!=='source-judgment')return{label:evidence.result,tone:evidence.result==='fail'?'bad':'neutral',detail:''};
+ if(evidence.result==='uncertain')return{
+  label:evidence.uncertaintyReason==='insufficient-source-context'?'Source context uncertain':'Source judgment uncertain',tone:'pending',
+  detail:evidence.uncertaintyReason==='insufficient-source-context'?'The supplied source context is insufficient to establish or refute this claim. Add the relevant code and reassess.':'The supplied source did not yield a conclusive support or contradiction judgment. Inspect the claim and recorded scores.'
+ };
+ if(evidence.result==='unknown')return{label:'Source check incomplete',tone:'pending',detail:'The model response did not contain valid scores for every required question. No support or contradiction is established.'};
+ if(evidence.result==='contradicts')return{label:'Source contradiction',tone:'bad',detail:'The recorded model judgment flags a conflict with the supplied source. Inspect its scope and evidence before treating it as a code finding.'};
+ if(evidence.result==='supports')return{label:'Source support',tone:'neutral',detail:'The model supports this source-linked claim. Runtime behavior remains a separate question.'};
+ return{label:'Source judgment needs review',tone:'pending',detail:'Inspect this recorded source judgment and its criteria.'};
+}
 export function verificationFor(doc,componentId,propertyId){
  const component=doc.components.find(c=>c.id===componentId);if(!component)throw new Error('Unknown component.');
  const properties=doc.properties.filter(p=>p.componentId===componentId),selected=properties.find(p=>p.id===propertyId)||properties[0]||null;

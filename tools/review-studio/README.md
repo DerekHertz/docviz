@@ -36,11 +36,17 @@ Docviz #16 reuses five descriptions and updates one. Its controlled replay selec
 
 ## Reuse the stored system map
 
+Cached graph values are validated before storage and on read. Description fields must be strings, ports must be string arrays, and source ranges and graph endpoints must be valid. Extra sibling fields remain excluded. Valid version-1 maps retain their IDs; malformed cached records fail explicitly.
+
 Immutable snapshots live under `dataRoot/system-maps`. **Inspect stored copy** shows the revision, model ID and source fingerprints. New comparisons reference an exact baseline in the registered repository and overlay changed descriptions and connections. Competing models require an explicit map ID. There is no global latest-map fallback.
 
 Reused descriptions do not inherit claims, Jev results, tests or human decisions. Changed source, changed contracts and changed connections remain distinct. Recorded downstream connections identify potentially affected context; unmapped changes remain coverage gaps. The supplied graph is a partial source interpretation, not automatic exhaustive dependency discovery.
 
 ## Test Jev before merge
+
+Jev now assesses whether the supplied source can establish or directly refute the claim before interpreting support or contradiction. Missing or unrelated source shows **Source context uncertain**, with an explanation and the recorded scores. A direct counterexample can still be a contradiction. Invalid or missing scores produce an incomplete check.
+
+New judgments record `source-context-v2`, the context/support/contradiction scores and their cutoffs. The context gate is provisional at 0.6; support at 0.6 and contradiction at 0.5 retain their existing cutoffs. These model scores and policies are not calibrated runtime guarantees. Earlier judgments retain their original result and criteria.
 
 Set `TYPESAFE_API_KEY` only in the local server environment. The review workspace can request Jev source judgments for source-linked properties. No key is stored in Git. The stack explorer displays recorded Jev status and questions; it does not currently launch stack-claim checks. A live Jev end-to-end run and independent pre-merge verification remain pending. Do not interpret a source judgment as runtime or formal proof.
 
