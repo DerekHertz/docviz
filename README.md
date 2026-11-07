@@ -2,6 +2,8 @@
 
 Review agent-written changes as a system map. The new [standalone review studio](tools/review-studio/README.md) shows a whole PR stack, changed behavior, source-linked pseudocode, claims and evidence. Cached maps retain source context while each change keeps its own verification.
 
+[Architecture and verification](tools/review-studio/ARCHITECTURE.md) explains how Jev source judgments, executed tests, model checks, recorded behavior and human review fit together.
+
 Start with the [studio setup and historical PR examples](tools/review-studio/README.md#start-the-studio). The studio is a new product direction alongside the documentation tools below. Live Jev validation is pending before merge.
 
 See how documented code **behaves**. Break down any docs page into inline diagrams, visualize

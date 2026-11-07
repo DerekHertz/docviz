@@ -48,7 +48,9 @@ Jev now assesses whether the supplied source can establish or directly refute th
 
 New judgments record `source-context-v2`, the context/support/contradiction scores and their cutoffs. The context gate is provisional at 0.6; support at 0.6 and contradiction at 0.5 retain their existing cutoffs. These model scores and policies are not calibrated runtime guarantees. Earlier judgments retain their original result and criteria.
 
-Set `TYPESAFE_API_KEY` only in the local server environment. The review workspace can request Jev source judgments for source-linked properties. No key is stored in Git. The stack explorer displays recorded Jev status and questions; it does not currently launch stack-claim checks. A live Jev end-to-end run and independent pre-merge verification remain pending. Do not interpret a source judgment as runtime or formal proof.
+Source context now expands whole anchor modules, declared supporting component code and bounded relative imports. **Inspect the source supplied to Jev** shows the included commits/blobs, omissions, limits and exact submitted packet. The selector can miss callers or runtime facts; expanding context does not guarantee a supported judgment. See [Architecture and verification](ARCHITECTURE.md) for the evidence boundaries.
+
+Set `TYPESAFE_API_KEY` only in the local server environment. The review workspace can request Jev source judgments for source-linked properties. No key is stored in Git. The stack explorer displays recorded Jev status and questions; it does not currently launch stack-claim checks. Live runs and independent verification are tied to their exact candidate. The PR records the latest results and remaining gaps. A source judgment remains separate from runtime and formal evidence.
 
 [Validation and limits](STANDALONE-VALIDATION.md) · [Agent review packages](AGENT-REVIEW.md)
 
@@ -108,7 +110,7 @@ The app detects existing `claude` and `codex` commands. **Run agent analysis** u
 
 For an agent outside this app, use **Export context & schema**, then **Import agent package**. See [the agent review guide](AGENT-REVIEW.md).
 
-Jev is optional. To enable it, set `TYPESAFE_API_KEY` in the environment used to start the server. Jev checks source claims, and its results remain model judgments. This installation has not exercised the Jev adapter because no key is configured.
+Jev is optional. To enable it, set `TYPESAFE_API_KEY` in the environment used to start the server. Jev checks source claims, and its results remain model judgments. Each requested run retains its submitted source packet and scores. The key stays in the operator-started server environment.
 
 ## Continue after new commits
 
@@ -158,4 +160,4 @@ The candidate must include the contract route (`helper/contracts.js`). **Whole P
 
 The reviewer comparison (`Docviz PR review` module) runs each PR18 revision's own `helper/cli.js` as a process on one frozen target: PR #1 `595f590 → 8967e5d`, the author's five unchanged steps (sha256 `385578d3…`), the candidate's `card-spend` profile, `--no-check`, and explicit `--trust-head` for that pinned head only. Lanes name the TOOL revision apart from the TARGET. The base and initial CLIs print **Look when you can** and write no coverage; that absence is recorded, never a fabricated violation. The candidate executes `card-spend-accounting` and prints **Needs you**. This changes the review of PR #1, not PR #1's behavior. PR #1's coverage record stays nested regression evidence and opens through the target link in its own review; it is never PR #18's coverage.
 
-The three rerunnable studio cases demonstrate malformed cache rejection, uncertainty for insufficient source context, and canonical evidence display. The latter two supply controlled provider scores/evidence records to real exported functions; they are not new live Jev judgments or an executed failing command. Captures bind their harness, exact Git blobs, inputs and outputs. The semantic map is curated source interpretation; it does not claim exhaustive dependency or runtime coverage. Missing captures, incompatible harnesses and historical source judgments remain explicit.
+The rerunnable studio cases demonstrate malformed cache rejection, source-context uncertainty, expansion of a clipped anchor into its helper/threshold definitions, and canonical evidence display. Source-context cases intercept provider responses to inspect real routing and outgoing packets. Canonical evidence uses supplied records. These are not live Jev judgments or an executed failing command. Captures bind their harness, exact Git blobs, inputs and outputs. The semantic map is curated source interpretation; it does not claim exhaustive dependency or runtime coverage. Missing captures, incompatible harnesses and historical source judgments remain explicit.
