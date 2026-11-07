@@ -64,12 +64,17 @@ const captures=[],evidence=[{id:harness.id}];
 const cloneAt=async(commit,root)=>{try{await stat(resolve(root,'.git'));}catch{await exec('git',['-c','core.hooksPath=/dev/null','clone','--no-checkout','--no-hardlinks','--template=','--',repository.path,root]);await git(root,['fetch','-q','origin','+refs/docviz/*:refs/docviz/*']);await git(root,['checkout','--detach',commit]);}
  assert.equal((await git(root,['rev-parse','HEAD'])).trim(),commit);assert.equal((await git(root,['status','--porcelain','--untracked-files=no'])).trim(),'','Capture source checkout must be clean.');return root;};
 const targetRoot=await cloneAt(pr1.head,resolve(checkouts,'pr1-target-'+pr1.head.slice(0,12)));
+// A local clone inherits a filesystem origin; printed source links must name this fixture’s GitHub repository.
+await git(targetRoot,['remote','set-url','origin','https://github.com/DerekHertz/docviz.git']);
 const printed={[target]:'look',[initial]:'look',[tip]:'needs'};
 async function captureCliReview(commit,root){
  const scenario=scenarios.find(s=>s.id==='contract-review'),scratch=resolve(checkouts,'runs',commit.slice(0,12)+'-contract-review-'+Date.now());await mkdir(scratch,{recursive:true});
  const argv=[process.execPath,worker,root,scenario.id,scratch,targetRoot,stepsFile,profileFile],startedAt=new Date().toISOString(),{stdout}=await exec(argv[0],argv.slice(1),{timeout:180000,maxBuffer:8000000});const result=JSON.parse(stdout);
  assert.equal((await git(targetRoot,['status','--porcelain'])).trim(),'','The PR1 target checkout must stay clean.');
  assert.equal(result.output.status,printed[commit],'The pinned CLI printed an unexpected verdict.');
+ const sourceLinks=[...result.stdout.matchAll(/\]\(([^)\n]*\/blob\/[^)\n]*)\)/g)].map(m=>m[1]);
+ assert.ok(sourceLinks.length>=5,'The captured CLI must emit source links.');
+ for(const url of sourceLinks)assert.ok(url.startsWith('https://github.com/DerekHertz/docviz/blob/'+pr1.head+'/'),'Captured source links must open the exact historical GitHub revision: '+url);
  if(commit===tip){const c=result.output.contract;assert.ok(c&&c.status==='violated'&&c.provenance==='executed-by-docviz'&&c.outcome==='fails'&&c.evidenceBase===pr1.base&&c.evidenceHead===pr1.head,'The candidate must execute the contract on the exact PR1 target.');}
  else assert.equal(result.output.contract,null,'An earlier revision has no contract route; nothing is fabricated for it.');
  const helperTree=(await git(root,['ls-tree','-r',commit,'--','helper/'])).trim().split('\n').map(entry=>entry.match(/^100\d+ blob ([a-f0-9]+)\t(.+)$/)).filter(Boolean).map(([,blob,path])=>({path,blob}));
