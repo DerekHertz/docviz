@@ -41,31 +41,35 @@ export const coverageMarks={
  unknown:{kind:'unknown',glyph:'?',tone:'uncertain',label:'Applicability unknown'},
  'no-result':{kind:'no-result',glyph:'?',tone:'uncertain',label:'No coverage result for this contract'}
 };
-const executedHere=(evidence,tip,outcome)=>evidence?.provenance==='executed-by-docviz'&&evidence.outcome===outcome&&evidence.head===tip;
-function coverageMark(row,tip){
+// A result or execution counts only for the exact comparison on screen: same base and same head.
+export const coverageBoundTo=(result,scope)=>!!result&&result.base===scope.base&&result.head===scope.head;
+const executedAt=(evidence,scope)=>evidence?.provenance==='executed-by-docviz'&&evidence.head===scope.head&&(evidence.base==null||evidence.base===scope.base);
+const executedHere=(evidence,scope,outcome)=>executedAt(evidence,scope)&&evidence.outcome===outcome;
+function coverageMark(row,scope){
  if(!row)return coverageMarks['no-result'];
  if(row.applies===null)return coverageMarks.unknown;
- if(row.status==='violated')return executedHere(row.evidence,tip,'fails')?coverageMarks.violated:{...coverageMarks.unverified,note:'The violation is not backed by a docviz execution at this head.'};
- if(row.status==='supported-in-scope')return executedHere(row.evidence,tip,'holds')?coverageMarks['supported-in-scope']:{...coverageMarks.unverified,note:'The support is not backed by a docviz execution at this head.'};
+ if(row.status==='violated')return executedHere(row.evidence,scope,'fails')?coverageMarks.violated:{...coverageMarks.unverified,note:'The violation is not backed by a docviz execution at this head.'};
+ if(row.status==='supported-in-scope')return executedHere(row.evidence,scope,'holds')?coverageMarks['supported-in-scope']:{...coverageMarks.unverified,note:'The support is not backed by a docviz execution at this head.'};
  return coverageMarks[row.status]||coverageMarks.unknown;
 }
-export function coverageResultMark(result,row,tip){return result&&result.head!==tip?{...coverageMarks.unknown,label:'Coverage recorded for another revision'}:coverageMark(row,tip);}
+export function coverageResultMark(result,row,scope){return result&&!coverageBoundTo(result,scope)?{...coverageMarks.unknown,label:'Coverage recorded for another comparison'}:coverageMark(row,scope);}
 const overlaps=(a,b)=>a.path===b.path&&a.commit===b.commit&&a.from<=b.to&&b.from<=a.to;
 
-export function coverageLifecycle(stack,{lifecycleId,step}={}){
+export function coverageLifecycle(stack,{lifecycleId,step,comparison='whole'}={}){
  const lifecycle=(stack.lifecycles||[]).find(l=>!lifecycleId||l.id===lifecycleId);if(!lifecycle)return null;
+ const scope=behaviorScope(stack,comparison),short=v=>String(v).slice(0,7);
  const steps=stack.authorSummary?.steps||[];
  const events=lifecycle.events.map(e=>{const citedBy=steps.filter(s=>s.sources.some(a=>e.sources.some(b=>overlaps(a,b)))).map(s=>s.id);return{...e,citedBy,omitted:!citedBy.length};});
  const summary={steps:steps.map(s=>({...s,events:events.filter(e=>e.citedBy.includes(s.id)).map(e=>e.id)})),edges:stack.authorSummary?.edges||[],gutter:steps.filter(s=>!events.some(e=>e.citedBy.includes(s.id))).map(s=>s.id)};
  const result=(stack.coverage||[]).find(v=>v.rows?.some(r=>r.contractId===lifecycle.contractId))||null,row=result?.rows.find(r=>r.contractId===lifecycle.contractId)||null;
- const stale=!!result&&result.head!==stack.tip;
- const mark=coverageResultMark(result,row,stack.tip);
- // Playback uses only per-action states a docviz execution recorded at this head. Nothing is inferred from the final result.
- const execution=!stale&&row?.evidence?.provenance==='executed-by-docviz'&&row.evidence.head===stack.tip?row.evidence:null;
+ const stale=!!result&&!coverageBoundTo(result,scope);
+ const mark=coverageResultMark(result,row,scope);
+ // Playback uses only per-action states a docviz execution recorded for this comparison. Nothing is inferred from the final result.
+ const execution=!stale&&executedAt(row?.evidence,scope)?row.evidence:null;
  const frames=Array.isArray(execution?.observed?.frames)?execution.observed.frames.filter(f=>f&&typeof f.id==='string'):[];
  const index=Math.max(0,Math.min(Number.isInteger(step)?step:frames.length-1,frames.length-1)),frame=frames[index];
  const eventOf=f=>events.find(e=>(e.frame??e.id)===f.id)||null;
- return{lifecycle,events,summary,result,row,mark,stale,banner:stale?`Coverage recorded for ${result.head.slice(0,7)}; this review is ${stack.tip.slice(0,7)}. Every mark is shown as unknown.`:null,
+ return{lifecycle,events,summary,scope,result,row,mark,stale,banner:stale?`Coverage recorded for ${short(result.base)} → ${short(result.head)}; this comparison is ${short(scope.base)} → ${short(scope.head)}. Every mark is shown as unknown.`:null,
   execution,frames,index,canPlay:frames.length>1,atOutcome:frames.length>0&&index===frames.length-1,state:frame?eventOf(frame)?.to??null:null,
   reached:new Set(frames.slice(0,index+1).map(eventOf).filter(Boolean).map(e=>e.id)),
   rail:lifecycle.rail.map(r=>({...r,value:frame?frame[r.field]:undefined,history:frames.slice(0,index+1).map(f=>f[r.field])})),
