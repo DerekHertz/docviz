@@ -2,6 +2,8 @@
 // author's summary. Each contract's applicability comes from the changed paths; the summary only
 // annotates which of its code anchors no step covers. Evidence counts only when docviz's own
 // registered harness ran in this process at the exact repository, base, head, definition and harness.
+// The harness's controller never loads the reviewed code, which runs in its own sandboxed children,
+// so execution trust in that code is never trust in what it says about itself.
 //
 // ContractCoverage and its statuses are documented in SPEC.md (PR mode) and consumed as is by
 // tools/review-studio/coverage.mjs.
@@ -17,12 +19,16 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export const STATUSES = ['violated', 'unverified', 'stale', 'supported-in-scope', 'not-applicable'];
 
 // Registered harnesses: a profile names one by id; a path or argv from any input is never run.
+// `file` is the controller docviz runs; `parts` is every file the harness runs, all in its identity.
 export const HARNESSES = {
-  'card-spend': { file: join(HERE, 'contracts', 'card-spend.mjs'), copies: ['extension/', 'package.json'] },
+  'card-spend': {
+    file: join(HERE, 'contracts', 'card-spend.mjs'), parts: [join(HERE, 'contracts', 'card-spend.mjs'), join(HERE, 'contracts', 'card-spend-device.mjs')],
+    copies: ['extension/', 'package.json'],
+  },
 };
 
 export const digest = (value) => createHash('sha256').update(typeof value === 'string' || Buffer.isBuffer(value) ? value : JSON.stringify(value)).digest('hex');
-export const harnessDigest = (id) => digest(readFileSync(HARNESSES[id].file));
+export const harnessDigest = (id) => digest(HARNESSES[id].parts.map((f) => digest(readFileSync(f))));
 
 // Only records the runner made in this process are executed evidence; a parsed record is reported.
 const EXECUTED = new WeakSet();
