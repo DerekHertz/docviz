@@ -214,20 +214,35 @@ returns one PR comment.
   (`card-spend-device.mjs`) under Node's permission model (`--permission`: no file writes, no
   reads outside its copy, no child processes or workers) with only an IPC channel back. The
   controller holds chrome.* storage and the helper's replies and computes every frame and the
-  outcome. It takes the child's messages only as chrome.storage and fetch calls, never as a value
-  or result; a message it doesn't expect, or a child that exits early, is a harness error. No
-  side-panel code runs. The page total is read from `sidepanel.js` only when its
-  `const page = …;` is the card-cost sum (`cards.reduce` adding each `cost.usd || 0`, from
-  `state.unassigned || 0` or `0`, any parameter names or spacing), and the controller computes
-  that sum; any other page total is unsupported (`surface-missing`). The harness evaluates no
-  general JS. Until 2026-11-06 the harness imported the reviewed code into its own process and
-  printed the result, so code that printed `holds` and exited read `supported-in-scope`; the
-  first fix then ran the page expression in a child whose reported value that expression could
-  forge over the same channel. Limits: Node calls its permission model a seat belt, not a
+  outcome. It takes the child's messages only as chrome.storage and fetch calls and its runtime
+  listener's replies, never as a value or result; a message it doesn't expect, or a child that
+  exits early, is a harness error. No side-panel code runs. The side panel must be one a reviewer
+  registered in `helper/contracts/card-spend-panel.mjs` after reading every file it loads: the
+  manifest's `side_panel` page, `sidepanel.html`, `sidepanel.js`, `settings.js`,
+  `prefs-form.js` and `ui.css`, each matched by sha256 of its committed bytes. The registry is
+  docviz's own code; no profile, PR or target supplies a hash. Today one panel is registered,
+  docviz's own, unchanged since `3d37957` (the same blobs at PR #1's head). Any other side panel,
+  including a comment, an unused function or a renamed parameter in it, is unsupported
+  (`surface-missing`) with no totals. After each action the controller sends the background the
+  panel's own `panel:get { tabId }` message and computes the page total from the reply with
+  docviz's copy of that panel's `refreshCards`. A reply that panel couldn't show (not `ok`, no
+  `state` or `cards`, a card without a section, a non-number total) is a harness error. The
+  ledger is `chrome.storage.local` `spend.total`, which that panel reads directly. The reply is
+  the background's answer, whichever way it arrives: the background can make it say anything it
+  could also send the real panel. The harness evaluates no general JS. Until 2026-11-06 the
+  harness imported the reviewed code into its own process and printed the result, so code that
+  printed `holds` and exited read `supported-in-scope`; the first fix then ran the page expression
+  in a child whose reported value that expression could forge over the same channel. Until
+  2026-11-07 a recognizer read the first `const page = …;` in `sidepanel.js` and summed raw
+  storage. A commented-out or unused copy of the expected line then held for a panel that drops
+  unassigned spend, and so did a `panel:get` that never hands the panel that spend. The independent
+  final review proved all three. Limits: Node calls its permission model a seat belt, not a
   guarantee against malicious code, and code that escapes it runs as the operator's user; code
   that detects the harness, for example by its Node globals, can make different chrome.storage
   calls here than in Chrome; a Node without `--permission` can't start the reviewed code, so the
-  run reads as a harness error. The harness's identity (`harnessDigest`) covers both files.
+  run reads as a harness error; the side panel's code is matched, not run, so how Chrome renders it
+  (DOM, CSS, timing of its refreshes) is not observed. The harness's identity (`harnessDigest`)
+  covers all three files.
   `card-spend` drives `extension/background.js` through draw → fail after spending → Retry →
   Dismiss → late return, with chrome.* and the helper as controlled fixtures, and records the ledger,
   card and side-panel page total it read after each action in `observed.frames` (the studio animates

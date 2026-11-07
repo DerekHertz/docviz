@@ -22,7 +22,8 @@ export const STATUSES = ['violated', 'unverified', 'stale', 'supported-in-scope'
 // `file` is the controller docviz runs; `parts` is every file the harness runs, all in its identity.
 export const HARNESSES = {
   'card-spend': {
-    file: join(HERE, 'contracts', 'card-spend.mjs'), parts: [join(HERE, 'contracts', 'card-spend.mjs'), join(HERE, 'contracts', 'card-spend-device.mjs')],
+    file: join(HERE, 'contracts', 'card-spend.mjs'),
+    parts: ['card-spend.mjs', 'card-spend-device.mjs', 'card-spend-panel.mjs'].map((f) => join(HERE, 'contracts', f)),
     copies: ['extension/', 'package.json'],
   },
 };

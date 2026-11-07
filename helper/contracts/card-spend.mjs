@@ -3,19 +3,22 @@
 // in a child process under Node's permission model (card-spend-device.mjs). The controller holds
 // chrome.* storage and the helper's HTTP replies, drives visualizeSelection and the registered Retry and
 // Dismiss handlers, and computes every frame and the outcome from what the code did at that boundary.
-// The child's messages are taken only as its chrome.storage and fetch calls, never as a value or result.
-// No side-panel code runs: its page total is recognized in the source and computed here.
+// The child's messages are taken only as its chrome.storage and fetch calls and its runtime listener's
+// replies, never as a value or result. No side-panel code runs. The side panel must be one a reviewer
+// registered by content (card-spend-panel.mjs). docviz asks the background for panel:get the way that
+// panel does, and computes the panel's page total from the reply with its own copy of the panel's code.
 // It prints one JSON object: { outcome, observed, path, scope, detail }.
 // Ported from historical-review/grounding/replay-pr1-dismiss-gap.mjs.
 import { fork } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { knownPanel, refreshCards } from './card-spend-panel.mjs';
 
 const DEVICE = join(dirname(fileURLToPath(import.meta.url)), 'card-spend-device.mjs');
 const root = realpathSync(resolve(process.argv[2]));
 const PATH = ['draw one card', 'call fails after spending', 'retry', 'dismiss while the call is out', 'helper returns usage', 'compare ledger with card and page totals'];
-const SCOPE = 'Target’s committed extension code, run by a docviz controller that loads none of it. background.js runs in a Node child process under Node’s permission model (no file writes, no reads outside its copy, no child processes or workers); its messages are taken only as chrome.storage and fetch calls, never as a value or result. The controller holds chrome.* storage and the helper’s replies, drives the exported visualizeSelection and the registered card:retry / card:dismiss handlers, and records the ledger, card and page total after each action (observed.frames). No side-panel code runs: the page total is read from sidepanel.js only when it is the card-cost sum (cards.reduce adding each cost.usd || 0, from state.unassigned || 0 or 0) and docviz computes that sum; any other page total is unsupported. No browser, DOM or provider call. One scenario, not every path, and code that detects this harness can behave differently in Chrome.';
+const SCOPE = 'Target’s committed extension code, run by a docviz controller that loads none of it. background.js runs in a Node child process under Node’s permission model (no file writes, no reads outside its copy, no child processes or workers); its messages are taken only as chrome.storage and fetch calls and its runtime listener’s replies, never as a value or result. The controller holds chrome.* storage and the helper’s replies, drives the exported visualizeSelection and the registered card:retry / card:dismiss handlers, and records the ledger, card and page total after each action (observed.frames). No side-panel code runs. The side panel (manifest side_panel page, sidepanel.html and every module and stylesheet it loads) must match, byte for byte, a side panel a reviewer registered in docviz (card-spend-panel.mjs); any other side panel is unsupported. After each action docviz sends the background the panel’s own panel:get { tabId } message and computes the page total from the reply with docviz’s copy of that panel’s refreshCards. The ledger is chrome.storage.local spend.total, which that panel reads directly. No browser, DOM or provider call. One scenario, not every path, and code that detects this harness can behave differently in Chrome.';
 const LIMIT = { messages: 10_000, quietMs: 50, requestMs: 3000, totalMs: 20_000 };
 
 const children = new Set();
@@ -59,20 +62,10 @@ function device() {
   return d;
 }
 
-// The side panel's page total, recognized and never run: the card-cost sum under any parameter names
-// and spacing, from `state.unassigned || 0` or `0`. This harness supports no other JS for it.
-const NAME = '([A-Za-z_$][\\w$]*)';
-const S = '\\s*';
-const PAGE_SUM = new RegExp(`^cards${S}\\.${S}reduce${S}\\(${S}\\(${S}${NAME}${S},${S}${NAME}${S}\\)${S}=>${S}\\1${S}\\+${S}\\(${S}\\2${S}\\.${S}cost${S}\\?\\.${S}usd${S}\\|\\|${S}0${S}\\)${S},${S}(state${S}\\.${S}unassigned${S}\\|\\|${S}0|0)${S}\\)$`);
-const backgroundFile = join(root, 'extension/background.js');
-const sidepanelFile = join(root, 'extension/sidepanel.js');
-if (!existsSync(backgroundFile)) await stop('inapplicable', 'extension/background.js is absent');
-const pageSource = existsSync(sidepanelFile) && readFileSync(sidepanelFile, 'utf8').match(/const page = (.*);/)?.[1];
-if (!pageSource) await stop('inapplicable', 'extension/sidepanel.js has no `const page = …;` page total');
-const pageForm = pageSource.trim().match(PAGE_SUM);
-if (!pageForm || pageForm[1] === pageForm[2]) await stop('inapplicable', 'extension/sidepanel.js’s page total is not the card-cost sum this harness computes (cards.reduce adding each cost.usd || 0, from state.unassigned || 0 or 0); docviz runs no side-panel code');
-const withUnassigned = pageForm[3] !== '0';
-const pageTotalOf = (cards, state) => cards.reduce((t, c) => t + (c.cost?.usd || 0), withUnassigned ? (state.unassigned || 0) : 0);
+// The side panel must be a registered one, matched by content; docviz never reads which of its lines run.
+if (!existsSync(join(root, 'extension/background.js'))) await stop('inapplicable', 'extension/background.js is absent');
+const known = knownPanel(root);
+if (known.missing) await stop('inapplicable', known.missing);
 
 // chrome.storage as the target wrote it. Null-prototype areas: a stored "__proto__" is just a key.
 const area = (values = {}) => Object.assign(Object.create(null), values);
@@ -115,23 +108,28 @@ const act = async (type, fields) => {
   background.post({ type, seq: n, ...fields });
   const r = await done;
   if (!r.ok) await stop('error', `${type === 'draw' ? 'visualizeSelection' : `${fields.message.type}`} threw: ${said(r.detail)}`);
+  return r;
 };
 
 const usage = { usd: 1, estimated: false, provider: 'controlled-helper', inputTokens: 10, outputTokens: 10 };
-const cardsOf = (tab) => (records.session[`tab:${tab}`]?.keys || []).map((k) => records.session[`card:${k}`]).filter(Boolean);
-const costOf = (card) => card?.cost?.usd || 0;
-// What storage held right after an action: the ledger, the card record and the side panel's page total.
+// What the registered side panel shows right after an action. Its cards, unassigned spend and page total
+// come from the background's reply to the panel's own panel:get { tabId }. Its ledger comes from
+// chrome.storage.local, which that panel reads directly (settings.js getSettings, `s.spend?.total || 0`).
 const frames = [];
-const snapshot = (id, action, key) => {
-  const card = key ? records.session[`card:${key}`] : undefined;
-  const state = records.session['tab:1'] || { keys: [] };
-  const pageTotal = pageTotalOf(cardsOf(1), state);
-  if (!Number.isFinite(pageTotal)) return stop('error', `the page total is not a number after: ${action}`);
+const snapshot = async (id, action, key) => {
+  const { response } = await act('send', { message: { type: 'panel:get', tabId: 1 } });
+  let shown;
+  try { shown = refreshCards(response); } catch (e) { return stop('error', `the side panel can’t show panel:get’s reply after: ${action} (${said(e?.message || e)})`); }
+  if (!Number.isFinite(shown.page)) return stop('error', `the side panel’s page total is not a number after: ${action}`);
+  const ledgerPaid = records.local.spend?.total || 0;
+  if (!Number.isFinite(ledgerPaid)) return stop('error', `the ledger is not a number after: ${action}`);
+  const card = shown.cards.find((c) => c.key === key);
   frames.push({
-    id, action, ledgerPaid: records.local.spend.total, ledgerCalls: records.local.spend.calls,
+    id, action, ledgerPaid, ledgerCalls: records.local.spend?.calls ?? null,
     card: { present: !!card, status: card?.status ?? null, cost: card?.cost?.usd ?? null },
-    tabCards: state.keys.length, unassigned: state.unassigned || 0, pageTotal,
+    tabCards: shown.cards.length, unassigned: shown.state.unassigned || 0, pageTotal: shown.page,
   });
+  return shown.page;
 };
 
 try {
@@ -143,27 +141,25 @@ try {
   const first = await nextRequest();
   const key = records.session['tab:1']?.keys?.[0];
   if (typeof key !== 'string') await stop('inapplicable', 'visualizeSelection made no card for the tab');
-  snapshot('before-first-reply', 'draw one card; the helper call is out', key);
+  await snapshot('before-first-reply', 'draw one card; the helper call is out', key);
   first({ ok: false, status: 500, body: { error: 'controlled failure after spending', usage } });
   await drawing;
   await settle();
-  snapshot('after-failed-draw', 'the call fails after spending $1', key);
+  await snapshot('after-failed-draw', 'the call fails after spending $1', key);
 
   await act('send', { message: { type: 'card:retry', key } });
   const second = await nextRequest();
-  snapshot('after-retry-request', 'Retry; a second call is out', key);
-  const chargedBeforeDismiss = cardsOf(1).reduce((t, c) => t + costOf(c), 0) + (records.session['tab:1']?.unassigned || 0);
+  // Cards and unassigned spend the side panel showed just before Dismiss.
+  const chargedBeforeDismiss = await snapshot('after-retry-request', 'Retry; a second call is out', key);
   await act('send', { message: { type: 'card:dismiss', key } });
   await settle();
-  snapshot('after-dismiss', 'Dismiss while the call is out', key);
+  await snapshot('after-dismiss', 'Dismiss while the call is out', key);
   const dismissed = !records.session[`card:${key}`];
 
   second({ ok: true, status: 200, body: { result: { title: 'Returned', mermaid: 'flowchart TD\n A["Returned"]' }, usage } });
   await settle();
-  snapshot('after-late-return', 'the late call returns with $1 of usage', key);
-
-  const pageTotalAfter = frames.at(-1).pageTotal;
-  const ledgerPaid = records.local.spend.total;
+  const pageTotalAfter = await snapshot('after-late-return', 'the late call returns with $1 of usage', key);
+  const ledgerPaid = frames.at(-1).ledgerPaid;
   const helperReported = 2 * usage.usd;
   const unattributed = helperReported - chargedBeforeDismiss - pageTotalAfter;
   const observed = { helperReported, ledgerPaid, chargedBeforeDismiss, dismissed, pageTotalAfter, unattributed, cardRecordAfter: records.session[`card:${key}`] ? 'present' : 'absent', frames };

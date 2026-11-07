@@ -1,6 +1,7 @@
 // Runs in a child process under Node's permission model, beside the reviewed checkout's background.js,
 // for helper/contracts/card-spend.mjs. That code can rewrite anything here, so the controller takes each
-// message only as a chrome.storage or fetch call the target made, never as a value or result.
+// message only as a chrome.storage or fetch call the target made, or as the reply its runtime listener
+// sent to a message, never as a value or result.
 // Usage (by the controller): node --permission … card-spend-device.mjs <root>
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -40,8 +41,9 @@ process.on('message', async (m) => {
   }
   if (m.type === 'send') {
     let sent = false;
-    const done = () => { if (!sent) { sent = true; send({ type: 'sent', seq: m.seq, ok: true }); } };
-    try { if (listener(m.message, {}, done) !== true) setTimeout(done, 0); } catch (e) { sent = true; send({ type: 'sent', seq: m.seq, ok: false, detail: reason(e) }); }
+    // `response` is what the listener passed to sendResponse; the controller reads it only for panel:get.
+    const done = (response) => { if (!sent) { sent = true; send({ type: 'sent', seq: m.seq, ok: true, response }); } };
+    try { if (listener(m.message, {}, done) !== true) setTimeout(() => done(), 0); } catch (e) { sent = true; send({ type: 'sent', seq: m.seq, ok: false, detail: reason(e) }); }
   }
 });
 try {
