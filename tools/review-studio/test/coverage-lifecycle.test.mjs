@@ -94,6 +94,20 @@ test('coverage binds to the selected comparison, so a layer report is not whole-
  assert.equal(coverageLifecycle(wholeReport,{comparison:'whole'}).mark.kind,'violation');
 });
 
+test('a report core marks as not current, or a stale row, never plays even when its head and base match',()=>{
+ const foreign=world();
+ foreign.coverage[0].binding={current:false,scope:'stack',layerId:null,reason:'other-repository',detail:'Recorded for another repository, not this stack'};
+ foreign.coverage[0].rows=[row({status:'stale',reason:'other-repository',recorded:{status:'violated',reason:'executed-fails'}})];
+ const lc=coverageLifecycle(foreign,{step:4});
+ assert.notEqual(lc.mark.kind,'violation');assert.equal(lc.stale,true);
+ assert.equal(lc.execution,null);assert.equal(lc.frames.length,0);
+ assert.match(lc.banner,/another repository/);
+ const staleRow=coverageLifecycle(world({rows:[row({status:'stale',reason:'harness-changed'})]}),{step:4});
+ assert.equal(staleRow.mark.kind,'stale');assert.equal(staleRow.execution,null);assert.equal(staleRow.frames.length,0,'frames on a stale row are history, not current playback');
+ const reported=coverageLifecycle(world({rows:[row({status:'unverified',reason:'reported-only'})]}),{step:4});
+ assert.equal(reported.frames.length,0);
+});
+
 test('the data rail shows recorded frame values only, and the page total is fed by cards, not the ledger',()=>{
  let lc=coverageLifecycle(world(),{step:4});
  const value=(lc,id)=>lc.rail.find(r=>r.id===id).value;
