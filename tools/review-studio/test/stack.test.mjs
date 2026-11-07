@@ -53,3 +53,34 @@ test('capture hydration rejects missing records and escaping declaration IDs',as
  f.world.captures=[{id:'b'.repeat(64)}];await f.saveWorld();await assert.rejects(()=>f.store.read('fixture'),{code:'ENOENT'});
  f.world.captures=[{id:'../escape'}];await f.saveWorld();await assert.rejects(()=>f.store.read('fixture'),/Unknown stack evidence/);
 });
+
+test('evidence cards use canonical artifact facts instead of inline success claims',async t=>{
+ const f=await replayFixture(t),payload={kind:'executed-command',commit:f.world.tip,title:'Actual failing check',scope:'A controlled failing command',exitCode:1,result:'fail',summary:'One assertion failed',output:'not ok 1'},record={...payload,id:digest(payload)};
+ await f.saveRecord(record);
+ f.world.evidence=[{id:record.id,kind:'executed-functions',commit:'f'.repeat(40),title:'Everything passed',scope:'Complete runtime proof',exitCode:0,result:'pass',status:'passed',summary:'All assertions passed',verified:true}];
+ await f.saveWorld();const loaded=await f.store.read('fixture'),card=loaded.evidence[0];
+ assert.equal(card.result,'fail');assert.equal(card.kind,'executed-command');assert.equal(card.commit,record.commit);
+ assert.equal(card.title,record.title);assert.equal(card.scope,record.scope);assert.equal(card.summary,record.summary);assert.equal(card.exitCode,1);
+ assert.equal(card.status,undefined);assert.equal(card.verified,undefined);
+ assert.equal((await f.store.evidence('fixture',record.id)).result,card.result);
+});
+
+test('captured-function cards derive execution status and scope from their artifact',async t=>{
+ const f=await replayFixture(t),{id:oldId,...original}=f.record;
+ const payload={...original,exitCode:0,environment:'Controlled capture; no live model checks'},record={...payload,id:digest(payload)};
+ await f.saveRecord(record);f.world.layers=[{id:'candidate',head:record.commit},{id:'other',head:'f'.repeat(40)}];
+ f.world.evidence=[{id:record.id,layerId:'candidate',result:'fail',summary:'All behavior verified',scope:'Whole system proof',title:'Everything verified'}];
+ await f.saveWorld();let card=(await f.store.read('fixture')).evidence[0];
+ assert.equal(card.kind,'executed-functions');assert.equal(card.result,'pass');assert.equal(card.scope,record.environment);
+ assert.equal(card.title,'Captured function execution');assert.equal(card.summary,'Execution completed; inspect captured outputs and limitations.');
+ assert.equal(card.layerId,'candidate');
+ f.world.evidence[0].layerId='other';await f.saveWorld();card=(await f.store.read('fixture')).evidence[0];assert.equal(card.layerId,undefined);
+ f.world.evidence=[{id:f.record.id,result:'pass',summary:'All behavior verified'}];await f.saveWorld();card=(await f.store.read('fixture')).evidence[0];
+ assert.equal(card.result,'unknown');assert.equal(card.summary,'No successful execution status is recorded.');
+});
+test('command cards derive test counts from canonical output and reject corrupt evidence',async t=>{
+ const f=await replayFixture(t),payload={kind:'executed-command',commit:f.world.tip,exitCode:0,output:'# pass 66\n# fail 0\n# skipped 14\n'},record={...payload,id:digest(payload)};
+ await f.saveRecord(record);f.world.captures=[];f.world.evidence=[{id:record.id,summary:'All behavior proved'}];await f.saveWorld();
+ const card=(await f.store.read('fixture')).evidence[0];assert.equal(card.result,'pass');assert.equal(card.summary,'pass 66 · fail 0 · skipped 14');
+ await f.saveRecord({...record,exitCode:1});await assert.rejects(()=>f.store.read('fixture'),/fingerprint/);
+});

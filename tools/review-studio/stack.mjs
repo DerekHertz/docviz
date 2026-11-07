@@ -14,14 +14,26 @@ export function createStackStore(dataRoot){
   const record=await json(resolve(folder(id),'artifacts',artifactId+'.json'));
   const{id:storedId,...payload}=record;if(storedId!==artifactId||digest(payload)!==artifactId)throw new Error('Stored evidence fingerprint does not match.');return record;
  }
+ function evidenceCard(stack,declared,record){
+  const failed=Number.isInteger(record.exitCode)&&record.exitCode!==0||['fail','failed','error','interrupted'].includes(record.status);
+  const result=failed?'fail':typeof record.result==='string'?record.result:record.exitCode===0||['pass','passed','success','succeeded','completed'].includes(record.status)?'pass':'unknown';
+  const kind=typeof record.kind==='string'?record.kind:'unknown';
+  const title=typeof record.title==='string'&&record.title.trim()?record.title:kind==='executed-functions'?'Captured function execution':kind==='executed-command'?'Executed command':'Recorded evidence';
+  const scope=typeof record.scope==='string'?record.scope:typeof record.environment==='string'?record.environment:'Inspect the immutable record for its execution scope.';
+  const counts=typeof record.output==='string'?record.output.match(/^# (?:pass|fail|skipped) \d+$/gm):null;
+  const summary=typeof record.summary==='string'&&record.summary.trim()?record.summary:result==='fail'?'Execution failed; inspect the recorded output.':counts?.length?counts.map(line=>line.slice(2)).join(' · '):result==='pass'?kind==='executed-functions'?'Execution completed; inspect captured outputs and limitations.':'Command completed successfully; inspect its assertions.':'No successful execution status is recorded.';
+  const association=record.layerId||declared.layerId,layer=stack.layers?.find(item=>item.id===association&&item.head===record.commit);
+  return{id:record.id,kind,commit:record.commit,title,scope,summary,result,...(record.status!==undefined?{status:record.status}:{}),...(record.exitCode!==undefined?{exitCode:record.exitCode}:{}),...(record.createdAt||record.startedAt?{createdAt:record.createdAt||record.startedAt}:{}),...(layer?{layerId:layer.id}:{})};
+ }
  const readStack=async id=>{
-  const stack=await load(id),captures=[];
+  const stack=await load(id),captures=[],evidence=[];
   for(const declared of stack.captures||[]){
    const captured=await artifact(id,stack,declared.id);
    if(captured.kind!=='executed-functions'||!(/^[a-f0-9]{40,64}$/).test(captured.commit)||typeof captured.scenarioId!=='string'||!captured.scenarioId.trim()||typeof captured.harnessDigest!=='string'||!captured.harnessDigest.trim()||!Array.isArray(captured.frames)||!captured.frames.length||captured.frames.some(frame=>!frame||typeof frame.id!=='string'||!frame.id.trim()||typeof frame.observed!=='boolean'||!Object.hasOwn(frame,'output'))||new Set(captured.frames.map(frame=>frame.id)).size!==captured.frames.length)throw new Error('Stored capture has an invalid replay shape.');
    captures.push(captured);
   }
-  const mapped=await maps.forStack(stack);return{...stack,...mapped,claims:stack.claims||[],evidence:stack.evidence||[],captures,jevConfigured:!!process.env.TYPESAFE_API_KEY};
+  for(const declared of stack.evidence||[])evidence.push(evidenceCard(stack,declared,await artifact(id,stack,declared.id)));
+  const mapped=await maps.forStack(stack);return{...stack,...mapped,claims:stack.claims||[],evidence,captures,jevConfigured:!!process.env.TYPESAFE_API_KEY};
  };
  return{
   async list(){let names;try{names=await readdir(resolve(dataRoot,'stacks'));}catch(e){if(e.code==='ENOENT')return[];throw e;}const rows=[];for(const id of names)try{const s=await load(id);rows.push({id:s.id,title:s.title,repositoryName:s.repository?.name||s.repositoryName||'Repository',kind:s.kind,numbers:(s.layers||[]).map(l=>l.number)});}catch{}return rows;},
