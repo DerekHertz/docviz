@@ -174,6 +174,27 @@ test('control: the fixed late return, read through the known side panel, holds; 
   assert.deepEqual([executed.outcome, totals(executed), executed.observed.unattributed], ['fails', [0, 1, 1, 0, 0], 1]);
 });
 
+test('pending attribution timers are uncertainty, not a proved accounting violation', () => {
+  for (const wait of [
+    'await new Promise((r) => setTimeout(r, 200));',
+    'await (await import("node:timers/promises")).setTimeout(200);',
+  ]) {
+    const delayed = fixedWith((f) => swap(f, 'extension/background.js', 'async function unassign(tabId, usage) {', `async function unassign(tabId, usage) { ${wait}`));
+    const r = runHarness(contract, delayed);
+    assert.equal(r.outcome, 'error', `${wait}: ${r.outcome} ${r.detail}`);
+    assert.match(r.detail, /pending.*timer/i);
+    assert.equal(r.observed.frames, undefined, 'an incomplete scenario must not animate as a completed counterexample');
+    assert.deepEqual(status(judge(contract, facts({ binding: delayed.binding, evidence: r }))), ['unverified', 'harness-error']);
+  }
+});
+
+test('cancelled and completed timers do not hide the genuine gap or a completed fix', () => {
+  const cancelled = runHarness(contract, withPrefix('const cancelled = setTimeout(() => {}, 60_000); clearTimeout(cancelled);\n'));
+  assert.equal(cancelled.outcome, 'fails', cancelled.detail);
+  const finished = runHarness(contract, fixedWith((f) => swap(f, 'extension/background.js', 'async function unassign(tabId, usage) {', 'async function unassign(tabId, usage) { await new Promise((r) => setTimeout(r, 5));')));
+  assert.equal(finished.outcome, 'holds', finished.detail);
+});
+
 test('a commented-out or unused copy of the known page total doesn’t make another side panel supported', () => {
   const decoys = {
     comment: (f) => { swap(f, 'extension/sidepanel.js', REAL_PAGE, NO_UNASSIGNED); swap(f, 'extension/sidepanel.js', "  $('empty').hidden = cards.length > 0;\n", `  $('empty').hidden = cards.length > 0;\n  // was: ${REAL_PAGE}\n`); },
