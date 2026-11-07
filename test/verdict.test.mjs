@@ -11,6 +11,7 @@ const step = (verdict, extra = {}) => ({ kind: 'step', source: 'pr', id: 'ship',
 test('the table has DESIGN.md’s rows in order, ending in "nothing"', () => {
   assert.deepEqual(TABLE.map((r) => [r.kind, r.level]), [
     ['rule-breaks', 'needs'],
+    ['contract-violated', 'needs'],
     ['contradicted', 'needs'],
     ['model-failed', 'needs'],
     ['rule-fixed', 'look'],
@@ -19,6 +20,7 @@ test('the table has DESIGN.md’s rows in order, ending in "nothing"', () => {
     ['model-edited', 'look'],
     ['model-removed', 'look'],
     ['behavior-changed', 'look'],
+    ['contract-unverified', 'look'],
     ['step-unconfirmed', 'look'],
     ['uncovered', 'look'],
     ['not-run', 'look'],

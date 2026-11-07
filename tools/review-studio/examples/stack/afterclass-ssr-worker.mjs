@@ -1,0 +1,9 @@
+import {pathToFileURL} from 'node:url';
+import {createRequire} from 'node:module';
+const [root,scenarioId]=process.argv.slice(2),require=createRequire(root+'/package.json');
+const {createElement}=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+const {DiagramSummaryView}=await import(pathToFileURL(root+'/emitted/app/diagram.js'));
+const topic={topicId:'fixture-topic',label:'Fixture topic',claimIds:['fixture-claim'],frame:null,summary:scenarioId==='preparing'?{state:'preparing'}:{state:'ready',title:'How does the state change?',lines:[{text:'The local value becomes 2.',evidence:['fixture-evidence-1']},{text:'The receiver keeps the ordered result.',evidence:['fixture-evidence-1','fixture-evidence-2']}]}};
+const input={topic,initialSources:scenarioId==='revealed'},html=renderToStaticMarkup(createElement(DiagramSummaryView,{...input,onRequest:()=>{},onCite:()=>{}}));
+const output={sourceButtonCount:(html.match(/class="citation"/g)||[]).length,sourceLabels:[...html.matchAll(/>(Sources \(\d+\)|Evidence \d+)<\/button>/g)].map(x=>x[1]),toggle:html.includes('Show sources')?'Show sources':html.includes('Hide sources')?'Hide sources':null,expanded:html.match(/aria-expanded="(true|false)"/)?.[1]??null,preparingMessage:scenarioId==='preparing'?html.replace(/<[^>]+>/g,'').trim():null,summaryLinesVisible:html.includes('The local value becomes 2.')};
+process.stdout.write(JSON.stringify({frames:[{id:'input',title:'Supply the same controlled topic and evidence',nodeId:'summary',input,output:{fixture:true,scenarioId},observed:false},{id:'render',title:'Render the real diagram summary component',nodeId:'diagram',input,output,observed:true},{id:'output',title:'Inspect the visible source controls',nodeId:'diagram',input:{mode:scenarioId},output,observed:true}],output,html})+'\n');

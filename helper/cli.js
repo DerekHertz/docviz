@@ -2,7 +2,7 @@
 // docviz [serve] [--port N] [--host H] [--provider auto|claude|codex] [--model M] [--codex-rates in,cached,out,image] [--new-code]
 // docviz lab [--port 47830]   (repo checkout only: the lab needs Playwright)
 // docviz pr <steps.json> --pr <url> [--title T] [--glossary FILE] [--base REF] [--provider P] [--model M] [--codex-rates ...] [--no-check]
-//           [--trust-atlas]
+//           [--trust-atlas] [--contracts PROFILE.json [--trust-head SHA] [--coverage-out FILE]]
 // docviz pr --rules [--glossary FILE]   |   docviz pr --lint <steps.json>
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { randomInt } from 'node:crypto';
@@ -61,6 +61,14 @@ if (opts.help || !['serve', 'code', 'pr', 'lab'].includes(opts.cmd) || (opts.cmd
             [--trust-atlas]
                          run the repo's .atlas/ models (TLC, via pstack's statechart) at base and head.
                          It imports the model's view.mjs: pass it on your own repos only
+            [--contracts PROFILE.json]
+                         check the contracts in your profile (kept outside the reviewed checkout) whatever
+                         the summary covers: which apply to the changed files, and which steps leave them out
+            [--trust-head SHA]
+                         run docviz's registered contract harnesses against exactly this commit's code.
+                         SHA is HEAD's full SHA (git rev-parse HEAD); short SHAs, tags and branches are refused
+            [--coverage-out FILE]
+                         write the contract coverage result as JSON (for the review studio)
   docviz pr --rules [--glossary FILE]
                          print the rules for the diagram an agent writes itself
   docviz pr --lint <steps.json>
@@ -92,10 +100,13 @@ if (opts.cmd === 'pr' && opts.lint) {
 if (opts.cmd === 'pr') {
   const log = (m) => console.error(m);
   try {
-    const { body, missing, usage } = await runPr({
+    if ((opts['trust-head'] || opts['coverage-out']) && !opts.contracts) throw new Error('--trust-head and --coverage-out need --contracts PROFILE.json');
+    const { body, missing, usage, coverage } = await runPr({
       stepsFile: opts.args[0], prUrl: opts.pr, title: opts.title, glossaryFile: opts.glossary,
-      provider: opts.provider, model: opts.model, check: !opts['no-check'], base: opts.base, trustAtlas: !!opts['trust-atlas'], log,
+      provider: opts.provider, model: opts.model, check: !opts['no-check'], base: opts.base, trustAtlas: !!opts['trust-atlas'],
+      contracts: opts.contracts, trustHead: opts['trust-head'], log,
     });
+    if (opts['coverage-out']) writeFileSync(opts['coverage-out'], JSON.stringify(coverage, null, 2) + '\n');
     if (missing.length) log(`warning: steps not drawn as nodes: ${missing.join(', ')}`);
     log(`cost: ${money(usage)}`);
     process.stdout.write(body);

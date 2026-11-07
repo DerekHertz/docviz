@@ -1,0 +1,315 @@
+{
+  "id": "docviz-pr16",
+  "number": 16,
+  "title": "Review an explicit checkout and add planted verdict fixtures",
+  "base": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+  "head": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+  "summary": "PR #16 makes the reviewed checkout an explicit runPr input. Repository identity, relative review files, source cuts, behavior context and generated links follow that checkout while the downstream atlas, comparison, source-check and attention-policy implementations remain unchanged. Most of the added lines are planted regression fixtures, not new production behavior.",
+  "before": "runPr discovers the repository through the process working directory. Relative steps and glossary paths are resolved there; a cwd argument is not part of its API.",
+  "after": "runPr accepts cwd, defaulting to the process working directory. The selected checkout supplies Git context and relative input files, enabling one process to review different checkouts without changing its own working directory.",
+  "producer": {
+    "name": "Independent source reviewer",
+    "role": "independent-reviewer",
+    "kind": "source-review",
+    "agent": "docviz_pr16",
+    "scope": "Independent examination of the pinned implementation diff and original tests. No runtime, Jev or TLC result is claimed by this summary."
+  },
+  "claims": [
+    {
+      "id": "pr16-checkout-context",
+      "nodeId": "input",
+      "label": "An explicit cwd selects the reviewed repository identity and source-link revision.",
+      "condition": "runPr is called with cwd pointing to a different Git checkout from the process working directory.",
+      "expectation": "Initial Git queries run at cwd; the discovered root, HEAD and remote are used for source cuts and generated code links.",
+      "sources": [
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 163,
+          "to": 169
+        },
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 182,
+          "to": 186
+        },
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 254,
+          "to": 259
+        },
+        {
+          "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+          "path": "helper/pr.js",
+          "from": 160,
+          "to": 165
+        }
+      ],
+      "verificationNeed": "Run the same process from a decoy checkout and review two distinct explicit cwd checkouts. Confirm each caption/source cut, remote and HEAD link belongs to the requested checkout, and that the process directory is unchanged.",
+      "producer": {
+        "name": "Independent source reviewer",
+        "role": "independent-reviewer",
+        "kind": "source-review",
+        "agent": "docviz_pr16",
+        "scope": "Independent examination of the pinned implementation diff and original tests. No runtime, Jev or TLC result is claimed by this summary."
+      },
+      "jev": {
+        "status": "not-assessed",
+        "reason": "No live Jev judgment is part of this source review.",
+        "questions": {
+          "supported": "Does the exact-revision source show every material clause of this claim?",
+          "contradicted": "Does the exact-revision source contradict any material clause of this claim?"
+        }
+      }
+    },
+    {
+      "id": "pr16-relative-inputs",
+      "nodeId": "input",
+      "label": "Relative steps and glossary files are resolved from cwd.",
+      "condition": "stepsFile or glossaryFile is a relative path and cwd differs from the process working directory.",
+      "expectation": "The review reads resolve(cwd, stepsFile) and resolve(cwd, glossaryFile), rather than resolving those files from the process directory.",
+      "sources": [
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 174,
+          "to": 174
+        },
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 188,
+          "to": 188
+        },
+        {
+          "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+          "path": "helper/pr.js",
+          "from": 171,
+          "to": 171
+        },
+        {
+          "commit": "cb4e3ca60eec5d80cb94323fc7f35c65e32d0aa2",
+          "path": "helper/pr.js",
+          "from": 185,
+          "to": 185
+        }
+      ],
+      "verificationNeed": "Use identical relative filenames with different contents in the process checkout and requested checkout. Check steps selection, successful glossary lookup, and expected failure for a glossary absent from the requested checkout. The new original test covers steps; it does not separately assert explicit-cwd glossary selection.",
+      "producer": {
+        "name": "Independent source reviewer",
+        "role": "independent-reviewer",
+        "kind": "source-review",
+        "agent": "docviz_pr16",
+        "scope": "Independent examination of the pinned implementation diff and original tests. No runtime, Jev or TLC result is claimed by this summary."
+      },
+      "jev": {
+        "status": "not-assessed",
+        "reason": "No live Jev judgment is part of this source review.",
+        "questions": {
+          "supported": "Does the exact-revision source show every material clause of this claim?",
+          "contradicted": "Does the exact-revision source contradict any material clause of this claim?"
+        }
+      }
+    },
+    {
+      "id": "pr16-composed-context",
+      "nodeId": "compare",
+      "label": "Behavior and Modules moved receive the selected checkout and its shared base.",
+      "condition": "A review runs with an explicit cwd and computes its comparison base.",
+      "expectation": "baseFor and movedSinceBase use the discovered root; runBehavior receives that root, the root-bound Git reader and the same base object.",
+      "sources": [
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 165,
+          "to": 172
+        },
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 207,
+          "to": 210
+        }
+      ],
+      "verificationNeed": "Run integration cases with differing .atlas content, origins and base refs in the requested checkouts. Confirm comparison findings and moved-module output are checkout-local. Reused downstream source files alone do not establish correct context propagation.",
+      "producer": {
+        "name": "Independent source reviewer",
+        "role": "independent-reviewer",
+        "kind": "source-review",
+        "agent": "docviz_pr16",
+        "scope": "Independent examination of the pinned implementation diff and original tests. No runtime, Jev or TLC result is claimed by this summary."
+      },
+      "jev": {
+        "status": "not-assessed",
+        "reason": "No live Jev judgment is part of this source review.",
+        "questions": {
+          "supported": "Does the exact-revision source show every material clause of this claim?",
+          "contradicted": "Does the exact-revision source contradict any material clause of this claim?"
+        }
+      }
+    }
+  ],
+  "changedNodes": [
+    "input"
+  ],
+  "tests": [
+    "test/pr.test.mjs",
+    "test/fixtures.test.mjs",
+    "test/behavior.test.mjs",
+    "test/verdict.test.mjs"
+  ],
+  "testEvidenceNotes": [
+    "test/pr.test.mjs:269\u2013274 is the new explicit-cwd regression. It uses an agent-supplied card and check:false, so it needs no provider/Jev call.",
+    "test/fixtures.test.mjs:24 invokes runPr with a separate worktree cwd, an agent-supplied card and recorded Jev answers. These are replay inputs, not live Jev judgments.",
+    "test/fixtures.test.mjs:12\u201314 skips TLC-dependent cases when required tooling is absent. Cases that are not skipped use actual configured model tooling; do not label skipped model cases as passes.",
+    "The existing test/behavior.test.mjs separately uses a fake statechart harness. Its parser/transformer coverage is not fresh formal verification."
+  ],
+  "scopeLimitations": [
+    "This is a historical merged PR comparison at exact commits, not an open GitHub PR or a merge approval.",
+    "Only helper/pr.js changes in production. Five cached downstream capability descriptions have unchanged source files, but their selected-root/base assumptions still need integration evidence.",
+    "SPEC.md and three test/fixture paths are outside the production system map. They are explicit change-accounting gaps/assets, not silently ignored or all treated as production risk.",
+    "Source support is not execution evidence. No Jev request, provider call or model run was performed by this independent summary.",
+    "The original explicit-cwd test does not by itself establish repeated multi-checkout isolation, relative glossary behavior or all downstream contract compatibility.",
+    "The untrusted-checkout Git protections remain present in the selected-cwd Git call. The existing malicious-hook/fsmonitor test is useful regression evidence, while an explicit-cwd variant is a distinct targeted check."
+  ],
+  "dependencyReview": [
+    {
+      "nodeId": "atlas",
+      "sourceUnchanged": true,
+      "reason": "A different cwd selects a different .atlas catalog; declared coverage and model metadata must come from the requested root.",
+      "check": "Compare two fixture checkouts with deliberately different model membership and rules."
+    },
+    {
+      "nodeId": "compare",
+      "sourceUnchanged": true,
+      "reason": "The base and root-bound Git reader are supplied by the changed entry point.",
+      "check": "Confirm base/head model lookup and Modules moved describe the same selected checkout."
+    },
+    {
+      "nodeId": "claims",
+      "sourceUnchanged": true,
+      "reason": "Step/source fidelity depends on cuts read from the selected root.",
+      "check": "Use distinct code under the same path in two requested checkouts; retain recorded versus live Jev provenance."
+    },
+    {
+      "nodeId": "policy",
+      "sourceUnchanged": true,
+      "reason": "Policy code is unchanged, but it consumes potentially different findings generated by the chosen checkout.",
+      "check": "Run planted finding cases through the real composition; preserve unchecked/skipped states."
+    },
+    {
+      "nodeId": "outcome",
+      "sourceUnchanged": true,
+      "reason": "Human-visible links and reasons depend on the selected repository identity and finding set.",
+      "check": "Inspect final comment links and attention reasons for each requested checkout."
+    }
+  ],
+  "pseudocode": [
+    {
+      "text": "choose cwd, defaulting to the process working directory",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 163,
+          "to": 164
+        }
+      ]
+    },
+    {
+      "text": "discover repository root, HEAD and remote from that directory",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 164,
+          "to": 169
+        }
+      ]
+    },
+    {
+      "text": "resolve one comparison base and read module movement from that root",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 171,
+          "to": 172
+        }
+      ]
+    },
+    {
+      "text": "read relative steps and glossary files from cwd",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 174,
+          "to": 174
+        },
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 188,
+          "to": 188
+        }
+      ]
+    },
+    {
+      "text": "read each linked source range from the selected repository root",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 182,
+          "to": 186
+        }
+      ]
+    },
+    {
+      "text": "pass the selected root and shared base into behavior checks",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 207,
+          "to": 210
+        }
+      ]
+    },
+    {
+      "text": "build the comment and code links using the selected HEAD and remote",
+      "indent": 0,
+      "sources": [
+        {
+          "commit": "7a16e4ec0d77d6fdb2a8692a659fd6e55f902b70",
+          "path": "helper/pr.js",
+          "from": 254,
+          "to": 260
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "changedFiles": 5,
+    "added": 408,
+    "removed": 5,
+    "productionFilesChanged": 1,
+    "productionAdded": 8,
+    "productionRemoved": 5
+  },
+  "captureRecommendation": {
+    "name": "Explicit checkout versus process checkout",
+    "method": "Create separate controlled Git fixture repositories for the process context and requested target. Give each a unique origin, source text and agent-supplied card in the same relative steps filename. From the fixed process checkout, call the real base/head runPr exports with the target cwd, check:false and trustAtlas:false. Record caption, linked SHA/remote, source text, current process directory and missing-check findings.",
+    "expectedDifference": "Base ignores the unknown cwd option and follows the process checkout; head follows the requested target. A second head call with another cwd should not inherit the first checkout context.",
+    "scope": "Real runPr composition over controlled Git/source/card fixtures. This does not call a provider or live Jev, does not run untrusted model code and does not establish all repository behavior."
+  }
+}

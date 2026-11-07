@@ -1,0 +1,424 @@
+[
+  {
+    "id": "diagram",
+    "title": "Diagram presentation",
+    "purpose": "Shows the selected frame before the summary heading and lines, with citation controls hidden by default and revealed by one diagram-wide toggle.",
+    "inputs": [
+      "Topic frame and summary state",
+      "Request, citation and close callbacks",
+      "Source-column and scene stylesheet constraints"
+    ],
+    "outputs": [
+      "Frame, title and summary text",
+      "One counted source-selection action per cited line when sources are shown"
+    ],
+    "sources": [
+      {
+        "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+        "path": "src/app/diagram.tsx",
+        "from": 78,
+        "to": 113
+      },
+      {
+        "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+        "path": "src/app/diagram.tsx",
+        "from": 124,
+        "to": 135
+      },
+      {
+        "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+        "path": "src/app/diagram-view.ts",
+        "from": 79,
+        "to": 85
+      },
+      {
+        "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+        "path": "src/app/review.css",
+        "from": 20,
+        "to": 23
+      }
+    ],
+    "steps": [
+      {
+        "title": "Render the current summary state",
+        "detail": "Keep preparation, failure and ready states explicit; the preparing message is display copy, not measured latency.",
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 78,
+            "to": 113
+          }
+        ]
+      },
+      {
+        "title": "Reveal grouped source controls",
+        "detail": "The local showSources state starts false. When shown, each cited line has one Sources (n) button that passes that line\u2019s complete ID list.",
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 78,
+            "to": 113
+          },
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram-view.ts",
+            "from": 79,
+            "to": 85
+          }
+        ]
+      },
+      {
+        "title": "Lay out frame before text",
+        "detail": "The panel puts its frame before the title. Targeted CSS declares natural-height containers and uncapped frame sizing; computed browser layout still needs verification.",
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 124,
+            "to": 135
+          },
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/review.css",
+            "from": 20,
+            "to": 23
+          }
+        ]
+      }
+    ],
+    "pseudocode": [
+      {
+        "text": "start with source controls hidden",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 78,
+            "to": 113
+          }
+        ]
+      },
+      {
+        "text": "show the frame, then the title and summary text",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 124,
+            "to": 135
+          },
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/review.css",
+            "from": 20,
+            "to": 23
+          }
+        ]
+      },
+      {
+        "text": "when sources are shown, make one counted button per cited line",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 78,
+            "to": 113
+          },
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram-view.ts",
+            "from": 79,
+            "to": 85
+          }
+        ]
+      },
+      {
+        "text": "pass the selected line\u2019s complete evidence IDs to the source handler",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 78,
+            "to": 113
+          },
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram-view.ts",
+            "from": 79,
+            "to": 85
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "record",
+    "title": "Illustrated record pages",
+    "purpose": "Reuses the updated diagram summary controls on a saved topic page while displaying learner answers and saved statuses separately.",
+    "inputs": [
+      "Saved topic question, frame and summary",
+      "Learner answers and recorded statuses",
+      "Shared DiagramSummaryView"
+    ],
+    "outputs": [
+      "Illustrated topic page with sources initially hidden",
+      "Selected evidence IDs for local source inspection",
+      "Displayed saved answer and status"
+    ],
+    "sources": [
+      {
+        "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+        "path": "src/app/diagram.tsx",
+        "from": 141,
+        "to": 166
+      },
+      {
+        "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+        "path": "src/app/diagram.tsx",
+        "from": 78,
+        "to": 113
+      }
+    ],
+    "steps": [
+      {
+        "title": "Render the saved page",
+        "detail": "Show the question and frame, then reuse DiagramSummaryView; the page does not override its hidden-source default.",
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 141,
+            "to": 166
+          },
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 78,
+            "to": 113
+          }
+        ]
+      },
+      {
+        "title": "Inspect a line\u2019s sources",
+        "detail": "The shared summary supplies grouped IDs; the page stores that selection and passes it to EvidencePane. Closing clears the selection.",
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 141,
+            "to": 166
+          }
+        ]
+      },
+      {
+        "title": "Keep the saved assessment visible",
+        "detail": "Answers and saved status are displayed independently of local source-selection state.",
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 141,
+            "to": 166
+          }
+        ]
+      }
+    ],
+    "pseudocode": [
+      {
+        "text": "render the saved topic question and frame",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 141,
+            "to": 166
+          }
+        ]
+      },
+      {
+        "text": "reuse the summary renderer with source controls hidden initially",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 141,
+            "to": 166
+          },
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 78,
+            "to": 113
+          }
+        ]
+      },
+      {
+        "text": "when sources are selected, open their grouped evidence IDs",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 141,
+            "to": 166
+          }
+        ]
+      },
+      {
+        "text": "display the saved learner answer and status",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/diagram.tsx",
+            "from": 141,
+            "to": 166
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "review",
+    "title": "Review workspace",
+    "purpose": "Keeps the review conversation beside topic diagrams and evidence, and keys the diagram panel by topic so switching topics creates fresh local display state.",
+    "inputs": [
+      "Current review view and selected topic",
+      "Tutor conversation and learner actions",
+      "Diagram source-selection callbacks"
+    ],
+    "outputs": [
+      "A topic-keyed DiagramPanel",
+      "Pinned or automatic evidence selection",
+      "Visible review conversation alongside source inspection"
+    ],
+    "sources": [
+      {
+        "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+        "path": "src/app/review.tsx",
+        "from": 26,
+        "to": 58
+      },
+      {
+        "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+        "path": "src/app/review.tsx",
+        "from": 238,
+        "to": 251
+      },
+      {
+        "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+        "path": "src/app/review.tsx",
+        "from": 81,
+        "to": 105
+      }
+    ],
+    "steps": [
+      {
+        "title": "Select the topic",
+        "detail": "The review supplies the chosen topic and renders the panel with that topic ID as its React key; actual mount/reset behavior remains a browser interaction check.",
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/review.tsx",
+            "from": 238,
+            "to": 251
+          }
+        ]
+      },
+      {
+        "title": "Open the selected source IDs",
+        "detail": "The existing source handler pins the supplied ID list, opens the source surface and schedules focus on its heading.",
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/review.tsx",
+            "from": 81,
+            "to": 105
+          },
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/review.tsx",
+            "from": 238,
+            "to": 251
+          }
+        ]
+      },
+      {
+        "title": "Close source inspection",
+        "detail": "Closing returns to automatic selection and restores focus to a surviving origin or the source toggle.",
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/review.tsx",
+            "from": 81,
+            "to": 105
+          }
+        ]
+      }
+    ],
+    "pseudocode": [
+      {
+        "text": "render the current topic\u2019s panel using its topic ID as the key",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/review.tsx",
+            "from": 238,
+            "to": 251
+          }
+        ]
+      },
+      {
+        "text": "pass grouped citation IDs through the existing source-selection handler",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/review.tsx",
+            "from": 238,
+            "to": 251
+          },
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/review.tsx",
+            "from": 81,
+            "to": 105
+          }
+        ]
+      },
+      {
+        "text": "show the selected evidence beside the ongoing conversation",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/review.tsx",
+            "from": 238,
+            "to": 251
+          }
+        ]
+      },
+      {
+        "text": "when source inspection closes, restore automatic selection and focus",
+        "indent": 0,
+        "sources": [
+          {
+            "commit": "0dc60beec7544acb487fb04a3b9b6cddb0e4f12d",
+            "path": "src/app/review.tsx",
+            "from": 81,
+            "to": 105
+          }
+        ]
+      }
+    ]
+  }
+]

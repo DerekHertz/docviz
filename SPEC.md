@@ -1,4 +1,21 @@
-# docviz — spec (v0)
+# docviz — product specification
+
+## Visual review studio
+
+The standalone studio is the current product direction for reviewing agent-written changes before opening or merging a PR. The earlier documentation-extension specification follows as the existing implementation.
+
+- Start with a holistic system map for a batch or stack. Zoom into each parent-to-candidate layer without losing connected context.
+- A capability describes its purpose, inputs, outputs, properties and implementation. Follow visual behavior through concise pseudocode to exact pinned source.
+- Keep source interpretations, observed execution, model judgments and human decisions distinct. Recorded-output diagrams show captured fields, with raw evidence available.
+- Cache immutable repository models by exact revision and registered repository identity. Reuse descriptions separately from new claims, tests, Jev results or decisions. Changed source/contracts and unmapped files remain visible.
+- Agents propose contracts. The human confirms consequential contracts and makes the final review decision. Independent reviewers challenge authoring-agent claims.
+- Jev can assess claim/source correspondence and help triage. Missing assessments stay explicit. A source judgment cannot establish runtime behavior or formal verification.
+- The local prototype includes manually prepared historical Docviz and AfterClass reviews. Its graph is partial; automatic repository modeling and live stack-claim Jev execution are not implemented.
+- Live Jev end-to-end validation and independent merge verification are pending before this new design merges.
+
+See [the studio guide](tools/review-studio/README.md) for setup and [validation](tools/review-studio/STANDALONE-VALIDATION.md) for recorded checks and gaps.
+
+## Documentation extension specification (v0)
 
 Annotate any docs page — or any selected text/code — with technical visuals, powered by the
 user's own Claude Code or Codex login. Audience: SWEs.
@@ -142,8 +159,8 @@ returns one PR comment.
   through, 1 of 9 held-out can't-tell passed. Adding the definitions a step calls (one hop,
   `helper/context.js`) didn't help overall and let a wrong link pass on its helper's code, so it is
   not used.
-- The comment, top to bottom: marker, verdict and its reasons, diagram and step table, Behavior,
-  Modules moved, and last the footer with every model call's cost: the total and its parts
+- The comment, top to bottom: marker, verdict and its reasons, diagram and step table, Contracts
+  (with `--contracts`), Behavior, Modules moved, and last the footer with every model call's cost: the total and its parts
   (diagram, step checks, model checks). Below a cent a figure keeps two significant digits
   (`$0.00004`, `$0.00012`), so a Jev check never reads as `$0.000` and every figure, total or part,
   is within 5% of what was spent.
@@ -176,6 +193,90 @@ returns one PR comment.
   models run only with `--trust-atlas`; TLC needs `TLA2TOOLS` and `JAVA`, statechart is found in
   pstack's plugin cache or `DOCVIZ_STATECHART`. TLC is local and free; model-step checks are in the
   footer as "model checks".
+- Contracts (`helper/contracts.js`, 2026-11-06; regression: historical PR #1, whose five-step summary
+  left out dismissal and read "Look" while its late return lost spend). The summary is the author's
+  choice, so it can't decide which promises get checked. `--contracts PROFILE.json` names the
+  operator's contract profile, which must sit outside the reviewed checkout. Each contract has a
+  definition, its governing text (`path`/`from`/`to`, quoted from head, else base), its code
+  anchors, the files it depends on, and optionally a registered harness id. A profile that sets
+  `authority`, `confirmed`, `status`, `evidence` or `result`, names a command or path to run, or
+  names an unknown harness is refused before any model call. Authority is "operator-selected", not
+  an authenticated signature. A contract applies when `git diff base head` touches its anchors' files
+  or dependencies. The steps only annotate which anchors no step's lines cover ("omits dismiss").
+  `--trust-head` takes HEAD's full SHA (`git rev-parse HEAD`, any case) and docviz compares the
+  text with HEAD; git never resolves it. A short SHA, tag, branch or `HEAD` is refused (exit 2)
+  before any work: until 2026-11-06 they went through git's ref lookup, and the independent CLI
+  matrix showed a tag named like the base's short SHA, pointing at head, trusting head. A full SHA
+  of another commit runs nothing (`trust-other-head`). With `--trust-head` equal to HEAD, docviz copies the head's committed files into a temp folder
+  and runs its own harness there, in a child process with a scrubbed environment and a 30 s timeout.
+  Trusting a head lets its code run; it never makes that code's account of itself evidence. The
+  harness's controller loads none of the reviewed code. `background.js` runs in a child process
+  (`card-spend-device.mjs`) under Node's permission model (`--permission`: no file writes, no
+  reads outside its copy, no child processes or workers) with only an IPC channel back. The
+  controller holds chrome.* storage and the helper's replies and computes every frame and the
+  outcome. It takes the child's messages only as chrome.storage and fetch calls and its runtime
+  listener's replies, never as a value or result; a message it doesn't expect, or a child that
+  exits early, is a harness error. No side-panel code runs. The side panel must be one a reviewer
+  registered in `helper/contracts/card-spend-panel.mjs` after reading every file it loads: the
+  manifest's `side_panel` page, `sidepanel.html`, `sidepanel.js`, `settings.js`,
+  `prefs-form.js` and `ui.css`, each matched by sha256 of its committed bytes. The registry is
+  docviz's own code; no profile, PR or target supplies a hash. Today one panel is registered,
+  docviz's own, unchanged since `3d37957` (the same blobs at PR #1's head). Any other side panel,
+  including a comment, an unused function or a renamed parameter in it, is unsupported
+  (`surface-missing`) with no totals. After each action the controller sends the background the
+  panel's own `panel:get { tabId }` message and computes the page total from the reply with
+  docviz's copy of that panel's `refreshCards`. A reply that panel couldn't show (not `ok`, no
+  `state` or `cards`, a card without a section, a non-number total) is a harness error. The
+  ledger is `chrome.storage.local` `spend.total`, which that panel reads directly. The reply is
+  the background's answer, whichever way it arrives: the background can make it say anything it
+  could also send the real panel. The harness evaluates no general JS. Until 2026-11-06 the
+  harness imported the reviewed code into its own process and printed the result, so code that
+  printed `holds` and exited read `supported-in-scope`; the first fix then ran the page expression
+  in a child whose reported value that expression could forge over the same channel. Until
+  2026-11-07 a recognizer read the first `const page = …;` in `sidepanel.js` and summed raw
+  storage. A commented-out or unused copy of the expected line then held for a panel that drops
+  unassigned spend, and so did a `panel:get` that never hands the panel that spend. The independent
+  final review proved all three. Limits: Node calls its permission model a seat belt, not a
+  guarantee against malicious code, and code that escapes it runs as the operator's user; code
+  that detects the harness, for example by its Node globals, can make different chrome.storage
+  calls here than in Chrome; a Node without `--permission` can't start the reviewed code, so the
+  run reads as a harness error; the side panel's code is matched, not run, so how Chrome renders it
+  (DOM, CSS, timing of its refreshes) is not observed. The 50 ms IPC quiet checkpoint is a finite
+  observation bound, not a latency contract or proof that all asynchronous work finished. A Node
+  async hook in the device counts one-shot timers before the reviewed module loads; callbacks
+  that have fired or timers that have been cleared no longer count. A pending timer at a page
+  snapshot, or an additional unanswered helper request, yields uncertainty with no completed
+  frames. The count can only withhold judgement. Other unresolved promises and I/O, and code
+  that detects or alters its test environment, remain outside this completion check.
+  The harness's identity (`harnessDigest`)
+  covers all three files.
+  `card-spend` drives `extension/background.js` through draw → fail after spending → Retry →
+  Dismiss → late return, with chrome.* and the helper as controlled fixtures, and records the ledger,
+  card and side-panel page total it read after each action in `observed.frames` (the studio animates
+  only those; a record without frames has none to show). It holds when the ledger records both
+  calls and the page total rises by each call's usage as that call lands (`shownOnLanding`), so
+  the page is checked per call. A page that rises by less leaves that spend `unattributed`
+  (`fails`). A page that rises by more shows spend that was never paid, which is a harness
+  error. Until 2026-11-07 the check was the sum reported − shown before Dismiss − page after.
+  A panel:get that always showed $1 made the genuine gap hold under that sum, and a design that
+  keeps a dismissed card's spend on the page read `fails`. "Inside the checkout" is by path segment, for
+  the named path, its folder's real location and the file it reads, so `..profile.json` and links
+  are caught while a sibling `repo-profiles/` is not. Only a record that run
+  made counts as executed. A record read from a file is "reported", whatever its fields or digest say.
+  Each contract is `violated` (the harness failed at this repo, base, head, definition and
+  harness: **Needs you**), `unverified` (no run, no harness, reported-only, unrelated evidence, code
+  the harness can't drive, harness error, or governing text not found), `stale` (evidence bound to
+  something else), both **Look**, or `supported-in-scope` (held on the one scenario, which is not
+  proof) or `not-applicable`, neither of which adds a reason. Harnesses are local and free (footer).
+  `--coverage-out FILE` writes the result (`kind: 'contract-coverage'`) that the review studio reads
+  through `tools/review-studio/coverage.mjs`. Each obligation records the harness its contract
+  selected and that harness's digest (`check`). A stored result is integrity-checked, never
+  authenticated: its id and each executed record's id must match their content, and a `violated` or
+  `supported-in-scope` row must carry an executed record bound to the result's repository root, base
+  and head, the obligation's contract id and definition, and its selected harness, or the file is
+  refused. A stack attaches coverage to one comparison, the whole stack (target to tip) or the layer
+  it names. A report for another repository, head or base still shows, but every row reads `stale`
+  with its recorded status kept for inspection.
 - `.atlas/` is the reviewed repo's text, checked where it is read and never dropped silently: a
   `rules.md` heading that isn't `## Name` (one TLA+ word), a rule with no sentence, a repeated
   name, or prose with no rule heading is a "look" reason naming its line; a `model.json` of the

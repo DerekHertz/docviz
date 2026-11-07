@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "about": "Operator-selected contract profile for docviz's own extension: the accounting promise in CLAUDE.md and SPEC.md's Cost section. Passed explicitly with --contracts; never read from a reviewed checkout.",
+  "contracts": [
+    {
+      "id": "card-spend-accounting",
+      "title": "Every paid helper call stays attributed",
+      "condition": "A helper call reports usage, so it spent money",
+      "expectation": "The spend ledger records it, and a card's cost breakdown or the page's unassigned total carries it",
+      "violation": "The ledger grows while no card and no page total shows that spend",
+      "consequential": true,
+      "governing": [
+        { "path": "CLAUDE.md", "from": "- Every helper call must return `usage`", "to": "- Codex dollars" },
+        { "path": "SPEC.md", "from": "## Cost", "to": "## Also in v0" }
+      ],
+      "code": [
+        { "id": "callHelper", "path": "extension/background.js", "from": "async function callHelper(", "to": "// Every call is charged to the ledger" },
+        { "id": "generate", "path": "extension/background.js", "from": "async function generate(", "to": "// Simpler / More detail" },
+        { "id": "dismiss", "path": "extension/background.js", "from": "async function dismiss(", "to": "// ---------- optional highlight chip" },
+        { "id": "pageTotal", "path": "extension/sidepanel.js", "from": "const page = ", "to": "\n" }
+      ],
+      "dependsOn": ["extension/ledger.js", "extension/settings.js"],
+      "check": { "harness": "card-spend" }
+    }
+  ]
+}

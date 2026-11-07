@@ -1,0 +1,163 @@
+# Review changes with Docviz
+
+The standalone studio lets you review a system map, zoom into a change or a layer of a PR stack, and follow behavior through pseudocode, exact code, claims and evidence. Saved source context is separate from verification.
+
+## Start the studio
+
+From the Docviz repository root, generate the example and its cached baseline:
+
+```bash
+node tools/review-studio/examples/stack/prepare.mjs \
+  "$PWD" "$PWD/.scratch/review-studio" "$PWD/.scratch/review-captures"
+npm run review:studio
+```
+
+Open [the stack explorer](http://127.0.0.1:47840/stack.html). On macOS, you can also use `Launch Stack Studio.command` in this folder after generating the example. Node.js 22 or newer and Git are required. The studio has no package dependencies.
+
+The example reconstructs actual merged Docviz PRs #13–15. **Whole stack** compares the original target with the stack tip. Each layer compares its own parent and candidate. Click a capability for its inputs, outputs and source explanation. Follow **Pseudocode** to exact Git source, then inspect **Claims**, **Jev** and **Evidence**. Play recorded checkpoints or use the timeline.
+
+The 12 function captures use actual historical exports with controlled upstream findings. Three captured regression commands have 43 passing cases. They do not execute live TLC or Jev. No approval is recorded by viewing the explorer. The capture process uses isolated snapshots and confines import-time caches to its capture folder.
+
+## Try another PR against the cached map
+
+To prepare Docviz #16 and AfterClass #94, supply an existing AfterClass checkout with its TypeScript and React dependencies installed:
+
+```bash
+node tools/review-studio/examples/stack/prepare-trials.mjs \
+  "$PWD" /absolute/path/to/AfterClass \
+  "$PWD/.scratch/review-studio" "$PWD/.scratch/pr-trial-captures"
+```
+
+For Docviz alone, append `--docviz-only`; the AfterClass path is then unused. The adapter does not install dependencies or call model providers. The review selector lists generated comparisons.
+
+Use **Source context reused**, **Changed or new**, **Connected context** and **Unmapped changed files** to inspect the overlay. Filters retain surrounding context. Expand a claim for **What needs reverification**. Inspect **Evidence → Outstanding checks** for missing runtime checks. Recorded checkout and citation-control diagrams project captured fields; raw values remain inspectable.
+
+Docviz #16 reuses five descriptions and updates one. Its controlled replay selects the requested checkout after the change. The recorded regression command has 66 passes and 14 skips. AfterClass #94 reuses three descriptions and updates three. Actual React static renders show hidden and grouped citations. Browser interactions, CSS layout and Bun tests remain open. A separate full-project typecheck passed on the tested AfterClass checkout; the adapter captures only its component typecheck.
+
+## Reuse the stored system map
+
+Cached graph values are validated before storage and on read. Description fields must be strings, ports must be string arrays, and source ranges and graph endpoints must be valid. Extra sibling fields remain excluded. Source ranges are checked against their anchored Git blobs before a map is stored or reused. Valid version-1 maps retain their IDs; malformed cached records fail explicitly. Replay frames are loaded from fingerprint-verified immutable artifacts, so an altered inline copy cannot change a recorded output.
+
+Immutable snapshots live under `dataRoot/system-maps`. **Inspect stored copy** shows the revision, model ID and source fingerprints. New comparisons reference an exact baseline in the registered repository and overlay changed descriptions and connections. Competing models require an explicit map ID. There is no global latest-map fallback.
+
+Reused descriptions do not inherit claims, Jev results, tests or human decisions. Changed source, changed contracts and changed connections remain distinct. Recorded downstream connections identify potentially affected context; unmapped changes remain coverage gaps. The supplied graph is a partial source interpretation, not automatic exhaustive dependency discovery.
+
+## Test Jev before merge
+
+Jev now assesses whether the supplied source can establish or directly refute the claim before interpreting support or contradiction. Missing or unrelated source shows **Source context uncertain**, with an explanation and the recorded scores. A direct counterexample can still be a contradiction. Invalid or missing scores produce an incomplete check.
+
+New judgments record `source-context-v2`, the context/support/contradiction scores and their cutoffs. The context gate is provisional at 0.6; support at 0.6 and contradiction at 0.5 retain their existing cutoffs. These model scores and policies are not calibrated runtime guarantees. Earlier judgments retain their original result and criteria.
+
+Source context now expands whole anchor modules, declared supporting component code and bounded relative imports. **Inspect the source supplied to Jev** shows the included commits/blobs, omissions, limits and exact submitted packet. The selector can miss callers or runtime facts; expanding context does not guarantee a supported judgment. See [Architecture and verification](ARCHITECTURE.md) for the evidence boundaries.
+
+Set `TYPESAFE_API_KEY` only in the local server environment. The review workspace can request Jev source judgments for source-linked properties. No key is stored in Git. The stack explorer displays recorded Jev status and questions; it does not currently launch stack-claim checks. Live runs and independent verification are tied to their exact candidate. The PR records the latest results and remaining gaps. A source judgment remains separate from runtime and formal evidence.
+
+[Validation and limits](STANDALONE-VALIDATION.md) · [Agent review packages](AGENT-REVIEW.md)
+
+![AfterClass map and recorded behavior comparison](docs/afterclass-review.png)
+
+## Review inside GitHub
+
+Load the generated `github-extension` folder as an unpacked Chrome extension. It adds **Visual review** to PR pages and explicit same-repository branch comparisons. Keep the local engine running. See [the extension installation guide](extension/INSTALL.md).
+
+## Start the app
+
+Double-click **Launch Docviz.command** in this folder. Keep its Terminal window open while you use the app. If Docviz is already running, the launcher opens the existing workspace.
+
+Open [your review workspace](http://127.0.0.1:47836/). Node.js 22 or newer is required. The app has no package dependencies to install.
+
+To start from a terminal, run these commands in this folder:
+
+```sh
+node cli.mjs serve --open
+```
+
+Press Control-C in that terminal to stop the server. Your reviews remain in `data/` and reappear after a restart. Keep this app folder at its current location while using existing reviews, since repository paths are absolute.
+
+## Review a personal project
+
+1. Click **Open project / PR**.
+2. Choose a registered repository, or paste the absolute path to another Git repository.
+3. Choose a target branch and a candidate branch. Use the common-ancestor comparison for a change you plan to submit as a PR.
+4. Click **Enter the change world**. The map displays real changed files. Directory groupings remain provisional until you supply a component model.
+5. Select a bubble and click **Enter component**. Explore **Abstract**, **Concrete**, **Properties**, and **Implementation**. The source viewer reads pinned Git blobs, including unchanged files assigned to that component.
+6. Add a property yourself, or use **Agents & evidence** to request a component proposal. Inspect each proposal before applying it. Confirm the property definitions you intend to govern the review.
+7. Click a property title to inspect its condition, expectation, source references, evidence, and agent findings. Use **Record decision & return** to save its decision.
+8. In **Review change**, review each changed component, give every finding a disposition with a reason, and describe your review scope. A source review can retain behavioral gaps as explicit follow-ups.
+9. Acknowledge the evidence limitations, then click **Record review & prepare handoff**. Copy the PR handoff or download its Markdown and JSON receipt.
+
+Register your own projects in the workspace. Runtime review records and agent contributions are local data; they are not included in the source checkout. No project is pre-approved.
+
+## Run a verification command
+
+Click **Run a local check** in **Agents & evidence**. Enter the command as a JSON argument list, such as `["node","--test","test/dismiss.test.mjs"]`.
+
+Choose **Isolated copy of this reviewed commit** to run another branch without switching your own checkout. The app creates a detached local copy in `data/checkouts/`. It does not install dependencies. You can run your project's dependency setup command there when needed, then run the tests.
+
+Choose **Current project checkout** if you need its existing dependencies or local configuration. Its HEAD must match the reviewed candidate, and tracked files must be clean. The app records the command, output, exit code, execution folder, and checkout fingerprints.
+
+A passing command establishes only that command's result. To attach an explicit executed assertion to a property, select the property in the command form and have the check print:
+
+```text
+DOCVIZ_OBSERVATION {"propertyId":"your-property-id","result":"holds","assertion":"the condition and result actually checked"}
+```
+
+Allowed observation results are `holds`, `fails`, and `unknown`. The raw output remains available for inspection. Editing a property makes evidence for its earlier definition historical. A failed check or contradictory judgment adds a finding that requires a disposition.
+
+## Work with your agents
+
+The app detects existing `claude` and `codex` commands. **Run agent analysis** uses their existing CLI login and configured default model. Choose the author, reviewer, or verifier role. Context is sent only when you request analysis. Agent runs propose source interpretations; they do not execute tests.
+
+For an agent outside this app, use **Export context & schema**, then **Import agent package**. See [the agent review guide](AGENT-REVIEW.md).
+
+Jev is optional. To enable it, set `TYPESAFE_API_KEY` in the environment used to start the server. Jev checks source claims, and its results remain model judgments. Each requested run retains its submitted source packet and scores. The key stays in the operator-started server environment.
+
+## Continue after new commits
+
+Click **Check for new commits**. If either selected ref changes, Docviz opens a fresh comparison with its own decisions. The earlier review remains in history. A historical receipt cannot authorize a newer candidate.
+
+The receipt records local human judgment, exact commits, model definitions, evidence, findings, and acknowledged gaps. It is not an authenticated signature. It does not create or merge a PR. Submit the exported handoff through your normal GitHub workflow and run integration CI against the current target branch.
+
+## Open GitHub PRs
+
+Use the **GitHub PR** tab in **Open project / PR**. Public PRs work without a GitHub token. The app fetches their refs into a local Git cache.
+
+For private projects, use your local checkout. A valid `GH_TOKEN` or `GITHUB_TOKEN` in the server environment enables authenticated metadata requests. Git fetch uses your normal Git credentials. The app does not repair the separate `gh` CLI login.
+
+## Back up or troubleshoot
+
+Keep `data/` to preserve your registry, review documents, immutable artifacts, history, job results, and receipts. Keep `.cache/` for cached Git repositories. Do not publish those folders as application source, since reviews and agent context can contain project code.
+
+If an agent fails, its job error appears in **Agents & evidence**. Source review, manual properties, and package import remain available. If a command changes tracked files in an isolated copy, inspect that copy before running another check; Docviz will not silently restore it.
+
+The app listens only on `127.0.0.1`. To use another port, set `DOCVIZ_REVIEW_PORT` before starting it. The macOS launcher uses the default port.
+
+To verify the implementation, run:
+
+```sh
+npm test
+```
+
+[Architecture](ARCHITECTURE.md) describes the source and persistence boundaries. The earlier historical prototype remains in the sibling `docviz-review` folder.
+
+## Play the behavior changes in PR #18
+
+The workspace opens a behavior diagram when exactly one prepared stack matches its repository, base and candidate. Select a module, play the recorded input → transformation → output, then click the output for its claim, visual assertion, implementation/test lines and raw capture. Other modules expose their inputs, outputs and source without borrowing a scenario from elsewhere.
+
+Prepare the Docviz example from the repository root:
+
+```sh
+git fetch origin pull/1/head:refs/docviz/pr1/head
+node tools/review-studio/examples/stack/prepare-pr18.mjs \
+  "$PWD" .scratch/review-studio .scratch/pr18-captures "$(git rev-parse HEAD)"
+node tools/review-studio/examples/stack/prepare-pr1.mjs \
+  "$PWD" .scratch/review-studio --coverage <pr1TargetCoverage printed above>
+node tools/review-studio/examples/stack/open-pr18.mjs \
+  "$PWD" .scratch/review-studio "$(git rev-parse HEAD)"
+```
+
+The candidate must include the contract route (`helper/contracts.js`). **Whole PR** shows the studio added and the CLI review changed: `Docviz PR review → Contract assessment → PR verdict`, with the coverage record read by the studio's execution evidence. **Review fixes inside this PR** compares the initial PR checkpoint with the candidate. These are two checkpoints of PR #18, not two stacked PRs.
+
+The reviewer comparison (`Docviz PR review` module) runs each PR18 revision's own `helper/cli.js` as a process on one frozen target: PR #1 `595f590 → 8967e5d`, the author's five unchanged steps (sha256 `385578d3…`), the candidate's `card-spend` profile, `--no-check`, and explicit `--trust-head` for that pinned head only. Lanes name the TOOL revision apart from the TARGET. The base and initial CLIs print **Look when you can** and write no coverage; that absence is recorded, never a fabricated violation. The candidate executes `card-spend-accounting` and prints **Needs you**. This changes the review of PR #1, not PR #1's behavior. PR #1's coverage record stays nested regression evidence and opens through the target link in its own review; it is never PR #18's coverage.
+
+The rerunnable studio cases demonstrate malformed cache rejection, source-context uncertainty, expansion of a clipped anchor into its helper/threshold definitions, and canonical evidence display. Source-context cases intercept provider responses to inspect real routing and outgoing packets. Canonical evidence uses supplied records. These are not live Jev judgments or an executed failing command. Captures bind their harness, exact Git blobs, inputs and outputs. The semantic map is curated source interpretation; it does not claim exhaustive dependency or runtime coverage. Missing captures, incompatible harnesses and historical source judgments remain explicit.

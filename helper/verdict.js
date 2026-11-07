@@ -26,6 +26,10 @@ export const TABLE = [
     when: (f) => (f.kind === 'rule' || f.kind === 'extra-rule') && f.status === 'breaks',
     text: (f) => `${f.name} breaks in ${f.model}${last(f.path)}${f.kind === 'extra-rule' ? ' (the model checks it; it isn’t in your rules.md)' : ''}`,
     ref: (f) => f.model },
+  { kind: 'contract-violated', level: 'needs', // docviz's own harness, run at this head, observed the contract fail (helper/contracts.js)
+    when: (f) => f.kind === 'contract' && f.status === 'violated',
+    text: (f) => `${f.title} (\`${f.id}\`) fails at this head: ${f.detail}${f.omittedBySummary ? '; the summary leaves it out' : ''}`,
+    ref: (f) => f.id },
   { kind: 'contradicted', level: 'needs', // a PR step or model step contradicted by its code (Jev ✗)
     when: (f) => f.kind === 'step' && f.verdict === 'flag',
     text: (f) => `${stepName(f)} is contradicted by its code`, ref: (f) => f.id },
@@ -54,6 +58,10 @@ export const TABLE = [
   { kind: 'behavior-changed', level: 'look', // behavior changed (Delta.changed) with rules holding
     when: (f) => f.kind === 'delta' && f.changed === true,
     text: (f) => `${f.model} behaves differently: ${changes(f)}`, ref: (f) => f.model },
+  { kind: 'contract-unverified', level: 'look', // a contract that applies with no current executed evidence: missing is never "nothing", never a violation
+    when: (f) => f.kind === 'contract' && (f.status === 'unverified' || f.status === 'stale'),
+    text: (f) => `\`${f.id}\`: ${f.detail}${f.omittedBySummary ? ' (the summary leaves it out)' : ''}`,
+    ref: (f) => f.id, group: () => 'Contracts not checked at this head' },
   { kind: 'step-unconfirmed', level: 'look', // a step ⚠ review, or unchecked (no key, Jev error)
     when: (f) => f.kind === 'step' && f.verdict !== 'pass',
     text: (f) => (f.verdict === 'review' ? `${stepName(f)} claims more than its code shows (⚠ review)` : `${stepName(f)} not checked: ${f.error || 'no answer'}`),
@@ -82,7 +90,8 @@ export const TABLE = [
     })[f.kind](),
     ref: (f) => f.model || f.name },
   { kind: 'fine', level: 'nothing', // none of the above
-    when: (f) => (f.kind === 'rule' && (f.status === 'holds' || f.status === 'untouched')) || (f.kind === 'step' && f.verdict === 'pass') || (f.kind === 'delta' && f.changed === false),
+    when: (f) => (f.kind === 'rule' && (f.status === 'holds' || f.status === 'untouched')) || (f.kind === 'step' && f.verdict === 'pass') || (f.kind === 'delta' && f.changed === false)
+      || (f.kind === 'contract' && (f.status === 'supported-in-scope' || f.status === 'not-applicable')),
     text: () => '' },
 ];
 
